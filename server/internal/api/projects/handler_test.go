@@ -281,3 +281,72 @@ func TestCreate_RejectsAnOverlongDescription(t *testing.T) {
 		t.Fatalf("error must name the limit, body=%s", rr.Body.String())
 	}
 }
+
+// GET /api/projects must include each project's folder paths.
+//
+// They are the only reliable way to associate a running agent with a project:
+// Agent.projectName is just basename(cwd), which collides across unrelated
+// checkouts, so a consumer has to match agent.cwd against real folder paths.
+// The list already eager-loads the folders edge (WithFolders) for its count, so
+// returning them costs no additional query and creates no N+1.
+func TestList_IncludesFolderPaths(t *testing.T) {
+	h := newTestHandler(t, false)
+	id := seedProject(t, h)
+	if _, err := h.folders.Create(context.Background(), id, "/gh/Proj", nil, true); err != nil {
+		t.Fatalf("seed folder: %v", err)
+	}
+
+	req := withJWT(t, httptest.NewRequest("GET", "/api/projects", nil), false)
+	rr := httptest.NewRecorder()
+	authedRouter(h).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", rr.Code, rr.Body.String())
+	}
+
+	var got []projectView
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("projects = %d, want 1", len(got))
+	}
+	if got[0].FolderCount == nil || *got[0].FolderCount != 1 {
+		t.Fatalf("folderCount = %v, want 1", got[0].FolderCount)
+	}
+	if len(got[0].Folders) != 1 {
+		t.Fatalf("folders = %d, want 1 — the list must expose paths, not just a count", len(got[0].Folders))
+	}
+	if got[0].Folders[0].Path != "/gh/Proj" {
+		t.Fatalf("folder path = %q, want /gh/Proj", got[0].Folders[0].Path)
+	}
+	if got[0].Folders[0].ProjectID != id {
+		t.Fatalf("folder projectId = %q, want %q", got[0].Folders[0].ProjectID, id)
+	}
+}
+
+// A project with no folders must report an empty list rather than being
+// omitted: the consumer distinguishes "no folders registered" (association
+// unknowable) from "folders exist but no agent is inside them" (a real zero).
+func TestList_ProjectWithoutFoldersHasEmptyList(t *testing.T) {
+	h := newTestHandler(t, false)
+	seedProject(t, h)
+
+	req := withJWT(t, httptest.NewRequest("GET", "/api/projects", nil), false)
+	rr := httptest.NewRecorder()
+	authedRouter(h).ServeHTTP(rr, req)
+
+	var got []projectView
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("projects = %d, want 1", len(got))
+	}
+	if got[0].FolderCount == nil || *got[0].FolderCount != 0 {
+		t.Fatalf("folderCount = %v, want 0", got[0].FolderCount)
+	}
+	if len(got[0].Folders) != 0 {
+		t.Fatalf("folders = %d, want 0", len(got[0].Folders))
+	}
+}
