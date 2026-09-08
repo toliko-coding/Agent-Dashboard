@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useProjects } from '@/composables/useProjects'
 import { useSystemResources } from '@/composables/useSystemResources'
 import { useAgents } from '@/features/agents'
+import { useLocalScopeSummary } from '@/features/localscope'
 import CockpitPanel from './CockpitPanel.vue'
 
 /*
@@ -22,6 +23,20 @@ const emit = defineEmits<{ navigate: [view: 'dashboard' | 'projects' | 'localsco
 const { agents } = useAgents({ autoStart: false })
 const { projects } = useProjects()
 const resources = useSystemResources()
+
+// LocalScope drives the three right-hand nodes. When its collector is running
+// they carry real counts; when it is absent they stay dashed and say so.
+const localScope = useLocalScopeSummary()
+const lsConnected = computed(() => localScope.reachable.value === true)
+
+/** LocalScope reports null for "not collected"; only a number is a real count. */
+function collectorNode(count: number | null | undefined, unit: string) {
+  if (!lsConnected.value)
+    return { sub: 'Not connected', available: false }
+  if (count === null || count === undefined)
+    return { sub: 'Not collected', available: false }
+  return { sub: `${count} ${unit}`, available: true }
+}
 
 const machineLabel = computed(() => resources.info.value?.cpu.model?.trim() || 'Local machine')
 
@@ -57,19 +72,27 @@ const sources = computed<MapNode[]>(() => [
   {
     id: 'localscope',
     label: 'LocalScope',
-    sub: 'Not connected',
-    available: false,
+    sub: lsConnected.value ? 'Connected' : 'Not connected',
+    available: lsConnected.value,
     x: 12,
     y: 158,
     view: 'localscope',
   },
 ])
 
-const outputs = computed<MapNode[]>(() => [
-  { id: 'services', label: 'Local Services', sub: 'Not collected', available: false, x: 400, y: 22 },
-  { id: 'emulators', label: 'Emulators', sub: 'Not collected', available: false, x: 400, y: 90 },
-  { id: 'network', label: 'Network', sub: 'Not collected', available: false, x: 400, y: 158 },
-])
+const outputs = computed<MapNode[]>(() => {
+  const s = localScope.data.value
+  const services = collectorNode(s?.services.running, 'listening')
+  const devices = collectorNode(s?.devices.connected, 'connected')
+  // Network has no collector even when LocalScope runs, so this stays dashed
+  // until that lands — driven by its own null, not hardcoded here.
+  const network = collectorNode(s?.network.active, 'active')
+  return [
+    { id: 'services', label: 'Local Services', ...services, x: 400, y: 22 },
+    { id: 'emulators', label: 'Devices', ...devices, x: 400, y: 90 },
+    { id: 'network', label: 'Network', ...network, x: 400, y: 158 },
+  ]
+})
 
 const NODE_W = 150
 const NODE_H = 46
@@ -118,9 +141,9 @@ function curveFromHub(to: { x: number, y: number }): string {
             v-for="n in outputs"
             :key="`edge-out-${n.id}`"
             :d="curveFromHub(n)"
-            stroke="var(--line-strong)"
-            stroke-dasharray="4 4"
-            :opacity="0.5"
+            :stroke="n.available ? 'var(--accent)' : 'var(--line-strong)'"
+            :stroke-dasharray="n.available ? undefined : '4 4'"
+            :opacity="n.available ? 0.75 : 0.5"
           />
         </g>
 
@@ -162,9 +185,11 @@ function curveFromHub(to: { x: number, y: number }): string {
         <g v-for="n in outputs" :key="n.id" :data-testid="`map-node-${n.id}`" :data-available="n.available">
           <rect
             :x="n.x" :y="n.y" :width="NODE_W" :height="NODE_H" rx="8"
-            fill="var(--card)" stroke="var(--line)" stroke-dasharray="4 4"
+            fill="var(--card)"
+            :stroke="n.available ? 'var(--line-strong)' : 'var(--line)'"
+            :stroke-dasharray="n.available ? undefined : '4 4'"
           />
-          <text :x="n.x + 12" :y="n.y + 20" fill="var(--fg-faint)" font-size="12" font-weight="600">{{ n.label }}</text>
+          <text :x="n.x + 12" :y="n.y + 20" :fill="n.available ? 'var(--fg)' : 'var(--fg-faint)'" font-size="12" font-weight="600">{{ n.label }}</text>
           <text :x="n.x + 12" :y="n.y + 35" fill="var(--fg-faint)" font-size="10">{{ n.sub }}</text>
         </g>
       </svg>

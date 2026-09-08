@@ -6,6 +6,13 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 const DASHBOARD_PORT = process.env.DASHBOARD_PORT || '13120'
+// LocalScope's collector. Default matches its own config.ts (LOCALSCOPE_PORT,
+// default 7317). It binds 127.0.0.1 and answers with
+// `Access-Control-Allow-Origin: null`, so the browser cannot call it directly —
+// it must be reached through a same-origin proxy. In production the Go server
+// does the same job (see server/internal/api/localscope).
+const LOCALSCOPE_PORT = process.env.LOCALSCOPE_PORT || '7317'
+const LOCALSCOPE_PREFIX_RE = /^\/localscope/
 const VITE_DEV_PORT = Number(process.env.VITE_DEV_PORT) || 5173
 const DESKTOP_DEV_NONCE = process.env.DESKTOP_DEV_NONCE || ''
 
@@ -143,6 +150,20 @@ export default defineConfig(({ mode }) => ({
               return
             console.error('[vite proxy]', err)
           })
+        },
+      },
+      // LocalScope collector, proxied under our own origin. The rewrite strips
+      // the prefix so `/localscope/api/system/summary` reaches the collector as
+      // `/api/system/summary`. changeOrigin makes the Host header name
+      // 127.0.0.1, which its DNS-rebinding guard (api/host.ts) requires.
+      // ECONNREFUSED is expected and silent: the collector is optional, and the
+      // UI renders "not connected" rather than an error when it is absent.
+      '/localscope': {
+        target: `http://127.0.0.1:${LOCALSCOPE_PORT}`,
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(LOCALSCOPE_PREFIX_RE, ''),
+        configure: (proxy) => {
+          proxy.on('error', () => {})
         },
       },
       '/auth': {
