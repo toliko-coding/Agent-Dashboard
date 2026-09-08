@@ -130,3 +130,71 @@ describe('agentModal session context', () => {
     expect(w.html()).not.toContain('agent-terminal')
   })
 })
+
+/*
+ * Phase 3 details-panel behaviour. The honesty cases matter most: the reference
+ * design showed Pause / Stop and a "Phase N/7", none of which the backend can
+ * support for a plain spawned agent.
+ */
+describe('agentModal — details panel', () => {
+  function overview(agent: Agent = baseAgent) {
+    const w = mountModal(agent)
+    return w
+  }
+
+  it('opens on the transcript tab so replying stays the default', () => {
+    const w = overview()
+    expect(w.get('[data-testid="agent-tab-transcript"]').attributes('aria-selected')).toBe('true')
+    expect(w.get('[data-testid="agent-tab-overview"]').attributes('aria-selected')).toBe('false')
+  })
+
+  it('switches to the overview tab', async () => {
+    const w = overview()
+    await w.get('[data-testid="agent-tab-overview"]').trigger('click')
+    expect(w.find('[data-testid="agent-overview-tab"]').exists()).toBe(true)
+  })
+
+  it('exposes no pause or stop action — no such endpoint exists', async () => {
+    const w = overview()
+    await w.get('[data-testid="agent-tab-overview"]').trigger('click')
+    const text = w.text().toLowerCase()
+    expect(text).not.toContain('pause')
+    expect(text).not.toContain('stop')
+  })
+
+  // A "Phase 3/7" for a plain agent would be invented; only pipeline-linked
+  // agents have a real stage. TodoWrite items are shown as tasks instead.
+  it('omits progress entirely when the session wrote no TodoWrite items', async () => {
+    const w = overview()
+    await w.get('[data-testid="agent-tab-overview"]').trigger('click')
+    expect(w.find('[data-testid="agent-task-progress"]').exists()).toBe(false)
+    expect(w.text().toLowerCase()).not.toContain('phase')
+  })
+
+  it('shows task progress as a completed ratio, never as a phase', async () => {
+    const w = overview({
+      ...baseAgent,
+      tasks: [
+        { id: '1', subject: 'a', status: 'completed' },
+        { id: '2', subject: 'b', status: 'completed' },
+        { id: '3', subject: 'c', status: 'in_progress' },
+      ],
+    } as Agent)
+    await w.get('[data-testid="agent-tab-overview"]').trigger('click')
+    const progress = w.get('[data-testid="agent-task-progress"]')
+    expect(progress.text()).toContain('2 / 3 completed')
+    expect(progress.text().toLowerCase()).not.toContain('phase')
+  })
+
+  it('warns that a session started outside the dashboard resumes rather than injects', async () => {
+    const w = overview({ ...baseAgent, liveInjectable: false } as Agent)
+    await w.get('[data-testid="agent-tab-overview"]').trigger('click')
+    expect(w.find('[data-testid="agent-resume-note"]').exists()).toBe(true)
+  })
+
+  it('says a remote session cannot be messaged instead of offering a dead box', async () => {
+    const w = overview({ ...baseAgent, machine: 'build-box' } as Agent)
+    await w.get('[data-testid="agent-tab-overview"]').trigger('click')
+    expect(w.get('[data-testid="agent-unreachable-note"]').text()).toContain('build-box')
+  })
+})

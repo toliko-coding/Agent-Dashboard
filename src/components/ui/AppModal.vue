@@ -15,13 +15,30 @@ const props = withDefaults(defineProps<{
   size?: 'standard' | 'auto'
   /** Width for the standard panel (px string like "560px" or CSS class). Defaults to 900px. */
   width?: string
+  /**
+   * Where the panel sits against the backdrop.
+   * - `center` (default): the classic centred dialog.
+   * - `end`: a full-height drawer flush to the inline end (right in LTR). The
+   *   slot supplies its own width and chrome, so this pairs with size="auto".
+   * Kept here rather than in a separate drawer component so side panels reuse
+   * this one's focus trap, escape handling, scroll lock and transition.
+   */
+  placement?: 'center' | 'end'
 }>(), {
   zIndex: 200,
   size: 'standard',
   width: '900px',
+  placement: 'center',
 })
 
 const emit = defineEmits<{ close: [] }>()
+
+// Backdrop layout. `end` stretches the panel full-height against the right edge
+// and drops the inset padding so the drawer meets the viewport edge.
+const backdropLayout = computed(() => props.placement === 'end'
+  ? 'items-stretch justify-end'
+  : 'items-center justify-center p-4')
+
 // Chrome for the standard size. `auto` is a transparent passthrough.
 const STANDARD_CHROME = 'bg-card border border-line rounded-xl shadow-modal overflow-hidden flex flex-col'
 const panelClass = computed(() => (props.size === 'standard' ? STANDARD_CHROME : ''))
@@ -108,10 +125,11 @@ function trapFocus(event: KeyboardEvent) {
 
 <template>
   <Teleport to="body">
-    <Transition name="dialog">
+    <Transition :name="placement === 'end' ? 'drawer' : 'dialog'">
       <div
         v-if="open"
-        class="fixed inset-0 flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm"
+        class="fixed inset-0 flex bg-black/55 backdrop-blur-sm"
+        :class="backdropLayout"
         :style="{ zIndex }"
         role="dialog"
         aria-modal="true"
@@ -152,5 +170,24 @@ function trapFocus(event: KeyboardEvent) {
 .dialog-leave-to .base-modal-box {
   transform: scale(0.95);
   opacity: 0;
+}
+
+/* placement="end": the panel slides in from the edge instead of scaling, which
+   reads as a drawer rather than a dialog that happens to be flush right. */
+.drawer-enter-active,
+.drawer-leave-active {
+  transition: opacity var(--duration-base) var(--ease-standard, ease);
+}
+.drawer-enter-active .base-modal-box,
+.drawer-leave-active .base-modal-box {
+  transition: transform var(--duration-base) var(--ease-standard, ease);
+}
+.drawer-enter-from,
+.drawer-leave-to {
+  opacity: 0;
+}
+.drawer-enter-from .base-modal-box,
+.drawer-leave-to .base-modal-box {
+  transform: translateX(100%);
 }
 </style>

@@ -28,6 +28,46 @@ const promptInputRef = ref<InstanceType<typeof PromptInput> | null>(null)
 const chatStreamRef = ref<InstanceType<typeof AgentChatStream> | null>(null)
 const showMetrics = ref(false)
 
+/*
+ * Tabs. Deliberately two, not the four in the reference design:
+ *
+ * - "Files" would need a per-agent file list. `meta` carries only counts
+ *   (filesModified / linesAdded / linesRemoved) and no endpoint returns paths,
+ *   so the tab could only be populated by inventing them.
+ * - "Settings" would need per-agent configuration. Spawners are global and an
+ *   agent has no editable fields, so there is nothing to put there.
+ *
+ * Both are omitted rather than shipped empty.
+ */
+type PanelTab = 'overview' | 'transcript'
+const activeTab = ref<PanelTab>('transcript')
+const TABS: { value: PanelTab, label: string }[] = [
+  { value: 'overview', label: 'Overview' },
+  { value: 'transcript', label: 'Transcript' },
+]
+
+/*
+ * TodoWrite items the session wrote, used as genuine task progress. These are
+ * NOT phases: the count is whatever the agent last wrote, so labelling them
+ * "Phase 3/7" would imply a fixed pipeline that does not exist. A real phase
+ * number is only available for a pipeline-linked agent (pipelineTaskId).
+ */
+const taskProgress = computed(() => {
+  const tasks = props.agent?.tasks ?? []
+  if (tasks.length === 0)
+    return null
+  const done = tasks.filter(t => t.status === 'completed').length
+  return { done, total: tasks.length, pct: Math.round((done / tasks.length) * 100) }
+})
+
+/*
+ * Whether a typed message can actually reach this session. `liveInjectable`
+ * means a pty broker or tmux backing exists; without it PromptInput falls back
+ * to resuming the session, which is a different and heavier action. Sessions on
+ * a remote machine cannot be reached from here at all.
+ */
+const canMessage = computed(() => !!props.agent && !props.agent.machine)
+
 const hasContext = computed(() => {
   const a = props.agent
   if (!a)
@@ -78,19 +118,47 @@ watch(() => props.agent?.sessionId, (sessionId) => {
 </script>
 
 <template>
-  <AppModal :open="!!agent" :z-index="1000" :labelled-by="agent ? `agent-modal-title-${agent.pid}` : undefined" @close="emit('close')">
-    <template v-if="agent">
-      <div class="bg-raised px-4 py-2.5 flex justify-between items-center flex-shrink-0">
+  <AppModal
+    :open="!!agent"
+    :z-index="1000"
+    size="auto"
+    placement="end"
+    :labelled-by="agent ? `agent-modal-title-${agent.pid}` : undefined"
+    @close="emit('close')"
+  >
+    <!--
+      Side drawer rather than a centred dialog: selecting an agent should not
+      cover the roster it was selected from. Full height, capped width, and it
+      falls back to the full viewport width on small screens.
+    -->
+    <div
+      v-if="agent"
+      data-testid="agent-details-panel"
+      class="w-screen sm:w-[min(560px,100vw)] h-full bg-card border-l border-line shadow-modal flex flex-col overflow-hidden"
+    >
+      <!-- Two rows: the drawer is narrower than the old centred dialog, so the
+           metrics line sits under the identity rather than wrapping through it. -->
+      <div class="bg-raised px-4 py-2.5 flex flex-col gap-1.5 flex-shrink-0">
         <div class="flex items-center gap-2.5 min-w-0">
           <AppBadge :variant="agentDisplayStatus(agent)" />
-          <span class="mr-1" aria-hidden="true">{{ getIdentity(agent.projectPath).emoji }}</span>
-          <span :id="`agent-modal-title-${agent.pid}`" class="font-semibold text-sm text-fg">{{ agent.projectName }}</span>
+          <span aria-hidden="true">{{ getIdentity(agent.projectPath).emoji }}</span>
+          <span :id="`agent-modal-title-${agent.pid}`" class="font-semibold text-sm text-fg truncate">{{ agent.projectName }}</span>
           <MachineBadge v-if="agent.machine" :machine="agent.machine" />
-          <span class="text-[11px] font-mono text-fg-mute whitespace-nowrap">{{ shortModel(agent.model ?? null) }} · {{ formatCost(agent.costEstimate) }} · {{ formatTokens(totalTokens) }} tok · {{ formatUptime(agent.uptime) }}</span>
+          <button
+            type="button"
+            aria-label="Close"
+            class="ml-auto shrink-0 bg-transparent border-none text-fg-mute text-base cursor-pointer px-2 py-1 rounded hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+            @click="emit('close')"
+          >
+            ✕
+          </button>
+        </div>
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="text-[11px] font-mono text-fg-mute truncate">{{ shortModel(agent.model ?? null) }} · {{ formatCost(agent.costEstimate) }} · {{ formatTokens(totalTokens) }} tok · {{ formatUptime(agent.uptime) }}</span>
           <!-- The breakdown behind the same affordance the card uses, instead of a
                token table nested two levels deep in a drawer. -->
           <span
-            class="relative"
+            class="relative shrink-0"
             @mouseenter="showMetrics = true"
             @mouseleave="showMetrics = false"
             @focusin="showMetrics = true"
@@ -106,11 +174,32 @@ watch(() => props.agent?.sessionId, (sessionId) => {
             <MetricsPopover v-if="showMetrics" :agent="agent" />
           </span>
         </div>
-        <div class="flex items-center gap-2 flex-shrink-0">
-          <button type="button" aria-label="Close" class="bg-transparent border-none text-fg-mute text-base cursor-pointer px-2 py-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-fg" @click="emit('close')">
-            ✕
-          </button>
-        </div>
+      </div>
+
+      <!-- Tabs are hidden while a subagent transcript is open: that view has its
+           own back affordance and belongs to neither tab. -->
+      <div
+        v-if="!openSubagent"
+        class="flex items-center gap-1 px-3 border-b border-line flex-shrink-0"
+        role="tablist"
+        aria-label="Agent detail sections"
+      >
+        <button
+          v-for="t in TABS"
+          :key="t.value"
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === t.value"
+          :tabindex="activeTab === t.value ? 0 : -1"
+          :data-testid="`agent-tab-${t.value}`"
+          class="px-3 h-8 text-[12px] border-b-2 -mb-px transition-colors duration-[var(--duration-fast)] ease-standard focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent rounded-t"
+          :class="activeTab === t.value
+            ? 'border-accent text-accent font-semibold'
+            : 'border-transparent text-fg-mute hover:text-fg'"
+          @click="activeTab = t.value"
+        >
+          {{ t.label }}
+        </button>
       </div>
       <CrossLinkBanner
         v-if="agent.pipelineTaskId"
@@ -139,6 +228,97 @@ watch(() => props.agent?.sessionId, (sessionId) => {
           class="flex-1 min-h-0 overflow-y-auto p-4"
         />
       </template>
+      <template v-else-if="activeTab === 'overview'">
+        <div data-testid="agent-overview-tab" class="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
+          <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[12px]">
+            <dt class="text-fg-faint">
+              Project
+            </dt>
+            <dd class="font-mono text-fg-soft truncate" :title="agent.projectPath">
+              {{ agent.projectPath }}
+            </dd>
+            <dt class="text-fg-faint">
+              Session
+            </dt>
+            <dd class="font-mono text-fg-soft truncate">
+              {{ agent.sessionId }}
+            </dd>
+            <dt class="text-fg-faint">
+              Process
+            </dt>
+            <dd class="font-mono text-fg-soft">
+              pid {{ agent.pid }} · {{ agent.provider }}
+            </dd>
+            <dt class="text-fg-faint">
+              Spawner
+            </dt>
+            <dd class="font-mono text-fg-soft truncate">
+              {{ agent.spawnerName ?? '—' }}
+            </dd>
+            <dt class="text-fg-faint">
+              Health
+            </dt>
+            <dd class="font-mono text-fg-soft">
+              {{ agent.healthScore }}/100
+            </dd>
+          </dl>
+
+          <!-- TodoWrite progress, shown only when the session actually wrote
+               items. Labelled "Tasks", never "Phase" — see taskProgress. -->
+          <div v-if="taskProgress" data-testid="agent-task-progress" class="flex flex-col gap-1.5">
+            <div class="flex items-baseline gap-2">
+              <span class="text-[10px] uppercase tracking-wider text-fg-faint font-bold">Tasks</span>
+              <span class="ml-auto text-[11px] font-mono tabular-nums text-fg-soft">
+                {{ taskProgress.done }} / {{ taskProgress.total }} completed
+              </span>
+            </div>
+            <span class="h-1.5 bg-raised rounded-full overflow-hidden">
+              <span
+                class="block h-full rounded-full bg-accent transition-[width] duration-[var(--duration-base)] ease-standard"
+                :style="{ width: `${taskProgress.pct}%` }"
+              />
+            </span>
+          </div>
+
+          <div v-if="agent.currentAction" class="flex flex-col gap-1">
+            <span class="text-[10px] uppercase tracking-wider text-fg-faint font-bold">Current action</span>
+            <span class="text-[12px] font-mono text-fg-soft">{{ agent.currentAction }}</span>
+          </div>
+
+          <!-- Recent output, terminal-styled. Real transcript text only; the
+               full history lives in the Transcript tab. -->
+          <div class="flex flex-col gap-1 min-h-0">
+            <span class="text-[10px] uppercase tracking-wider text-fg-faint font-bold">Recent output</span>
+            <pre
+              v-if="agent.lastOutput"
+              data-testid="agent-recent-output"
+              class="text-[11px] font-mono text-fg-mute bg-app border border-line rounded-md p-3 whitespace-pre-wrap break-words max-h-64 overflow-y-auto"
+            >{{ agent.lastOutput }}</pre>
+            <p v-else class="text-[12px] text-fg-faint italic">
+              No output yet
+            </p>
+          </div>
+
+          <!--
+            Actions are limited to what the backend supports. There is no pause
+            and no stop endpoint for an agent process, so no such buttons exist
+            here; dismissing a finished agent and messaging a reachable one are
+            the real capabilities.
+          -->
+          <div class="flex flex-col gap-1">
+            <span class="text-[10px] uppercase tracking-wider text-fg-faint font-bold">Actions</span>
+            <p v-if="canMessage" class="text-[11px] text-fg-mute">
+              Use the message box below to send this session a prompt.
+            </p>
+            <p v-else data-testid="agent-unreachable-note" class="text-[11px] text-warning-text">
+              This session runs on {{ agent.machine }} and cannot be messaged from here.
+            </p>
+            <p v-if="!agent.liveInjectable && canMessage" data-testid="agent-resume-note" class="text-[11px] text-fg-faint">
+              It was not started by the dashboard, so sending resumes the session in a new process rather than typing into the running one.
+            </p>
+          </div>
+        </div>
+      </template>
       <template v-else>
         <!-- Session context: what you read while reading the transcript. -->
         <div
@@ -160,6 +340,6 @@ watch(() => props.agent?.sessionId, (sessionId) => {
       </template>
       <PromptInput v-if="!agent.machine" ref="promptInputRef" :agent="agent" variant="full" :approve-handler="approveHandler" @message-sent="onMessageSent" />
       <PluginSlot name="agent-modal-footer" :ctx="{ agent }" />
-    </template>
+    </div>
   </AppModal>
 </template>
