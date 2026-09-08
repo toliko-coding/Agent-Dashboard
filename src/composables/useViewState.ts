@@ -17,7 +17,8 @@ export type ActiveView
     | 'cost' | 'eval'
 export type DashboardLayout = 'cards' | 'list'
 
-const ACTIVE_VIEWS: ActiveView[] = [
+/** Every valid view id. Exported so callers can assert a destination is real. */
+export const ACTIVE_VIEWS: ActiveView[] = [
   'cockpit',
   'dashboard',
   'projects',
