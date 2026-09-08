@@ -321,7 +321,7 @@ onMounted(() => usageComposable.start())
           Error: {{ error }}
         </p>
 
-        <CockpitView v-else-if="activeView === 'cockpit'" />
+        <CockpitView v-else-if="activeView === 'cockpit'" @new-agent="showSpawnDialog = true" />
 
         <DashboardView
           v-else-if="activeView === 'dashboard'"
