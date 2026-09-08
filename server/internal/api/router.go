@@ -31,6 +31,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/grants"
 	apihistory "github.com/lx-wnk/agent-dashboard/server/internal/api/history"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/hooks"
+	"github.com/lx-wnk/agent-dashboard/server/internal/api/localscope"
 	apimemory "github.com/lx-wnk/agent-dashboard/server/internal/api/memory"
 	apiobsidian "github.com/lx-wnk/agent-dashboard/server/internal/api/obsidian"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/onboarding"
@@ -107,6 +108,9 @@ type RouterConfig struct {
 	// AuthRateLimiterConfig configures the per-IP rate limiter applied to auth,
 	// MCP, and bulk-resolve endpoints. The zero value uses safe defaults (10 r/s, burst 20).
 	AuthRateLimiterConfig IPRateLimiterConfig
+	// LocalScopePort is the loopback port of the optional LocalScope collector.
+	// Zero disables the read-only /localscope proxy.
+	LocalScopePort int
 }
 
 // RouterDeps holds all dependencies injected into the router.
@@ -406,6 +410,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 		if deps.GrantsHandler != nil {
 			deps.GrantsHandler.Mount(r)
 		}
+
+		// Read-only proxy to the optional LocalScope collector, so the SPA can
+		// reach it same-origin in the embedded build exactly as Vite does in
+		// dev. Inside the protected group: it exposes this machine's process and
+		// port table, which is at least as sensitive as the rest of this group.
+		// New(...) returns nil when the port is 0, and Mount is then a no-op.
+		localscope.New("127.0.0.1", deps.Config.LocalScopePort).Mount(r)
 
 		if deps.SystemPromptsHandler != nil {
 			deps.SystemPromptsHandler.Mount(r)
