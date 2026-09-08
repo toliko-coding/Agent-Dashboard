@@ -82,6 +82,10 @@ function openDialog() {
   void nextTick(() => inputRef.value?.focus())
 }
 
+// Lets the topbar's search affordance open the same dialog as ⌘K, so there is
+// one search implementation rather than a second field that filters nothing.
+defineExpose({ open: openDialog })
+
 function closeDialog() {
   open.value = false
   query.value = ''
