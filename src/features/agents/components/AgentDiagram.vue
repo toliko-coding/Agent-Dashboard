@@ -33,26 +33,53 @@ const taskCount = computed(() => props.agent.tasks.length)
 const doneCount = computed(() => props.agent.tasks.filter(t => t.status === 'completed').length)
 const subagentCount = computed(() => props.agent.subagents.length)
 
+/*
+ * Node kinds are visually distinct so the diagram reads as a system rather
+ * than a row of identical boxes: what belongs to the agent's own work (tasks,
+ * subagents), what is an attachable surface (terminal), and what is a real
+ * process observed on the machine by LocalScope (service).
+ */
+type LeafKind = 'work' | 'surface' | 'service'
+
 interface Leaf {
   id: string
   label: string
   sub: string
+  kind: LeafKind
+}
+
+const LEAF_STYLE: Record<LeafKind, { stroke: string, fill: string, text: string }> = {
+  work: { stroke: 'var(--line-strong)', fill: 'var(--card)', text: 'var(--fg-soft)' },
+  surface: { stroke: 'var(--info-line)', fill: 'var(--info-soft)', text: 'var(--info-text)' },
+  service: { stroke: 'var(--success-line)', fill: 'var(--success-soft)', text: 'var(--success-text)' },
 }
 
 /** Only branches with real backing data. */
 const leaves = computed<Leaf[]>(() => {
   const out: Leaf[] = []
   if (taskCount.value > 0)
-    out.push({ id: 'tasks', label: 'Tasks', sub: `${doneCount.value}/${taskCount.value} done` })
+    out.push({ id: 'tasks', label: 'Tasks', sub: `${doneCount.value}/${taskCount.value} done`, kind: 'work' })
   if (subagentCount.value > 0)
-    out.push({ id: 'subagents', label: 'Subagents', sub: `${subagentCount.value}` })
+    out.push({ id: 'subagents', label: 'Subagents', sub: `${subagentCount.value}`, kind: 'work' })
   if (props.agent.liveInjectable)
-    out.push({ id: 'terminal', label: 'Terminal', sub: 'attachable' })
+    out.push({ id: 'terminal', label: 'Terminal', sub: 'attachable', kind: 'surface' })
   if (props.agent.pipelineTaskId)
-    out.push({ id: 'pipeline', label: 'Pipeline', sub: 'linked task' })
+    out.push({ id: 'pipeline', label: 'Pipeline', sub: 'linked task', kind: 'work' })
+  // Observed by LocalScope, not inferred here — a listening port whose project
+  // root is inside this agent's cwd really is a server in the project it edits.
   for (const s of relatedServices.value.slice(0, 2))
-    out.push({ id: `svc-${s.id}`, label: s.label, sub: `:${s.port}` })
+    out.push({ id: `svc-${s.id}`, label: s.label, sub: `:${s.port}`, kind: 'service' })
   return out
+})
+
+/** Which kinds are actually present, for the legend. */
+const legend = computed(() => {
+  const kinds = new Set(leaves.value.map(l => l.kind))
+  return ([
+    ['service', 'Local service'],
+    ['surface', 'Attachable'],
+    ['work', 'Agent work'],
+  ] as [LeafKind, string][]).filter(([k]) => kinds.has(k))
 })
 
 const WIDTH = 300
@@ -101,14 +128,37 @@ const positions = computed(() => {
           />
         </g>
 
-        <g v-for="p in positions" :key="p.leaf.id" :data-testid="`diagram-leaf-${p.leaf.id}`">
-          <rect :x="p.cx - 42" y="140" width="84" height="34" rx="7" fill="var(--card)" stroke="var(--line)" />
-          <text :x="p.cx" y="155" text-anchor="middle" fill="var(--fg-soft)" font-size="9.5" font-weight="600">
+        <g
+          v-for="p in positions"
+          :key="p.leaf.id"
+          :data-testid="`diagram-leaf-${p.leaf.id}`"
+          :data-kind="p.leaf.kind"
+        >
+          <title>{{ p.leaf.label }} — {{ p.leaf.sub }}</title>
+          <rect
+            :x="p.cx - 42" y="140" width="84" height="34" rx="7"
+            :fill="LEAF_STYLE[p.leaf.kind].fill"
+            :stroke="LEAF_STYLE[p.leaf.kind].stroke"
+          />
+          <text :x="p.cx" y="155" text-anchor="middle" :fill="LEAF_STYLE[p.leaf.kind].text" font-size="9.5" font-weight="600">
             {{ p.leaf.label.length > 13 ? `${p.leaf.label.slice(0, 12)}…` : p.leaf.label }}
           </text>
           <text :x="p.cx" y="166" text-anchor="middle" fill="var(--fg-faint)" font-size="8">{{ p.leaf.sub }}</text>
         </g>
       </template>
     </svg>
+
+    <!-- Legend lists only the kinds actually drawn, so it never advertises a
+         node type this agent has no data for. -->
+    <ul v-if="legend.length" class="flex flex-wrap gap-x-3 gap-y-1 mt-1" data-testid="diagram-legend">
+      <li v-for="[kind, label] in legend" :key="kind" class="flex items-center gap-1 text-[9px] text-fg-faint">
+        <span
+          class="size-2 rounded-sm shrink-0 border"
+          :style="{ backgroundColor: LEAF_STYLE[kind].fill, borderColor: LEAF_STYLE[kind].stroke }"
+          aria-hidden="true"
+        />
+        {{ label }}
+      </li>
+    </ul>
   </div>
 </template>

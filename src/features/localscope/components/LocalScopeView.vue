@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 import ViewPlaceholder from '@/components/ViewPlaceholder.vue'
 import { localScopeClient } from '../client'
 import {
@@ -48,8 +49,18 @@ async function toggleAllProcesses(): Promise<void> {
   }
 }
 
-const shownProcesses = computed(() =>
+const allShown = computed(() =>
   (showAllProcesses.value ? allProcesses.value?.processes : processes.data.value?.processes) ?? [])
+
+/*
+ * The list is capped for rendering. With "show all" on a busy machine this is
+ * ~900 rows, and painting them all costs far more than it informs — but the cap
+ * must be stated, or the header's "906 of 906" would be contradicted by a list
+ * that silently stops at 60.
+ */
+const RENDER_CAP = 60
+const shownProcesses = computed(() => allShown.value.slice(0, RENDER_CAP))
+const hiddenCount = computed(() => Math.max(0, allShown.value.length - RENDER_CAP))
 
 const processTotal = computed(() => processes.data.value?.total ?? null)
 const relevantCount = computed(() => processes.data.value?.processes.length ?? null)
@@ -110,7 +121,7 @@ function stateTone(state: string): string {
             Processes
           </h2>
           <span v-if="relevantCount !== null && processTotal !== null" class="text-[11px] text-fg-faint font-mono">
-            {{ showAllProcesses ? shownProcesses.length : relevantCount }} of {{ processTotal }}
+            {{ showAllProcesses ? allShown.length : relevantCount }} of {{ processTotal }}
           </span>
           <button
             type="button"
@@ -129,7 +140,7 @@ function stateTone(state: string): string {
 
         <ul v-else class="flex flex-col gap-1" data-testid="localscope-processes">
           <li
-            v-for="p in shownProcesses.slice(0, 60)"
+            v-for="p in shownProcesses"
             :key="p.id"
             class="border border-line rounded-md bg-card px-3 py-2 flex flex-col gap-1 min-w-0"
           >
@@ -143,8 +154,12 @@ function stateTone(state: string): string {
                 {{ p.project.name }}
               </span>
             </div>
-            <div class="text-[10px] font-mono text-fg-faint truncate" :title="p.command">
-              {{ p.command }}
+            <!-- A dev command line can be thousands of characters (bundler
+                 flags, long paths). It is clamped to one line with the full
+                 text in the title, and copyable for pasting into a shell. -->
+            <div class="flex items-center gap-1 min-w-0">
+              <code class="text-[10px] font-mono text-fg-faint truncate min-w-0 flex-1" :title="p.command">{{ p.command }}</code>
+              <CopyButton :value="p.command" label="command" />
             </div>
             <!-- LocalScope's internal codes are never shown; the sentence is. -->
             <div v-if="p.relevanceReasons.length" class="flex flex-wrap gap-1">
@@ -157,6 +172,9 @@ function stateTone(state: string): string {
             </div>
           </li>
         </ul>
+        <p v-if="hiddenCount > 0" class="text-[11px] text-fg-faint" data-testid="processes-render-cap">
+          Showing the first {{ RENDER_CAP }}; {{ hiddenCount }} more not rendered.
+        </p>
       </section>
 
       <!-- Devices -->

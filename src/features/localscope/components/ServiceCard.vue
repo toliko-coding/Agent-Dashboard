@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { LocalService } from '../types'
 import AppCard from '@/components/ui/AppCard.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 
 /*
  * A listening port presented in developer terms. LocalScope has already done
@@ -38,16 +39,19 @@ defineProps<{ service: LocalService }>()
         </span>
       </div>
 
-      <a
-        v-if="service.url"
-        :href="service.url"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="text-[12px] font-mono text-accent hover:underline truncate rounded focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
-      >{{ service.url }}</a>
-      <span v-else class="text-[12px] font-mono text-fg-mute truncate">
-        {{ service.address }}:{{ service.port }}
-      </span>
+      <div class="flex items-center gap-1 min-w-0">
+        <a
+          v-if="service.url"
+          :href="service.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-[12px] font-mono text-accent hover:underline truncate rounded focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+        >{{ service.url }}</a>
+        <span v-else class="text-[12px] font-mono text-fg-mute truncate">
+          {{ service.address }}:{{ service.port }}
+        </span>
+        <CopyButton :value="service.url ?? `${service.address}:${service.port}`" label="service address" />
+      </div>
 
       <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
         <div class="flex gap-1.5 min-w-0">
@@ -88,9 +92,16 @@ defineProps<{ service: LocalService }>()
         </div>
       </dl>
 
-      <div v-if="service.project" class="text-[10px] text-fg-faint font-mono truncate" :title="service.project.rootPath">
-        {{ service.project.displayPath }}
-        <span v-if="service.project.git.branch" class="text-fg-mute"> · {{ service.project.git.branch }}</span>
+      <div v-if="service.project" class="flex items-center gap-1 min-w-0">
+        <!-- dir="rtl" keeps the END of a long path visible, which is the part
+             that identifies the project; plain truncate would cut it off. -->
+        <span
+          class="text-[10px] text-fg-faint font-mono truncate text-left"
+          dir="rtl"
+          :title="service.project.rootPath"
+        >{{ service.project.displayPath }}</span>
+        <span v-if="service.project.git.branch" class="text-[10px] text-fg-mute shrink-0">· {{ service.project.git.branch }}</span>
+        <CopyButton :value="service.project.rootPath" label="project path" />
       </div>
     </div>
   </AppCard>
