@@ -163,7 +163,20 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true,
         rewrite: (path: string) => path.replace(LOCALSCOPE_PREFIX_RE, ''),
         configure: (proxy) => {
-          proxy.on('error', () => {})
+          // Answer 503 when the collector is not listening. Vite's default is
+          // 500, which is indistinguishable from the collector itself failing —
+          // and the UI must tell "LocalScope is not running" (an expected state
+          // for an optional dependency) apart from "LocalScope is broken".
+          proxy.on('error', (_err, _req, res) => {
+            const socket = res as unknown as { writeHead?: (code: number, headers: Record<string, string>) => void, end?: (body?: string) => void, destroy?: () => void }
+            if (typeof socket.writeHead === 'function' && typeof socket.end === 'function') {
+              socket.writeHead(503, { 'Content-Type': 'application/json' })
+              socket.end(JSON.stringify({ error: 'localscope unreachable' }))
+            }
+            else {
+              socket.destroy?.()
+            }
+          })
         },
       },
       '/auth': {
