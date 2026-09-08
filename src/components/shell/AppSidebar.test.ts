@@ -37,9 +37,25 @@ describe('appSidebar', () => {
     const { AppSidebar, useSidebar } = await load()
     useSidebar().togglePinned()
     const w = mount(AppSidebar, { props })
-    expect(w.text()).toContain('Monitor')
-    expect(w.text()).toContain('Build')
+    expect(w.text()).toContain('Main')
+    expect(w.text()).toContain('Automation')
+    expect(w.text()).toContain('Tools')
     expect(w.text()).toContain('Insights')
+    expect(w.text()).toContain('System')
+  })
+
+  // Settings opens a modal, so it is not a view — it must emit rather than
+  // setting activeView, and there must be exactly one of it in the rail.
+  it('emits openSettings from the System group without changing the view', async () => {
+    const { AppSidebar, useViewState, useSidebar } = await load()
+    useSidebar().togglePinned()
+    const w = mount(AppSidebar, { props })
+    const before = useViewState().activeView.value
+    const settings = w.findAll('button').filter(b => b.text().includes('Settings'))
+    expect(settings).toHaveLength(1)
+    await settings[0].trigger('click')
+    expect(w.emitted('openSettings')).toHaveLength(1)
+    expect(useViewState().activeView.value).toBe(before)
   })
 
   it('clicking a nav item sets activeView', async () => {
@@ -90,10 +106,11 @@ describe('appSidebar', () => {
   it('separates the nav groups with a rule when collapsed', async () => {
     const { AppSidebar } = await load()
     const w = mount(AppSidebar, { props })
-    // Three groups, so two rules — the group captions that carry the split when
-    // expanded are hidden in the icon rail.
-    expect(w.findAll('[data-testid="nav-group-divider"]')).toHaveLength(2)
-    expect(w.text()).not.toContain('Monitor')
+    // Four nav groups plus the trailing System group: the first nav group needs
+    // no leading rule, so that is 3 + 1 = 4. The group captions that carry the
+    // split when expanded are hidden in the icon rail.
+    expect(w.findAll('[data-testid="nav-group-divider"]')).toHaveLength(4)
+    expect(w.text()).not.toContain('Main')
   })
 
   it('drops the rules again once the captions are back', async () => {
@@ -160,7 +177,7 @@ describe('appSidebar', () => {
     const nav = w.get('nav')
     await nav.trigger('mouseenter')
 
-    const dashboard = w.findAll('button').find(b => b.text().includes('Dashboard'))!
+    const dashboard = w.findAll('button').find(b => b.text().includes('Agents'))!
     await dashboard.trigger('focusin')
     await dashboard.trigger('click')
 

@@ -54,11 +54,14 @@ const budgetUsage: UsageData = {
 describe('appStatusBar', () => {
   beforeEach(() => localStorage.clear())
 
-  it('renders compact CPU/MEM values in the strip', async () => {
+  // CPU/MEM/DISK moved to the sidebar MachineCard (see MachineCard.test.ts).
+  // The strip now carries load average, which the MachineCard does not show.
+  it('renders load average in the strip and no longer duplicates CPU/MEM', async () => {
     const Bar = await load()
     const w = mount(Bar, { props: { costDelta: 0.42, todayCostLabel: '$5.00', usageData: null } })
-    expect(w.text()).toContain('34%')
-    expect(w.text()).toContain('62%')
+    expect(w.get('[data-testid="load-strip"]').text()).toBe('1.20')
+    expect(w.text()).not.toContain('34%')
+    expect(w.text()).not.toContain('62%')
   })
 
   it('shows consumption text when no budget is set', async () => {
@@ -139,53 +142,5 @@ describe('appStatusBar', () => {
     const Bar = await load()
     const w = mount(Bar, { props: { costDelta: null, todayCostLabel: '$0.00', usageData: null } })
     expect(w.text()).toContain('—')
-  })
-
-  it('does not color MEM below the warning threshold', async () => {
-    const Bar = await load()
-    const w = mount(Bar, { props: { costDelta: 0, todayCostLabel: '$0.00', usageData: null } })
-    const mem = w.get('[data-testid="mem-pct-strip"]')
-    expect(mem.classes()).not.toContain('text-warning-text')
-    expect(mem.classes()).not.toContain('text-danger-text')
-  })
-
-  it('colors MEM/CPU/DISK warning at >=75% usage', async () => {
-    vi.doMock('../../composables/useSystemResources', () => ({
-      useSystemResources: () => ({
-        info: {
-          value: {
-            cpu: { usage: 80, cores: 8, model: 'x' },
-            memory: { total: 100, used: 80, available: 20, usagePercent: 80 },
-            disk: { total: 100, used: 78, available: 22, usagePercent: 78, mount: '/' },
-            loadAvg: [1.2, 1.0, 0.8],
-            uptime: 100,
-          },
-        },
-      }),
-    }))
-    const Bar = await load()
-    const w = mount(Bar, { props: { costDelta: 0, todayCostLabel: '$0.00', usageData: null } })
-    const mem = w.get('[data-testid="mem-pct-strip"]')
-    expect(mem.classes()).toContain('text-warning-text')
-  })
-
-  it('colors MEM danger at >=90% usage', async () => {
-    vi.doMock('../../composables/useSystemResources', () => ({
-      useSystemResources: () => ({
-        info: {
-          value: {
-            cpu: { usage: 95, cores: 8, model: 'x' },
-            memory: { total: 100, used: 95, available: 5, usagePercent: 95 },
-            disk: { total: 100, used: 91, available: 9, usagePercent: 91, mount: '/' },
-            loadAvg: [1.2, 1.0, 0.8],
-            uptime: 100,
-          },
-        },
-      }),
-    }))
-    const Bar = await load()
-    const w = mount(Bar, { props: { costDelta: 0, todayCostLabel: '$0.00', usageData: null } })
-    const mem = w.get('[data-testid="mem-pct-strip"]')
-    expect(mem.classes()).toContain('text-danger-text')
   })
 })
