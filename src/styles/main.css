@@ -36,6 +36,15 @@
   --font-mono: 'Fira Code', 'SF Mono', 'Cascadia Code', 'Menlo', monospace;
   --shadow-card-hover: var(--card-hover-shadow);
   --shadow-modal: var(--modal-shadow);
+
+  /*
+   * Motion easing. `--ease-*` IS a Tailwind v4 theme namespace, so this emits a
+   * real `ease-standard` utility. Durations are NOT a themeable namespace (a
+   * `--duration-fast` token here would silently emit nothing — which is exactly
+   * the bug AgentRow.vue:67 hit), so the duration scale lives in :root below and
+   * is applied as duration-[var(--duration-fast)].
+   */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
 /*
@@ -88,6 +97,18 @@
 :root {
   --card-hover-shadow: 0 4px 12px rgba(0,0,0,0.08);
   --modal-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  /*
+   * Motion duration scale — theme-independent. Apply as
+   * `duration-[var(--duration-fast)]`, pairing with `ease-standard`.
+   * fast  = hover/colour feedback on small controls
+   * base  = the house 200ms used by modal, toast and sidebar transitions
+   * slow  = larger surfaces entering (side panels, drawers)
+   * The global prefers-reduced-motion block at the end of this file overrides
+   * all three, so components need no extra guard for durations alone.
+   */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
   /* Surfaces — calm light: soft, low-contrast chrome */
   --app: var(--color-slate-50);
   --card: #ffffff;
