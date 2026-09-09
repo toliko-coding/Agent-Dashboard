@@ -340,10 +340,21 @@ type CreateTaskParams struct {
 	// a task a human created. Deliberately absent from the HTTP create body:
 	// the scheduler is the only writer (see the schema field's comment).
 	RoutineID string
-	UserID    *string
-	Metadata  map[string]any
-	Autonomy  *string
-	PlanMode  *bool
+	// ParentTaskID makes this task a child of another. Caller-supplied and
+	// validated against what that caller can see (see validateParentTask).
+	//
+	// Note what is NOT here: delegated_by_stage_run_id. A parent link says
+	// where a task sits in a hierarchy, which a person is entitled to decide;
+	// provenance says which agent run created it, which only a credential can
+	// establish. Accepting the second from a request body would let any caller
+	// attribute its work to another agent's run, so this struct has no field
+	// for it and the HTTP path leaves it nil — every REST-created task is
+	// honestly recorded as not delegated by an agent.
+	ParentTaskID string
+	UserID       *string
+	Metadata     map[string]any
+	Autonomy     *string
+	PlanMode     *bool
 }
 
 // CreateTaskFromInput is the reusable task-creation core: it checks slug
@@ -410,6 +421,15 @@ func (h *Handler) CreateTaskFromInput(ctx context.Context, p CreateTaskParams) (
 		routineIDPtr = &rid
 	}
 
+	var parentIDPtr *string
+	if p.ParentTaskID != "" {
+		if err := h.validateParentTask(ctx, p.ParentTaskID, "", p.UserID); err != nil {
+			return nil, err
+		}
+		pid := p.ParentTaskID
+		parentIDPtr = &pid
+	}
+
 	priority := p.Priority
 	if priority == "" {
 		priority = db.DefaultPriority
@@ -453,9 +473,13 @@ func (h *Handler) CreateTaskFromInput(ctx context.Context, p CreateTaskParams) (
 		ProjectID:           projectIDPtr,
 		SpawnerID:           spawnerIDPtr,
 		RoutineID:           routineIDPtr,
-		Autonomy:            p.Autonomy,
-		Metadata:            p.Metadata,
-		PlanMode:            planMode,
+		ParentTaskID:        parentIDPtr,
+		// DelegatedByStageRunID is deliberately absent. Nothing on this path
+		// can establish that an agent run created this task, so nil — "a
+		// person made this" — is the only honest value. See CreateTaskParams.
+		Autonomy: p.Autonomy,
+		Metadata: p.Metadata,
+		PlanMode: planMode,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("tasks.create: %w", err)
@@ -482,6 +506,15 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) error {
 		SpawnerID       string  `json:"spawnerId"`
 		Autonomy        *string `json:"autonomy"`
 		PlanMode        *bool   `json:"planMode"`
+		// ParentTaskID makes the new task a child of an existing one.
+		//
+		// There is deliberately NO delegatedByStageRunId field here, and one
+		// sent anyway is discarded with the rest of the unknown keys: a body
+		// that could name the agent run behind a task would let any caller
+		// forge that attribution. Provenance comes from a credential or not at
+		// all, so a task created through this route is recorded as created by
+		// a person.
+		ParentTaskID string `json:"parentTaskId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		return apierr.NewAppError(http.StatusBadRequest, "invalid JSON body")
@@ -522,6 +555,7 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) error {
 		UserID:          &userID,
 		Autonomy:        body.Autonomy,
 		PlanMode:        body.PlanMode,
+		ParentTaskID:    body.ParentTaskID,
 	})
 	if err != nil {
 		return err
