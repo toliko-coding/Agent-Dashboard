@@ -706,12 +706,24 @@ func extractTextFromPrompt(raw json.RawMessage) []string {
 
 // isSystemXMLContent reports whether text is an internal Claude Code protocol
 // message that should not be shown in the transcript. These appear as user-role
-// JSONL entries and include slash-command envelopes and local-command caveats.
+// JSONL entries and include slash-command envelopes, local-command caveats,
+// IDE context notices and background-task notifications.
+//
+// Filtering matters beyond tidiness: handleUserMessage emits ONE human message
+// per text block, so a turn Claude records as [envelope, "the real prompt"]
+// renders as two chat bubbles — the second looking exactly like a message the
+// user never sent. <ide_opened_file> and <task-notification> are both written
+// that way (31 and 39 occurrences across 1144 user turns in local sessions),
+// which is why they are listed here rather than left to a generic
+// "starts with a tag" rule: a prompt may legitimately begin with markup, and
+// guessing at that would silently swallow a real message.
 func isSystemXMLContent(text string) bool {
 	return strings.HasPrefix(text, "<command-name>") ||
 		strings.HasPrefix(text, "<local-command-caveat>") ||
 		strings.HasPrefix(text, "<command-message>") ||
-		strings.HasPrefix(text, "<function_calls>")
+		strings.HasPrefix(text, "<function_calls>") ||
+		strings.HasPrefix(text, "<ide_opened_file>") ||
+		strings.HasPrefix(text, "<task-notification>")
 }
 
 func strPtr(s string) *string {
