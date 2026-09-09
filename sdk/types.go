@@ -334,13 +334,34 @@ type DetectedConfirm struct {
 	Options  []DetectedOption `json:"options"`
 }
 
-// PendingScreen is whichever interactive AskUserQuestion screen is currently
-// open on a session's terminal. At most one field is non-nil; both are nil when
-// no such screen is open. Probing for both in one round-trip keeps the scan hot
+// DetectedPermission is Claude Code's permission dialog, detected from a live
+// terminal's rendered rows by askq.DetectPermissionPrompt.
+//
+// This is POSITIVE evidence that the session is blocked on a decision. The
+// transcript cannot supply it: a tool awaiting approval and a tool still
+// running leave the identical unresolved tool_use, which is why the dashboard
+// previously had to infer waiting from three minutes of silence and then
+// reported it as "No activity".
+// There is deliberately no tool-name field. The dialog's heading ("Bash
+// command", "Fetch") sits above a box border, and borders are stripped before
+// the rows are parsed, so the heading cannot be located reliably — the first
+// attempt returned unrelated scrollback. A field that is usually wrong is worse
+// than no field; the question line already says what is being asked.
+type DetectedPermission struct {
+	// Question is the prompt line, e.g. "Do you want to proceed?".
+	Question string `json:"question"`
+	// Options are the numbered choices as rendered, first Yes … last No.
+	Options []DetectedOption `json:"options"`
+}
+
+// PendingScreen is whichever interactive screen is currently open on a
+// session's terminal. At most one field is non-nil; all are nil when no such
+// screen is open. Probing for all of them in one round-trip keeps the scan hot
 // path to a single capture per tick.
 type PendingScreen struct {
-	Question *DetectedQuestion `json:"question,omitempty"`
-	Confirm  *DetectedConfirm  `json:"confirm,omitempty"`
+	Question   *DetectedQuestion   `json:"question,omitempty"`
+	Confirm    *DetectedConfirm    `json:"confirm,omitempty"`
+	Permission *DetectedPermission `json:"permission,omitempty"`
 }
 
 // How an agent's spawner attribution was established: recorded from the pipeline
@@ -423,13 +444,22 @@ type Agent struct {
 	// detected on this session's live terminal, or nil. Mutually exclusive with
 	// PendingQuestion: the TUI shows one or the other, never both. Only ever set
 	// on injectable sessions.
-	PendingConfirm      *DetectedConfirm `json:"pendingConfirm,omitempty"`
-	LastOutput          *string          `json:"lastOutput"`
-	ConvergenceAlert    bool             `json:"convergenceAlert"`
-	ConvergenceToolName *string          `json:"convergenceToolName"`
-	ErrorState          *ErrorState      `json:"errorState"`
-	PipelineTaskID      string           `json:"pipelineTaskId,omitempty"`
-	PipelineTaskTitle   string           `json:"pipelineTaskTitle,omitempty"`
+	PendingConfirm *DetectedConfirm `json:"pendingConfirm,omitempty"`
+	// PendingPermissionPrompt is Claude Code's own permission dialog, detected
+	// on this session's live terminal, or nil when none is open. Only ever set
+	// on injectable sessions — a session the dashboard has no terminal for
+	// cannot supply this, and nothing else can: the transcript renders an
+	// awaiting-approval tool call and a running one identically.
+	//
+	// It clears as soon as the dialog does, because it is re-derived from the
+	// current screen on every tick rather than latched.
+	PendingPermissionPrompt *DetectedPermission `json:"pendingPermissionPrompt,omitempty"`
+	LastOutput              *string             `json:"lastOutput"`
+	ConvergenceAlert        bool                `json:"convergenceAlert"`
+	ConvergenceToolName     *string             `json:"convergenceToolName"`
+	ErrorState              *ErrorState         `json:"errorState"`
+	PipelineTaskID          string              `json:"pipelineTaskId,omitempty"`
+	PipelineTaskTitle       string              `json:"pipelineTaskTitle,omitempty"`
 	// SpawnerID/SpawnerName name the configured spawner this session belongs to,
 	// and SpawnerSource says how that was established (see SpawnerSource*).
 	// Empty when no spawner could be attributed.

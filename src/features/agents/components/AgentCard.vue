@@ -12,7 +12,8 @@ import { toast } from '@/composables/useToast'
 import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vue'
 import MetricsPopover from '@/features/agents/components/MetricsPopover.vue'
 import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
-import { formatCost, formatDuration, formatTokens, formatUptime, isAwaitingInput, isStalled, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
+import { agentState } from '@/utils/agentState'
+import { formatCost, formatDuration, formatTokens, formatUptime, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
 import { friendlyProjectName } from '@/utils/friendlyProjectName'
 import { agentDisplayStatus } from '@/utils/statusColors'
 
@@ -58,8 +59,17 @@ const healthChipClass = computed(() => {
 })
 
 const secSince = computed(() => secondsSince(props.agent.lastActivity, nowMs.value))
-const stalled = computed(() => isStalled(props.agent.status, secSince.value))
-const awaitingInput = computed(() => isAwaitingInput(props.agent))
+/*
+ * One classifier, shared with the triage band. The card used to decide for
+ * itself (`working ? 'working' : status`) while the band ran separate rules, so
+ * a session blocked on a permission prompt read "working" here and "No
+ * activity" there at the same moment.
+ */
+const state = computed(() => agentState(props.agent, secSince.value))
+const stalled = computed(() => state.value.state === 'stalled')
+const awaitingInput = computed(() =>
+  state.value.state === 'awaiting_input' || state.value.state === 'idle')
+const blocked = computed(() => state.value.blocking)
 
 const activeSubagents = computed(() => props.agent.subagents.filter(s => s.status === 'active'))
 
@@ -122,10 +132,19 @@ const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
           title="Claude Code's own internal daemon process — not a session you can message"
           data-testid="agent-card-internal-badge"
         />
+        <!-- Blocking states first: they are what someone has to act on, and they
+             are the same verdict the triage band shows for this agent. -->
         <span
-          v-if="stalled"
+          v-if="blocked"
+          data-testid="agent-card-blocked"
+          class="text-[10px] font-medium px-1 py-0.5 rounded whitespace-nowrap"
+          :class="state.tone === 'danger' ? 'bg-danger-soft text-danger-text' : 'bg-warning-soft text-warning-text'"
+          :title="state.label"
+        >{{ state.label.toLowerCase() }}</span>
+        <span
+          v-else-if="stalled"
           class="text-[10px] font-medium px-1 py-0.5 rounded bg-warning-soft text-warning-text whitespace-nowrap"
-          title="Agent is active but has produced no output for 3+ minutes"
+          title="No output for 3+ minutes"
         >stalled</span>
         <span
           v-else-if="awaitingInput"

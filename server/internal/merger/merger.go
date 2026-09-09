@@ -451,9 +451,10 @@ func (m *Merger) buildAgent(proc scanner.ProcessInfo, session *parser.SessionDat
 	discovery := readAgentChannelState(proc.PID)
 	var pendingQuestion *sdk.DetectedQuestion
 	var pendingConfirm *sdk.DetectedConfirm
+	var pendingPermission *sdk.DetectedPermission
 	if discovery.liveInjectable && m.screenProbe != nil {
 		if screen := m.screenProbe(proc.PID); screen != nil {
-			pendingQuestion, pendingConfirm = screen.Question, screen.Confirm
+			pendingQuestion, pendingConfirm, pendingPermission = screen.Question, screen.Confirm, screen.Permission
 		}
 	}
 	health := ComputeHealthScore(session, c.Total, c.Unknown, baselineCost)
@@ -476,6 +477,7 @@ func (m *Merger) buildAgent(proc scanner.ProcessInfo, session *parser.SessionDat
 		PermissionsBypassed:       parser.PermissionsBypassedFromArgs(proc.Command),
 		PendingQuestion:           pendingQuestion,
 		PendingConfirm:            pendingConfirm,
+		PendingPermissionPrompt:   pendingPermission,
 		Uptime:                    proc.Uptime,
 		LastActivity:              session.LastActivity.Format(time.RFC3339),
 		CurrentAction:             strPtr(session.CurrentAction),

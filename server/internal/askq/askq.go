@@ -361,5 +361,12 @@ func DetectScreen(rows []string) *sdk.PendingScreen {
 	if c := DetectConfirmScreen(rows); c != nil {
 		return &sdk.PendingScreen{Confirm: c}
 	}
+	// Last: an AskUserQuestion modal also renders numbered options, so it is
+	// given the chance to claim the screen first. DetectPermissionPrompt
+	// declines a screen carrying question meta-rows anyway; the ordering makes
+	// that independent of it.
+	if p := DetectPermissionPrompt(rows); p != nil {
+		return &sdk.PendingScreen{Permission: p}
+	}
 	return nil
 }

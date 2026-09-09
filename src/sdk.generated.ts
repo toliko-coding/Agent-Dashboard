@@ -358,14 +358,33 @@ export interface DetectedConfirm {
   options: DetectedOption[]
 }
 /**
- * PendingScreen is whichever interactive AskUserQuestion screen is currently
- * open on a session's terminal. At most one field is non-nil; both are nil when
- * no such screen is open. Probing for both in one round-trip keeps the scan hot
+ * DetectedPermission is Claude Code's permission dialog, detected from a live
+ * terminal's rendered rows by askq.DetectPermissionPrompt.
+ * This is POSITIVE evidence that the session is blocked on a decision. The
+ * transcript cannot supply it: a tool awaiting approval and a tool still
+ * running leave the identical unresolved tool_use, which is why the dashboard
+ * previously had to infer waiting from three minutes of silence and then
+ * reported it as "No activity".
+ * There is deliberately no tool-name field. The dialog's heading ("Bash
+ * command", "Fetch") sits above a box border, and borders are stripped before
+ * the rows are parsed, so the heading cannot be located reliably — the first
+ * attempt returned unrelated scrollback. A field that is usually wrong is worse
+ * than no field; the question line already says what is being asked.
+ */
+export interface DetectedPermission {
+  question: string
+  options: DetectedOption[]
+}
+/**
+ * PendingScreen is whichever interactive screen is currently open on a
+ * session's terminal. At most one field is non-nil; all are nil when no such
+ * screen is open. Probing for all of them in one round-trip keeps the scan hot
  * path to a single capture per tick.
  */
 export interface PendingScreen {
   question?: DetectedQuestion
   confirm?: DetectedConfirm
+  permission?: DetectedPermission
 }
 export const SpawnerSourceTask = 'task'
 export const SpawnerSourceEnv = 'env'
@@ -456,6 +475,16 @@ export interface Agent {
    * on injectable sessions.
    */
   pendingConfirm?: DetectedConfirm
+  /**
+   * PendingPermissionPrompt is Claude Code's own permission dialog, detected
+   * on this session's live terminal, or nil when none is open. Only ever set
+   * on injectable sessions — a session the dashboard has no terminal for
+   * cannot supply this, and nothing else can: the transcript renders an
+   * awaiting-approval tool call and a running one identically.
+   * It clears as soon as the dialog does, because it is re-derived from the
+   * current screen on every tick rather than latched.
+   */
+  pendingPermissionPrompt?: DetectedPermission
   lastOutput?: string
   convergenceAlert: boolean
   convergenceToolName?: string
