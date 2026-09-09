@@ -7,8 +7,9 @@ import ViewPlaceholder from '@/components/ViewPlaceholder.vue'
 import { localScopeClient } from '../client'
 import { useLocalMachine } from '../composables/useLocalMachine'
 import { useMachineDevices, useMachineProcesses, useMachineServices } from '../composables/useMachineLists'
-import { formatAge, freshnessNote } from '../snapshot'
+import { formatAge } from '../snapshot'
 import { relevanceLabel } from '../types'
+import DataFreshnessIndicator from './DataFreshnessIndicator.vue'
 import ServiceCard from './ServiceCard.vue'
 
 /*
@@ -34,10 +35,6 @@ const devices = useMachineDevices()
 const serviceItems = computed(() => services.data.value.items)
 const processItems = computed(() => processes.data.value.items)
 const deviceItems = computed(() => devices.data.value.items)
-
-const servicesNote = computed(() => freshnessNote(services.data.value))
-const processesNote = computed(() => freshnessNote(processes.data.value))
-const devicesNote = computed(() => freshnessNote(devices.data.value))
 
 /*
  * The page banner, on the same four states as everything else.
@@ -220,9 +217,7 @@ function stateTone(state: string): string {
           <span v-if="serviceItems" class="text-[11px] text-fg-faint font-mono">
             {{ serviceItems.length }} listening
           </span>
-          <span v-if="servicesNote" data-testid="services-freshness" class="text-[11px] text-warning-text font-mono">
-            {{ servicesNote }}
-          </span>
+          <DataFreshnessIndicator :reading="services.data.value" testid="services-freshness" />
         </header>
         <!-- Not knowing the list and knowing it is empty are different claims. -->
         <p v-if="!serviceItems" data-testid="services-unknown" class="text-[12px] text-fg-mute">
@@ -245,9 +240,7 @@ function stateTone(state: string): string {
           <span v-if="relevantCount !== null && processTotal !== null" class="text-[11px] text-fg-faint font-mono">
             {{ showAllProcesses ? allShown.length : relevantCount }} of {{ processTotal }}
           </span>
-          <span v-if="processesNote" data-testid="processes-freshness" class="text-[11px] text-warning-text font-mono">
-            {{ processesNote }}
-          </span>
+          <DataFreshnessIndicator :reading="processes.data.value" testid="processes-freshness" />
           <button
             type="button"
             data-testid="toggle-all-processes"
@@ -315,9 +308,7 @@ function stateTone(state: string): string {
           <span v-if="deviceCount !== null" class="text-[11px] text-fg-faint font-mono">
             {{ deviceCount }} connected
           </span>
-          <span v-if="devicesNote" data-testid="devices-freshness" class="text-[11px] text-warning-text font-mono">
-            {{ devicesNote }}
-          </span>
+          <DataFreshnessIndicator :reading="devices.data.value" testid="devices-freshness" />
         </header>
 
         <!-- Three different claims, three different sentences. -->

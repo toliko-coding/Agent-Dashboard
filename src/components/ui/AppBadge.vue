@@ -6,36 +6,45 @@ type Variant = 'active' | 'working' | 'waiting' | 'idle' | 'finished' | 'complet
 
 const props = defineProps<{ variant: Variant, label?: string }>()
 
-const dotClass: Record<Variant, string> = {
-  active: 'bg-success-dot',
-  working: 'bg-info-dot animate-pulse',
-  waiting: 'bg-warning-dot',
-  idle: 'bg-slate-400 dark:bg-slate-500',
-  finished: 'bg-slate-400 dark:bg-slate-500',
-  completed: 'bg-slate-400 dark:bg-slate-500',
-  error: 'bg-danger-dot',
-  info: 'bg-info-dot',
+/*
+ * Presentation for one agent state, in one table.
+ *
+ * `motion` is empty for every state where nothing is happening, which is the
+ * point: a badge moves only while the system is doing something. Previously
+ * `working` carried Tailwind's `animate-pulse` — a fixed opacity throb at the
+ * same rate as every other spinner in every other app — so it read as
+ * decoration rather than as a claim about this agent.
+ *
+ * Motion is never the only encoding. Each row also carries a colour and a text
+ * label, and the label is rendered twice: once visibly and once for assistive
+ * technology. A viewer with prefers-reduced-motion loses the emphasis and keeps
+ * the state.
+ */
+const PRESENTATION: Record<Variant, { dot: string, label: string, motion: string }> = {
+  active: { dot: 'bg-state-live', label: 'text-success-text', motion: '' },
+  working: { dot: 'bg-state-working', label: 'text-state-working', motion: 'motion-working' },
+  waiting: { dot: 'bg-state-waiting', label: 'text-state-waiting', motion: '' },
+  idle: { dot: 'bg-state-idle', label: 'text-fg-mute', motion: '' },
+  finished: { dot: 'bg-state-idle', label: 'text-fg-mute', motion: '' },
+  completed: { dot: 'bg-state-idle', label: 'text-fg-mute', motion: '' },
+  error: { dot: 'bg-state-error', label: 'text-state-error', motion: '' },
+  info: { dot: 'bg-state-working', label: 'text-state-working', motion: '' },
 }
 
-const labelClass: Record<Variant, string> = {
-  active: 'text-success-text',
-  working: 'text-info-text',
-  waiting: 'text-warning-text',
-  idle: 'text-fg-mute',
-  finished: 'text-fg-mute',
-  completed: 'text-fg-mute',
-  error: 'text-danger-text',
-  info: 'text-info-text',
-}
-
+const presentation = computed(() => PRESENTATION[props.variant])
 const displayLabel = computed(() => props.label ?? statusLabel(props.variant))
 </script>
 
 <template>
   <!-- UX-15: status conveyed via color dot + visible text label; sr-only provides AT fallback -->
-  <span class="inline-flex items-center gap-1.5 text-xs">
-    <span class="size-2 rounded-full flex-shrink-0" :class="dotClass[variant]" aria-hidden="true" />
-    <span :class="labelClass[variant]" aria-hidden="true">{{ displayLabel }}</span>
+  <span class="inline-flex items-center gap-1.5 text-xs" :data-state="variant">
+    <span
+      class="size-2 rounded-full flex-shrink-0"
+      :class="[presentation.dot, presentation.motion]"
+      data-testid="state-dot"
+      aria-hidden="true"
+    />
+    <span :class="presentation.label" aria-hidden="true">{{ displayLabel }}</span>
     <span class="sr-only">{{ displayLabel }}</span>
   </span>
 </template>
