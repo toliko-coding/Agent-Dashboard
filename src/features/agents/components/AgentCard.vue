@@ -9,6 +9,7 @@ import AppCard from '@/components/ui/AppCard.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import { useNow } from '@/composables/useNow'
 import { toast } from '@/composables/useToast'
+import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vue'
 import MetricsPopover from '@/features/agents/components/MetricsPopover.vue'
 import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
 import { formatCost, formatDuration, formatTokens, formatUptime, isAwaitingInput, isStalled, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
@@ -157,6 +158,9 @@ const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
         <span class="whitespace-nowrap" title="Uptime">{{ formatUptime(agent.uptime) }}</span>
 
         <span class="ml-auto flex items-center gap-1.5 shrink-0">
+          <!-- Runtime observed by LocalScope for this agent's project. Renders
+               nothing when the collector is down or nothing correlates. -->
+          <AgentServiceChips :agent="agent" />
           <span
             class="text-[10px] font-mono px-1.5 py-0.5 rounded"
             :class="healthChipClass"

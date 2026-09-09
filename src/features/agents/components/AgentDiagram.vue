@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { Agent } from '@/types'
 import { computed } from 'vue'
-import { useLocalScopeServices } from '@/features/localscope'
-import { isPathUnder } from '@/utils/projectAgents'
+import { useAgentServices } from '../composables/useAgentServices'
 
 /*
  * A diagram of what this agent is actually connected to.
@@ -18,16 +17,8 @@ import { isPathUnder } from '@/utils/projectAgents'
  */
 const props = defineProps<{ agent: Agent }>()
 
-const services = useLocalScopeServices()
-
-/** Listening ports LocalScope found inside this agent's working directory. */
-const relatedServices = computed(() => {
-  const list = services.data.value ?? []
-  return list.filter((s) => {
-    const root = s.project?.rootPath ?? s.cwd
-    return root ? isPathUnder(root, props.agent.cwd) || isPathUnder(props.agent.cwd, root) : false
-  })
-})
+// The same correlation the agent card uses — one rule, not two.
+const { services: relatedServices } = useAgentServices(() => props.agent)
 
 const taskCount = computed(() => props.agent.tasks.length)
 const doneCount = computed(() => props.agent.tasks.filter(t => t.status === 'completed').length)
