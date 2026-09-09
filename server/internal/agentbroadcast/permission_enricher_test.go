@@ -14,6 +14,10 @@ type fakeBridge struct {
 	terminalTool map[string]string
 	armed        map[string]bool
 	swept        int
+	// reconciled records the (session, pending tool-use) pairs the enricher
+	// offered, so a test can assert the notice is reconciled against the
+	// agent's own transcript state on every tick.
+	reconciled [][2]string
 }
 
 func (f *fakeBridge) StateForSession(sessionID string) ([]sdk.PendingPermission, bool, string, bool) {
@@ -21,6 +25,10 @@ func (f *fakeBridge) StateForSession(sessionID string) ([]sdk.PendingPermission,
 }
 
 func (f *fakeBridge) SweepExpired() { f.swept++ }
+
+func (f *fakeBridge) ReconcileTerminalNotice(sessionID, currentToolUseID string) {
+	f.reconciled = append(f.reconciled, [2]string{sessionID, currentToolUseID})
+}
 
 func strPtr(s string) *string { return &s }
 

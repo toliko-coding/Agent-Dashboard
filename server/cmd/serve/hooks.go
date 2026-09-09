@@ -54,7 +54,7 @@ func newHooksCmd() *cobra.Command {
 
 func newHooksInstallCmd() *cobra.Command {
 	var settingsPath, scriptPath string
-	var dryRun bool
+	var dryRun, observeOnly bool
 
 	cmd := &cobra.Command{
 		Use:   "install",
@@ -62,6 +62,11 @@ func newHooksInstallCmd() *cobra.Command {
 		Long: "Adds two hook entries to the Claude Code settings file so a permission\n" +
 			"prompt can be answered in the dashboard instead of in the session's\n" +
 			"terminal. Existing hooks are preserved; running it twice changes nothing.\n\n" +
+			"With --observe-only, ONLY the Notification hook is registered: the\n" +
+			"dashboard reports that a session is waiting but never answers for it,\n" +
+			"and the session's own terminal stays the only place a decision is made.\n" +
+			"That is the mode for sessions the dashboard did not launch, where there\n" +
+			"is no terminal for it to read.\n\n" +
 			"Sessions read settings at start, so restart any session that should use it.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			path, err := resolveSettingsPath(settingsPath)
@@ -83,7 +88,7 @@ func newHooksInstallCmd() *cobra.Command {
 				}
 			}
 
-			outcome, err := applyPermissionHooks(settings, script)
+			outcome, err := applyPermissionHooks(settings, script, observeOnly)
 			if err != nil {
 				return err
 			}
@@ -112,6 +117,8 @@ func newHooksInstallCmd() *cobra.Command {
 	cmd.Flags().StringVar(&settingsPath, "settings", "", "settings file to edit (default ~/.claude/settings.json)")
 	cmd.Flags().StringVar(&scriptPath, "script", "", "use this script instead of the embedded one (development)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the resulting settings instead of writing them")
+	cmd.Flags().BoolVar(&observeOnly, "observe-only", false,
+		"register only the Notification hook: report that a prompt is open, never answer one")
 	return cmd
 }
 
@@ -275,7 +282,21 @@ const (
 // after a binary upgrade or a moved checkout it points at nothing, and Claude
 // Code then reports a non-blocking hook failure on every tool call while the CLI
 // happily said "already installed".
-func applyPermissionHooks(settings map[string]any, script string) (hooksOutcome, error) {
+/*
+ * applyPermissionHooks registers the dashboard's hook entries.
+ *
+ * observeOnly registers ONLY the Notification hook, which reports that a prompt
+ * has opened and returns no decision. The PreToolUse entry is what lets the
+ * dashboard answer a prompt, and it is therefore what can approve a tool call;
+ * an install that only wants visibility must not carry it.
+ *
+ * This matters most for sessions the dashboard did not launch — a VS Code or
+ * Terminal Claude, where there is no pty to read a dialog off. Observe-only is
+ * the mode that reaches them without taking any authority over their decisions:
+ * measured against a real external session, the Notification alone is enough to
+ * surface a prompt, and the transcript reports the answer.
+ */
+func applyPermissionHooks(settings map[string]any, script string, observeOnly bool) (hooksOutcome, error) {
 	hooks, _ := settings["hooks"].(map[string]any)
 	if hooks == nil {
 		hooks = map[string]any{}
@@ -290,16 +311,26 @@ func applyPermissionHooks(settings map[string]any, script string) (hooksOutcome,
 			}
 		}
 	}
-	pre, err := upsertHookEntry(hooks, "PreToolUse", script, map[string]any{
-		"matcher": permissionGatedTools,
-		"hooks": []any{map[string]any{
-			"type":    "command",
-			"command": script,
-			"timeout": permissionHookTimeoutSeconds,
-		}},
-	})
-	if err != nil {
+	pre := hooksUnchanged
+	if !observeOnly {
+		var err error
+		pre, err = upsertHookEntry(hooks, "PreToolUse", script, map[string]any{
+			"matcher": permissionGatedTools,
+			"hooks": []any{map[string]any{
+				"type":    "command",
+				"command": script,
+				"timeout": permissionHookTimeoutSeconds,
+			}},
+		})
+		if err != nil {
+			return hooksUnchanged, err
+		}
+	} else if removed, err := removeHookEntry(hooks, "PreToolUse", script); err != nil {
 		return hooksUnchanged, err
+	} else if removed {
+		// Downgrading a full install to observe-only must actually give up the
+		// decision hook, not leave it behind while reporting a narrower mode.
+		pre = hooksRepaired
 	}
 	// Not folded into one expression: both entries must be attempted, and || or
 	// && would skip the second whenever the first already decided the outcome.
@@ -399,6 +430,42 @@ func removePermissionHooks(settings map[string]any) (changed bool, foreign []str
 		delete(settings, "hooks")
 	}
 	return changed, foreign
+}
+
+// removeHookEntry drops this command's own entries for one event, leaving every
+// other entry untouched.
+//
+// It is the observe-only install's way of giving up the decision hook. Only
+// entries entryCommand reports as ours are removed, so a PreToolUse hook the
+// user registered by hand survives an observe-only install of ours — this
+// command may retract what it wrote and nothing else.
+func removeHookEntry(hooks map[string]any, event, script string) (bool, error) {
+	raw, present := hooks[event]
+	if !present {
+		return false, nil
+	}
+	list, isArray := raw.([]any)
+	if !isArray {
+		return false, fmt.Errorf("hooks.%s is not a list — fix or remove it first", event)
+	}
+	kept := make([]any, 0, len(list))
+	changed := false
+	for _, e := range list {
+		if _, ours, _ := entryCommand(e, script); ours {
+			changed = true
+			continue
+		}
+		kept = append(kept, e)
+	}
+	if !changed {
+		return false, nil
+	}
+	if len(kept) == 0 {
+		delete(hooks, event)
+	} else {
+		hooks[event] = kept
+	}
+	return true, nil
 }
 
 // entryCommand reports an entry's command line when it is about the permission

@@ -14,6 +14,10 @@ type PermissionBridgeReader interface {
 	// driven from this tick rather than from the read, so it does not depend on
 	// someone happening to look at a session.
 	SweepExpired()
+	// ReconcileTerminalNotice clears a terminal-prompt notice once the session
+	// has answered it. The notification hook fires when a prompt opens and
+	// never when it closes, so the transcript is what reports the decision.
+	ReconcileTerminalNotice(sessionID, currentToolUseID string)
 }
 
 // NewPermissionBridgeEnricher annotates each agent with the permission prompts
@@ -37,6 +41,20 @@ func NewPermissionBridgeEnricher(bridge PermissionBridgeReader) merger.Enricher 
 			if sid == "" {
 				continue
 			}
+			/*
+			 * Reconcile before reading. The agent's own unresolved tool_use is
+			 * the session reporting whether its prompt is still open: answering
+			 * one writes a tool_result for that exact call within a second
+			 * (measured: 0.4s approving, 0.008s rejecting). Doing this here is
+			 * what keeps the notice from outliving the prompt — the hook itself
+			 * only ever says a prompt OPENED.
+			 */
+			pending := ""
+			if agents[i].PendingToolUse != nil {
+				pending = agents[i].PendingToolUse.ID
+			}
+			bridge.ReconcileTerminalNotice(sid, pending)
+
 			held, atTerminal, terminalToolUseID, armed := bridge.StateForSession(sid)
 			// A held hook call goes in its own field, never into
 			// PendingPermissions: that one carries pipeline stage-run rows,

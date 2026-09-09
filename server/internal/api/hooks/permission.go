@@ -100,6 +100,19 @@ type armedSession struct {
 type permissionNotice struct {
 	at        time.Time
 	toolUseID string
+	// blockedOn is the transcript tool_use the prompt is about, latched on the
+	// first scan tick after the notice arrives. It is how the notice clears:
+	// measured against a real session, answering a prompt — approve, reject, or
+	// answering an AskUserQuestion — writes a tool_result for exactly this call
+	// within a second, so the call ceasing to be the pending one is the session
+	// itself reporting that the prompt is gone.
+	//
+	// Empty means "not latched yet": the notice arrives a few seconds after the
+	// tool_use is written, and the first tick that sees both fills this in.
+	blockedOn string
+	// latched guards against a notice that arrives while nothing is pending,
+	// which must not be treated as "already resolved" on its very first tick.
+	latched bool
 }
 
 // lapse records a hold that ended without a decision, so an incoming notice can
@@ -282,9 +295,7 @@ func (h *Handler) PermissionNotify(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if body.NotificationType == permissionPromptNotification && body.SessionID != "" {
-		h.permissions.noteTerminalPrompt(body.SessionID)
-	}
+	h.permissions.noteTerminalPromptIfPermission(body.SessionID, body.NotificationType)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -509,6 +520,26 @@ func (b *HookEnforcer) holdsForLocked(sessionID string) int {
 	return n
 }
 
+/*
+ * noteTerminalPromptIfPermission is the receiver's whole filter, in one place
+ * so it can be tested without an HTTP round trip.
+ *
+ * Only "permission_prompt" records anything. Measured on a real session, that
+ * is the type Claude Code sends both for a tool permission dialog AND for an
+ * AskUserQuestion modal — both mean "this session is waiting for a person" —
+ * while any other notification type is inert here rather than being taken as
+ * evidence of blocking.
+ *
+ * An empty session id records nothing: a notice that cannot be attributed to a
+ * session would otherwise become state attached to no agent.
+ */
+func (b *HookEnforcer) noteTerminalPromptIfPermission(sessionID, notificationType string) {
+	if notificationType != permissionPromptNotification || sessionID == "" {
+		return
+	}
+	b.noteTerminalPrompt(sessionID)
+}
+
 func (b *HookEnforcer) noteTerminalPrompt(sessionID string) {
 	b.mu.Lock()
 	now := b.nowFn()
@@ -564,9 +595,63 @@ func (b *HookEnforcer) StateForSession(sessionID string) (held []sdk.PendingPerm
 	return out, true, notice.toolUseID, b.isArmedReadLocked(sessionID)
 }
 
+/*
+ * ReconcileTerminalNotice clears a terminal-prompt notice once the session has
+ * answered it.
+ *
+ * currentToolUseID is the agent's unresolved transcript tool_use this tick, or
+ * "" when it has none. The notification hook fires when a prompt OPENS and
+ * never when it is answered, so without this the notice could only age out —
+ * a latched state with a long TTL, which reports someone as blocked for minutes
+ * after they have already decided.
+ *
+ * Measured on a real external session: approving wrote the tool_result 0.4s
+ * later, rejecting 0.008s later, and answering an AskUserQuestion 0.058s later.
+ * In every case it was a tool_result for the SAME call, so this watches that one
+ * call rather than clearing on arbitrary output — a session that simply printed
+ * something must not be taken as a decision.
+ *
+ * A different pending call is also a clear: Claude commonly issues the next
+ * tool_use immediately after a decision, so "some call is pending" would keep a
+ * stale notice alive forever. Identity is what makes it correct.
+ */
+func (b *HookEnforcer) ReconcileTerminalNotice(sessionID, currentToolUseID string) {
+	b.mu.Lock()
+	notice, ok := b.notices[sessionID]
+	if !ok {
+		b.mu.Unlock()
+		return
+	}
+	switch {
+	case !notice.latched:
+		// First tick that can see the call. A notice with nothing pending is
+		// left unlatched rather than cleared: the transcript may simply not
+		// have been re-read yet, and the TTL remains the backstop.
+		if currentToolUseID != "" {
+			notice.blockedOn = currentToolUseID
+			notice.latched = true
+			b.notices[sessionID] = notice
+		}
+		b.mu.Unlock()
+		return
+	case currentToolUseID == notice.blockedOn:
+		// Still waiting on the same call.
+		b.mu.Unlock()
+		return
+	}
+	delete(b.notices, sessionID)
+	b.mu.Unlock()
+	b.changed()
+}
+
 // SweepExpired drops armed marks and terminal notices that have aged out. It is
 // the only place either map shrinks on a timer, so it must be called
 // periodically -- the agent scan tick does.
+//
+// The TTL is now a backstop rather than the mechanism: ReconcileTerminalNotice
+// clears a notice as soon as the session answers it. This still matters for a
+// notice that never latched onto a call, or a session that vanished between
+// ticks.
 func (b *HookEnforcer) SweepExpired() {
 	b.mu.Lock()
 	defer b.mu.Unlock()

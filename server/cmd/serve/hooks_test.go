@@ -26,10 +26,10 @@ func writeJSON(t *testing.T, path string, v any) {
 func TestApplyPermissionHooksIsIdempotent(t *testing.T) {
 	settings := map[string]any{}
 
-	if got, err := applyPermissionHooks(settings, testScript); err != nil || got != hooksInstalled {
+	if got, err := applyPermissionHooks(settings, testScript, false); err != nil || got != hooksInstalled {
 		t.Fatalf("first install = (%v, %v), want (installed, nil)", got, err)
 	}
-	if got, err := applyPermissionHooks(settings, testScript); err != nil || got != hooksUnchanged {
+	if got, err := applyPermissionHooks(settings, testScript, false); err != nil || got != hooksUnchanged {
 		t.Fatalf("second install = (%v, %v), want (unchanged, nil)", got, err)
 	}
 
@@ -109,7 +109,7 @@ func TestApplyPermissionHooksRepairsAStalePath(t *testing.T) {
 	settings := map[string]any{}
 	mustApply(t, settings, "/old/location/dashboard-hooks/dashboard-permission.sh")
 
-	got, err := applyPermissionHooks(settings, testScript)
+	got, err := applyPermissionHooks(settings, testScript, false)
 	if err != nil || got != hooksRepaired {
 		t.Fatalf("re-install after a move = (%v, %v), want (repaired, nil)", got, err)
 	}
@@ -161,7 +161,7 @@ func TestApplyPermissionHooksRefusesANonArrayValue(t *testing.T) {
 		},
 	}
 
-	if _, err := applyPermissionHooks(settings, testScript); err == nil {
+	if _, err := applyPermissionHooks(settings, testScript, false); err == nil {
 		t.Fatal("install overwrote a shape it did not write")
 	}
 	hooks := settings["hooks"].(map[string]any)
@@ -193,7 +193,7 @@ func TestRemovePermissionHooksLeavesANonArrayValueAlone(t *testing.T) {
 
 func mustApply(t *testing.T, settings map[string]any, script string) {
 	t.Helper()
-	if _, err := applyPermissionHooks(settings, script); err != nil {
+	if _, err := applyPermissionHooks(settings, script, false); err != nil {
 		t.Fatalf("applyPermissionHooks: %v", err)
 	}
 }
@@ -427,7 +427,7 @@ func TestInstallRefusesWhenAForeignCopyIsRegistered(t *testing.T) {
 		},
 	}
 
-	if _, err := applyPermissionHooks(settings, testScript); err == nil {
+	if _, err := applyPermissionHooks(settings, testScript, false); err == nil {
 		t.Fatal("install silently replaced an entry pointing at somebody else's script")
 	}
 	entries := settings["hooks"].(map[string]any)["PreToolUse"].([]any)
@@ -442,11 +442,140 @@ func TestAStaleEntryInTheOwnedDirectoryIsStillOurs(t *testing.T) {
 	settings := map[string]any{}
 	mustApply(t, settings, "/old/location/dashboard-hooks/dashboard-permission.sh")
 
-	if _, err := applyPermissionHooks(settings, testScript); err != nil {
+	if _, err := applyPermissionHooks(settings, testScript, false); err != nil {
 		t.Fatalf("re-install after a move: %v", err)
 	}
 	removed, foreign := removePermissionHooks(settings)
 	if !removed || len(foreign) != 0 {
 		t.Fatalf("uninstall = (%v, %v), want the repaired entry removed and nothing reported", removed, foreign)
+	}
+}
+
+/*
+ * Observe-only mode.
+ *
+ * The PreToolUse entry is what lets the dashboard ANSWER a prompt, so it is
+ * also what could approve a tool call. An install that only wants visibility
+ * must not carry it — that is the whole distinction, and these pin it.
+ */
+
+func eventEntries(t *testing.T, settings map[string]any, event string) []any {
+	t.Helper()
+	hooks, _ := settings["hooks"].(map[string]any)
+	if hooks == nil {
+		return nil
+	}
+	entries, _ := hooks[event].([]any)
+	return entries
+}
+
+func TestApplyPermissionHooksObserveOnlyRegistersNotificationAlone(t *testing.T) {
+	settings := map[string]any{}
+	if got, err := applyPermissionHooks(settings, testScript, true); err != nil || got != hooksInstalled {
+		t.Fatalf("observe-only install = (%v, %v), want (installed, nil)", got, err)
+	}
+	if n := len(eventEntries(t, settings, "Notification")); n != 1 {
+		t.Fatalf("Notification has %d entries, want 1", n)
+	}
+	if n := len(eventEntries(t, settings, "PreToolUse")); n != 0 {
+		t.Fatalf("observe-only must register no PreToolUse hook, got %d entries", n)
+	}
+}
+
+func TestApplyPermissionHooksObserveOnlyIsIdempotent(t *testing.T) {
+	settings := map[string]any{}
+	if _, err := applyPermissionHooks(settings, testScript, true); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := applyPermissionHooks(settings, testScript, true); err != nil || got != hooksUnchanged {
+		t.Fatalf("second observe-only install = (%v, %v), want (unchanged, nil)", got, err)
+	}
+	if n := len(eventEntries(t, settings, "Notification")); n != 1 {
+		t.Fatalf("Notification has %d entries, want 1", n)
+	}
+}
+
+// Downgrading must actually give up the decision hook rather than leave it
+// behind while reporting a narrower mode.
+func TestApplyPermissionHooksObserveOnlyDropsAnExistingPreToolUse(t *testing.T) {
+	settings := map[string]any{}
+	if _, err := applyPermissionHooks(settings, testScript, false); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(eventEntries(t, settings, "PreToolUse")); n != 1 {
+		t.Fatalf("setup: PreToolUse has %d entries, want 1", n)
+	}
+
+	if got, err := applyPermissionHooks(settings, testScript, true); err != nil || got == hooksUnchanged {
+		t.Fatalf("downgrade = (%v, %v), want a change", got, err)
+	}
+	if n := len(eventEntries(t, settings, "PreToolUse")); n != 0 {
+		t.Fatalf("downgrade left %d PreToolUse entries — it must give up the decision hook", n)
+	}
+	if n := len(eventEntries(t, settings, "Notification")); n != 1 {
+		t.Fatalf("Notification has %d entries, want 1", n)
+	}
+}
+
+// A PreToolUse hook the user registered by hand is not ours to remove.
+func TestApplyPermissionHooksObserveOnlyKeepsForeignPreToolUse(t *testing.T) {
+	foreign := map[string]any{
+		"matcher": "Bash",
+		"hooks": []any{map[string]any{
+			"type":    "command",
+			"command": "/opt/me/my-own-hook.sh",
+		}},
+	}
+	settings := map[string]any{"hooks": map[string]any{"PreToolUse": []any{foreign}}}
+
+	if _, err := applyPermissionHooks(settings, testScript, true); err != nil {
+		t.Fatal(err)
+	}
+	entries := eventEntries(t, settings, "PreToolUse")
+	if len(entries) != 1 {
+		t.Fatalf("PreToolUse has %d entries, want the foreign one preserved", len(entries))
+	}
+	got := entries[0].(map[string]any)["hooks"].([]any)[0].(map[string]any)["command"]
+	if got != "/opt/me/my-own-hook.sh" {
+		t.Fatalf("foreign command = %v, want it untouched", got)
+	}
+}
+
+// Unrelated settings survive an observe-only install exactly.
+func TestApplyPermissionHooksObserveOnlyPreservesUnrelatedSettings(t *testing.T) {
+	settings := map[string]any{
+		"model":      "opus",
+		"env":        map[string]any{"FOO": "bar"},
+		"statusLine": map[string]any{"type": "command", "command": "/bin/echo hi"},
+	}
+	if _, err := applyPermissionHooks(settings, testScript, true); err != nil {
+		t.Fatal(err)
+	}
+	if settings["model"] != "opus" {
+		t.Fatalf("model = %v, want opus", settings["model"])
+	}
+	if env, _ := settings["env"].(map[string]any); env["FOO"] != "bar" {
+		t.Fatalf("env = %v, want it untouched", settings["env"])
+	}
+	if sl, _ := settings["statusLine"].(map[string]any); sl["command"] != "/bin/echo hi" {
+		t.Fatalf("statusLine = %v, want it untouched", settings["statusLine"])
+	}
+}
+
+// Uninstall removes what we own regardless of which mode installed it.
+func TestRemovePermissionHooksAfterObserveOnlyInstall(t *testing.T) {
+	settings := map[string]any{}
+	if _, err := applyPermissionHooks(settings, testScript, true); err != nil {
+		t.Fatal(err)
+	}
+	changed, foreign := removePermissionHooks(settings)
+	if !changed {
+		t.Fatal("uninstall reported no change after an observe-only install")
+	}
+	if len(foreign) != 0 {
+		t.Fatalf("foreign = %v, want none", foreign)
+	}
+	if _, present := settings["hooks"]; present {
+		t.Fatalf("hooks key survived uninstall: %v", settings["hooks"])
 	}
 }
