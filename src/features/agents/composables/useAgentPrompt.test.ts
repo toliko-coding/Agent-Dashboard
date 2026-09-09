@@ -141,3 +141,91 @@ describe('useAgentPrompt offline queueing', () => {
     expect(isSending.value).toBe(false)
   })
 })
+
+/*
+ * The echoed message must be the text the SERVER says it delivered, not the
+ * text that was typed. Sanitization strips newlines before the prompt reaches
+ * the agent, so a client-side echo would render something that was never sent
+ * and would not match the same message when the session transcript returns it —
+ * which is what made a multi-line prompt appear as two chat bubbles.
+ */
+describe('useAgentPrompt delivered-text echo', () => {
+  const TYPED = 'START-AAAA\n\nMIDDLE-BBBB\nEND-CCCC'
+  const DELIVERED = 'START-AAAAMIDDLE-BBBBEND-CCCC'
+
+  function stubInject(body: unknown, ok = true) {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok, json: async () => body })))
+  }
+
+  it('echoes the server delivered text, not the typed text', async () => {
+    stubInject({ ok: true, delivered: DELIVERED })
+    const onMessageSent = vi.fn()
+    const { promptInput, handleSend } = useAgentPrompt(
+      () => makeAgent({ liveInjectable: true }),
+      onMessageSent,
+    )
+    promptInput.value = TYPED
+    await handleSend()
+
+    expect(onMessageSent).toHaveBeenCalledTimes(1)
+    expect(onMessageSent.mock.calls[0][0]).toMatchObject({
+      role: 'human',
+      content: DELIVERED,
+    })
+  })
+
+  // Nothing is shown until the outcome is known, so exactly one representation
+  // of a message exists in client state at any moment.
+  it('does not echo before the response resolves', async () => {
+    let release: (v: unknown) => void = () => {}
+    const pending = new Promise((r) => {
+      release = r
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      await pending
+      return { ok: true, json: async () => ({ ok: true, delivered: DELIVERED }) }
+    }))
+
+    const onMessageSent = vi.fn()
+    const { promptInput, handleSend } = useAgentPrompt(
+      () => makeAgent({ liveInjectable: true }),
+      onMessageSent,
+    )
+    promptInput.value = TYPED
+    const done = handleSend()
+
+    expect(onMessageSent).not.toHaveBeenCalled()
+    release(null)
+    await done
+    expect(onMessageSent).toHaveBeenCalledTimes(1)
+  })
+
+  // A response without the field must not drop the turn from the chat.
+  it('falls back to the typed text when the server omits delivered', async () => {
+    stubInject({ ok: true })
+    const onMessageSent = vi.fn()
+    const { promptInput, handleSend } = useAgentPrompt(
+      () => makeAgent({ liveInjectable: true }),
+      onMessageSent,
+    )
+    promptInput.value = TYPED
+    await handleSend()
+    expect(onMessageSent.mock.calls[0][0].content).toBe(TYPED)
+  })
+
+  // Nothing was delivered, so there is no canonical text — keep the typed copy
+  // as a record rather than losing what the user wrote.
+  it('echoes the typed text when delivery fails', async () => {
+    stubInject({ error: 'channel not available' }, false)
+    const onMessageSent = vi.fn()
+    const { promptInput, handleSend, sendStatus } = useAgentPrompt(
+      () => makeAgent({ liveInjectable: true }),
+      onMessageSent,
+    )
+    promptInput.value = TYPED
+    await handleSend()
+    expect(onMessageSent).toHaveBeenCalledTimes(1)
+    expect(onMessageSent.mock.calls[0][0].content).toBe(TYPED)
+    expect(sendStatus.value).toBe('error')
+  })
+})

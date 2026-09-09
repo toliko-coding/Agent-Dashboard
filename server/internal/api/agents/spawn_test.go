@@ -243,7 +243,7 @@ func TestSendMessageToChannel_RespectsContextCancellation(t *testing.T) {
 	// PID 99999 almost certainly doesn't exist; the function will fail while
 	// trying to read the discovery file — but the important contract is that it
 	// returns an error promptly (not block) when the context is already cancelled.
-	_, err := m.SendMessageToChannel(ctx, 99999, "ping")
+	_, _, err := m.SendMessageToChannel(ctx, 99999, "ping")
 	require.Error(t, err, "SendMessageToChannel must return an error for an unknown PID")
 
 	// Ensure the call did not block: if we got here at all, the test passes.
@@ -255,7 +255,7 @@ func TestSendMessageToChannel_RespectsContextCancellation(t *testing.T) {
 	defer cancel2()
 	cancel2() // cancel immediately
 
-	_, err2 := m.SendMessageToChannel(ctx2, 99999, "ping")
+	_, _, err2 := m.SendMessageToChannel(ctx2, 99999, "ping")
 	require.Error(t, err2, "SendMessageToChannel must return an error with a cancelled deadline context")
 }
 
@@ -1111,7 +1111,7 @@ func TestSendMessageToChannel_PtyFileTakesPrecedenceOverBridgeHTTP(t *testing.T)
 	})
 
 	m := NewSpawnManager(5, 60000, 30, 60000, nil, nil)
-	_, err := m.SendMessageToChannel(context.Background(), pid, "hello pty")
+	_, _, err := m.SendMessageToChannel(context.Background(), pid, "hello pty")
 	require.NoError(t, err, "SendMessageToChannel with only pty file must succeed")
 	assert.Equal(t, "pty-secret", gotToken, "must use pty file token")
 	assert.Equal(t, "hello pty", gotMessage, "must send correct message body")
@@ -1164,7 +1164,7 @@ func TestSendMessageToChannel_TmuxTakesPrecedenceOverPty(t *testing.T) {
 	}
 
 	m := NewSpawnManager(5, 60000, 30, 60000, nil, nil)
-	_, err := m.SendMessageToChannel(context.Background(), pid, "via tmux")
+	_, _, err := m.SendMessageToChannel(context.Background(), pid, "via tmux")
 	require.NoError(t, err)
 	assert.True(t, tmuxCalled, "tmux send-keys must be used when bridge file has tmuxPane")
 	assert.False(t, ptyHit, "pty HTTP server must NOT be called when tmux path is taken")
@@ -1204,7 +1204,7 @@ func TestSendMessageToChannel_FallsBackToBridgeHTTPWhenNoPty(t *testing.T) {
 	})
 
 	m := NewSpawnManager(5, 60000, 30, 60000, nil, nil)
-	_, err := m.SendMessageToChannel(context.Background(), pid, "bridge msg")
+	_, _, err := m.SendMessageToChannel(context.Background(), pid, "bridge msg")
 	require.NoError(t, err, "must succeed with bridge file only")
 	assert.Equal(t, "bridge msg", gotMessage)
 }

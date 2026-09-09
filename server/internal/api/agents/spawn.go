@@ -598,14 +598,23 @@ func (m *SpawnManager) GetStatus(pid int) *SpawnStatus {
 //  3. Bridge file ({pid}.json) with a non-zero port → POST to the channel-bridge
 //     HTTP endpoint (MCP log channel; legacy / pipeline-agent path).
 //
-// Returns the chosen transport ("tmux", "pty", or "bridge") and any error.
-// transport is "" when no channel is available.
-func (m *SpawnManager) SendMessageToChannel(ctx context.Context, pid int, message string) (transport string, err error) {
-	message = sanitizeInjectMessage(message)
+// Returns the chosen transport ("tmux", "pty", or "bridge"), the exact text
+// that was delivered, and any error. transport is "" when no channel is
+// available.
+//
+// delivered is the sanitized message and comes back on every path, success or
+// not, because this function is the ONLY authority on what reaches the agent:
+// it owns the sanitize call, so a caller that needs to report the delivered
+// text must take it from here rather than deriving its own. Two independent
+// normalizations of one message is exactly what made a multi-line prompt
+// render twice in the chat.
+func (m *SpawnManager) SendMessageToChannel(ctx context.Context, pid int, message string) (transport, delivered string, err error) {
+	delivered = sanitizeInjectMessage(message)
+	message = delivered
 
 	home, herr := os.UserHomeDir()
 	if herr != nil {
-		return "", fmt.Errorf("UserHomeDir: %w", herr)
+		return "", delivered, fmt.Errorf("UserHomeDir: %w", herr)
 	}
 	// Attempt 1: read the bridge file for tmux delivery.
 	var bridgePort int
@@ -620,7 +629,7 @@ func (m *SpawnManager) SendMessageToChannel(ctx context.Context, pid int, messag
 		if json.Unmarshal(data, &disc) == nil {
 			if disc.TmuxPane != "" {
 				// Highest-priority path: tmux send-keys.
-				return "tmux", sendKeysToTmux(ctx, disc.TmuxSocket, disc.TmuxPane, message)
+				return "tmux", delivered, sendKeysToTmux(ctx, disc.TmuxSocket, disc.TmuxPane, message)
 			}
 			bridgePort = disc.Port
 			bridgeToken = disc.Token
@@ -634,16 +643,16 @@ func (m *SpawnManager) SendMessageToChannel(ctx context.Context, pid int, messag
 			Token string `json:"token"`
 		}
 		if json.Unmarshal(data, &disc) == nil && disc.Port != 0 {
-			return "pty", sendHTTPMessage(ctx, disc.Port, disc.Token, message)
+			return "pty", delivered, sendHTTPMessage(ctx, disc.Port, disc.Token, message)
 		}
 	}
 
 	// Attempt 3: fall back to the bridge HTTP endpoint (legacy/MCP-log path).
 	if bridgePort != 0 {
-		return "bridge", sendHTTPMessage(ctx, bridgePort, bridgeToken, message)
+		return "bridge", delivered, sendHTTPMessage(ctx, bridgePort, bridgeToken, message)
 	}
 
-	return "", fmt.Errorf("channel not available for PID %d", pid)
+	return "", delivered, fmt.Errorf("channel not available for PID %d", pid)
 }
 
 // SendAnswerKeys delivers a sequence of raw answer-keystroke tokens (the
@@ -922,8 +931,6 @@ func (h *SpawnHandler) Message(w http.ResponseWriter, r *http.Request) {
 	}
 
 	target := fmt.Sprintf("pid:%d", pid)
-	sanitized := sanitizeInjectMessage(body.Message)
-	msgHash := sha256hex(sanitized)
 
 	if !h.manager.InjectAllowAndRecord(sub) {
 		h.recordAudit(r.Context(), sub, repo.AuditActionLiveInjectRejected, target, map[string]any{
@@ -936,13 +943,16 @@ func (h *SpawnHandler) Message(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	transport, delivErr := h.manager.SendMessageToChannel(r.Context(), pid, sanitized)
+	// delivered is what actually reached the agent. The audit records it and the
+	// response returns it, so the log, the transport and the client all describe
+	// the same bytes.
+	transport, delivered, delivErr := h.manager.SendMessageToChannel(r.Context(), pid, body.Message)
 
 	auditMeta := func(outcome string) map[string]any {
 		return map[string]any{
 			"transport": transport,
-			"msgLen":    len(sanitized),
-			"sha256":    msgHash,
+			"msgLen":    len(delivered),
+			"sha256":    sha256hex(delivered),
 			"outcome":   outcome,
 		}
 	}
@@ -957,8 +967,13 @@ func (h *SpawnHandler) Message(w http.ResponseWriter, r *http.Request) {
 
 	h.recordAudit(r.Context(), sub, repo.AuditActionLiveInject, target, auditMeta("delivered"))
 
+	// Return the delivered text so the client can render the message the agent
+	// actually received. Sanitization can change the content (newlines are
+	// stripped), and a client that echoed its own copy would be showing
+	// something that was never sent — and would fail to recognise the same
+	// message when it comes back from the session transcript.
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "delivered": delivered})
 }
 
 // recordAudit writes a best-effort audit row. Logs a warning on failure.

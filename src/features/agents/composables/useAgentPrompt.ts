@@ -76,10 +76,28 @@ export function useAgentPrompt(
    * the 3s auto-clear — so neither handleSend nor confirmResume duplicate this logic.
    */
   async function deliver(agent: Agent, msg: string, mode: 'inject' | 'resume'): Promise<void> {
-    // Optimistic: show message immediately before the network round-trip
-    onMessageSent?.({ role: 'human', content: msg, timestamp: new Date().toISOString() })
     isSending.value = true
     sendStatus.value = null
+
+    /*
+     * The echoed message is inserted only once the outcome is known, because
+     * only then is its canonical text known.
+     *
+     * The inject path sanitizes server-side — newlines are stripped before the
+     * text reaches the agent — so an echo written from the typed string would
+     * render something that was never sent, and would not match the same
+     * message when it comes back from the session transcript, which is what
+     * made a multi-line prompt appear as two chat bubbles. Waiting keeps
+     * exactly ONE representation of a message in client state at any time; the
+     * alternative, inserting the typed text and rewriting it on response,
+     * holds a second one for the length of the round trip and visibly reflows
+     * the bubble when it converges.
+     *
+     * The timestamp is taken when the send started, so the bubble sorts where
+     * the user acted rather than where the response happened to land.
+     */
+    const sentAt = new Date().toISOString()
+    const echo = (content: string) => onMessageSent?.({ role: 'human', content, timestamp: sentAt })
 
     try {
       if (mode === 'inject') {
@@ -93,6 +111,11 @@ export function useAgentPrompt(
           const data = await res.json().catch(() => ({}))
           throw new Error(data.error || `Send failed (${res.status})`)
         }
+        // The server reports what it actually delivered. Falling back to the
+        // typed text keeps the message visible if that field is ever absent —
+        // showing an approximation beats dropping the turn from the chat.
+        const data = await res.json().catch(() => ({})) as { delivered?: string }
+        echo(typeof data.delivered === 'string' ? data.delivered : msg)
       }
       else {
         const res = await fetch('/api/agents/spawn', {
@@ -108,10 +131,17 @@ export function useAgentPrompt(
           const data = await res.json().catch(() => ({}))
           throw new Error(data.error || `Resume failed (${res.status})`)
         }
+        // Resume hands the prompt to the CLI as a single argv element with no
+        // sanitization, so the typed text is the delivered text.
+        echo(msg)
       }
       sendStatus.value = 'sent'
     }
     catch (err) {
+      // Nothing was delivered, so there is no canonical text to defer to. Keep
+      // the typed copy as a local record — the input has already been cleared,
+      // and dropping it would lose what the user wrote.
+      echo(msg)
       if (isNetworkFailure(err)) {
         const useChannel = mode === 'inject'
         try {
