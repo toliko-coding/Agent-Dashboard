@@ -52,6 +52,41 @@ const ProjectsView = defineAsyncComponent(() => import('@/features/projects/comp
 const LocalScopeView = defineAsyncComponent(() => import('@/features/localscope/components/LocalScopeView.vue'))
 const TerminalView = defineAsyncComponent(() => import('@/features/terminal/components/TerminalView.vue'))
 const SystemView = defineAsyncComponent(() => import('@/features/system/components/SystemView.vue'))
+/*
+ * Design-system sandbox. Development only, and not a destination: no nav entry,
+ * no ActiveView id, no route. Opened with the #design-sandbox hash so it cannot
+ * be reached by accident.
+ *
+ * The `import.meta.env.DEV` ternary is load-bearing, and was settled against
+ * the built bundle rather than reasoned about: an UNCONDITIONAL
+ * `defineAsyncComponent(() => import(...))` at module scope emitted a
+ * DesignSandbox chunk into the production build, because a runtime `v-if`
+ * tells Rollup nothing about reachability. Vite substitutes the flag with a
+ * literal `false`, which puts the import() in a dead branch, and the chunk
+ * then disappears — confirmed absent from dist, along with every fixture
+ * string in it.
+ *
+ * That matters beyond bundle size: this file holds representative fake data,
+ * and fake data must not ship next to surfaces that show real data.
+ */
+const DesignSandbox = import.meta.env.DEV
+  ? defineAsyncComponent(() => import('@/features/design/DesignSandbox.vue'))
+  : undefined
+const designSandboxOpen = ref(false)
+
+function syncDesignSandbox(): void {
+  designSandboxOpen.value = window.location.hash === '#design-sandbox'
+}
+if (import.meta.env.DEV) {
+  syncDesignSandbox()
+  window.addEventListener('hashchange', syncDesignSandbox)
+  onUnmounted(() => window.removeEventListener('hashchange', syncDesignSandbox))
+}
+
+function closeDesignSandbox(): void {
+  // Clearing the hash drives the same listener, so state has one source.
+  window.location.hash = ''
+}
 // Heavy modal loaded on demand — split into its own chunk (includes DependencyGraph + StageCostWaterfall).
 const TaskModal = defineAsyncComponent(() => import('@/features/pipeline/components/TaskModal.vue'))
 // Modal/panel components that drag in marked + dompurify (RefinementChat) and diff (EditGateModal) —
@@ -418,6 +453,7 @@ onMounted(() => usageComposable.start())
       @navigate-task="task => openTask(task)"
       @navigate-agent="agent => selectAgent(agent)"
     />
+    <component :is="DesignSandbox" v-if="designSandboxOpen && DesignSandbox" @close="closeDesignSandbox" />
   </div>
   <div v-else class="min-h-screen bg-app" />
 </template>

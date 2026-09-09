@@ -6,6 +6,12 @@
  * its envelope are internals: no other feature knows LocalScope's URL shape,
  * its response format, or that it is a separate process at all.
  */
+/*
+ * The freshness qualifier. Exported because it renders a localscope-owned
+ * concept (Freshness) that other surfaces must state identically — three
+ * phrasings of "stale" read as three different states.
+ */
+export { default as DataFreshnessIndicator } from './components/DataFreshnessIndicator.vue'
 export { default as LocalScopeView } from './components/LocalScopeView.vue'
 export { default as ServiceCard } from './components/ServiceCard.vue'
 export { useLocalMachine } from './composables/useLocalMachine'
