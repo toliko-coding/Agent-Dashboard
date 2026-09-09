@@ -11,6 +11,7 @@ describe('navConfig', () => {
       'dashboard',
       'eval',
       'localscope',
+      'orchestrations',
       'pipeline',
       'projects',
       'schedules',
@@ -38,9 +39,9 @@ describe('navConfig', () => {
       expect(views).toContain(view)
   })
 
-  it('groups Pipeline, Schedules and Workflows under Automation', () => {
+  it('groups Pipeline, Orchestrations, Schedules and Workflows under Automation', () => {
     const automation = NAV_ITEMS.filter(i => i.group === 'Automation').map(i => i.view)
-    expect(automation).toEqual(['pipeline', 'schedules', 'workflows'])
+    expect(automation).toEqual(['pipeline', 'orchestrations', 'schedules', 'workflows'])
   })
 
   it('groups Cost and Eval under Insights', () => {

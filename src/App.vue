@@ -46,6 +46,7 @@ const CostAnalyticsView = defineAsyncComponent(() => import('@/features/analytic
 const EvalView = defineAsyncComponent(() => import('@/features/analytics/components/EvalView.vue'))
 const PipelineBoard = defineAsyncComponent(() => import('@/features/pipeline/components/PipelineBoard.vue'))
 const WorkflowsView = defineAsyncComponent(() => import('@/features/workflows/components/WorkflowsView.vue'))
+const OrchestrationsView = defineAsyncComponent(() => import('@/features/orchestrations/components/OrchestrationsView.vue'))
 const SchedulesView = defineAsyncComponent(() => import('./components/SchedulesView.vue'))
 // New Phase 2 destinations. Async for the same entry-chunk budget reason as above.
 const ProjectsView = defineAsyncComponent(() => import('@/features/projects/components/ProjectsView.vue'))
@@ -338,6 +339,7 @@ onMounted(() => usageComposable.start())
           @open-chat="(t) => { activeConceptTask = t; showRefinementChat = true }"
           @navigate-agent="(sessionId) => { const a = agents.find(x => x.sessionId === sessionId); if (a) selectAgent(a) }"
         />
+        <OrchestrationsView v-else-if="activeView === 'orchestrations'" />
         <CostAnalyticsView v-else-if="activeView === 'cost'" />
         <SchedulesView v-else-if="activeView === 'schedules'" />
         <EvalView v-else-if="activeView === 'eval'" />

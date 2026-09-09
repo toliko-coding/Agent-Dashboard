@@ -12,7 +12,7 @@ import { AGENT_STATUS_FILTERS } from '../utils/agentStatusFilter'
  */
 export type ActiveView
   = | 'cockpit' | 'dashboard' | 'projects' | 'localscope'
-    | 'pipeline' | 'schedules' | 'workflows'
+    | 'pipeline' | 'orchestrations' | 'schedules' | 'workflows'
     | 'terminal' | 'system'
     | 'cost' | 'eval'
 export type DashboardLayout = 'cards' | 'list'
@@ -24,6 +24,7 @@ export const ACTIVE_VIEWS: ActiveView[] = [
   'projects',
   'localscope',
   'pipeline',
+  'orchestrations',
   'schedules',
   'workflows',
   'terminal',

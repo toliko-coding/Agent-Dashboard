@@ -29,8 +29,9 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { view: 'localscope', label: 'LocalScope', icon: '◉', group: 'Main' },
 
   { view: 'pipeline', label: 'Pipeline', icon: '▤', group: 'Automation' },
+  { view: 'orchestrations', label: 'Orchestrations', icon: '⤳', group: 'Automation' },
   { view: 'schedules', label: 'Schedules', icon: '⏱', group: 'Automation' },
-  { view: 'workflows', label: 'Workflows', icon: '⤳', group: 'Automation' },
+  { view: 'workflows', label: 'Workflows', icon: '⇉', group: 'Automation' },
 
   { view: 'terminal', label: 'Terminal', icon: '▮', group: 'Tools' },
   { view: 'system', label: 'System', icon: '⬢', group: 'Tools' },

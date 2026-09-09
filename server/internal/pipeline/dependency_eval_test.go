@@ -55,6 +55,20 @@ func (f *fakeDepRepo) ListDownstream(context.Context, string) ([]*ent.TaskDepend
 }
 func (f *fakeDepRepo) RemoveByID(context.Context, string) error { return nil }
 
+// ListForTasks serves the orchestration view, which nothing here exercises;
+// answering from the same upstream map keeps the fake consistent rather than
+// silently empty if a future test does reach for it.
+func (f *fakeDepRepo) ListForTasks(_ context.Context, ids []string) ([]*ent.TaskDependency, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var out []*ent.TaskDependency
+	for _, id := range ids {
+		out = append(out, f.upstream[id]...)
+	}
+	return out, nil
+}
+
 func TestEvaluateTaskDeps(t *testing.T) {
 	stages := map[string]string{
 		"up-done":    "done",
