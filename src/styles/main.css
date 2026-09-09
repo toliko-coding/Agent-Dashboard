@@ -92,6 +92,26 @@
   --color-neutral-soft: var(--neutral-soft);
   --color-neutral-text: var(--neutral-text);
   --color-neutral-line: var(--neutral-line);
+
+  /*
+   * Semantic STATE colors.
+   *
+   * A state is what the system is doing; a status family (success/warning/…)
+   * is how that reads visually. Components asked for the family directly, so
+   * "working" was spelled `info` at every call site and could not be retuned
+   * without a sweep. These alias onto the SAME audited values -- no new hue
+   * enters the palette -- but give the state a name of its own.
+   *
+   * Pairs with agentStatusTone() in src/utils/statusColors.ts, which stays the
+   * mapping authority; these are the colors that mapping resolves to.
+   */
+  --color-state-idle: var(--state-idle);
+  --color-state-working: var(--state-working);
+  --color-state-tool: var(--state-tool);
+  --color-state-waiting: var(--state-waiting);
+  --color-state-error: var(--state-error);
+  --color-state-success: var(--state-success);
+  --color-state-live: var(--state-live);
 }
 
 :root {
@@ -155,6 +175,20 @@
   --neutral-soft: var(--color-slate-100);
   --neutral-text: var(--color-slate-600);
   --neutral-line: var(--color-slate-200);
+  /*
+   * State values, light. Aliases onto the WCAG-audited families above rather
+   * than new hues, so the contrast audit of 2026-06-29 still describes them.
+   * idle is deliberately the muted foreground, not a color: a quiet agent
+   * should recede, and giving it a hue would make "nothing is happening" the
+   * loudest thing on a roster of thirty rows.
+   */
+  --state-idle: var(--fg-faint);
+  --state-working: var(--info-text);
+  --state-tool: var(--info-text);
+  --state-waiting: var(--warning-text);
+  --state-error: var(--danger-text);
+  --state-success: var(--success-text);
+  --state-live: var(--success-dot);
 }
 
 .dark {
@@ -194,6 +228,14 @@
   --neutral-soft: var(--color-slate-800);
   --neutral-text: var(--color-slate-400);
   --neutral-line: var(--color-slate-700);
+  /* State values, dark: same aliases, so they follow the retinted families. */
+  --state-idle: var(--fg-faint);
+  --state-working: var(--info-text);
+  --state-tool: var(--info-text);
+  --state-waiting: var(--warning-text);
+  --state-error: var(--danger-text);
+  --state-success: var(--success-text);
+  --state-live: var(--success-dot);
 }
 
 /*
@@ -278,11 +320,121 @@ html, body {
   50% { opacity: 1; }
 }
 
-/* WCAG 2.3.3 — suppress all motion when the user has requested reduced motion */
+/*
+ * ============================================================================
+ * Semantic motion
+ * ============================================================================
+ *
+ * The rule: ANIMATION = INFORMATION. A thing moves because the system is doing
+ * something, and it stops when that stops. Motion that runs regardless of state
+ * teaches the eye to ignore it, which costs the real signals their meaning --
+ * the reason `animate-pulse` is not used for state here: it throbs at the same
+ * rate whether an agent is thinking or has been dead for an hour.
+ *
+ * Motion is ALWAYS a redundant encoding, never the only one. Every state below
+ * is carried by colour and by text as well, because a viewer with reduced
+ * motion, a screenshot, or a colour-vision deficiency must still be able to
+ * read the state. This is what makes the reduced-motion block at the end of
+ * this file safe: it removes an emphasis, never the information.
+ *
+ * Every keyframe below RESOLVES TO ITS RESTING STATE at both 0% and 100%. That
+ * is deliberate and load-bearing: prefers-reduced-motion collapses duration to
+ * 0.01ms, freezing each animation on its final frame, so a cycle ending at full
+ * opacity freezes visible while one ending mid-fade would freeze half-erased.
+ *
+ * Timings are slow on purpose. A 2s breath reads as "alive"; the 1s throb of a
+ * generic spinner reads as "urgent", and an operations console that is urgent
+ * about everything is urgent about nothing.
+ */
+
+/* Working: a slow breath. The system is busy and nothing is wrong. */
+@keyframes state-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* Tool execution: a discrete blip, faster than a breath and clearly not it. */
+@keyframes state-activity {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.65; transform: scale(0.82); }
+}
+
+/*
+ * Waiting for a person: an expanding ring that fades outward. Unlike a breath
+ * it points AT the element, because this is the one state whose resolution
+ * requires the viewer to act.
+ */
+@keyframes state-attention {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--state-waiting) 55%, transparent); }
+  70% { box-shadow: 0 0 0 6px color-mix(in oklch, var(--state-waiting) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--state-waiting) 0%, transparent); }
+}
+
+/*
+ * Live data: a dash travelling along a path. For connection lines and data-flow
+ * edges, where the question is "is anything moving through this", not "is this
+ * element busy".
+ */
+@keyframes state-flow {
+  from { stroke-dashoffset: var(--flow-dash, 12); }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Completion: one brief settle, then nothing. Success is an event, not a state. */
+@keyframes state-settle {
+  0% { opacity: 0.4; transform: scale(0.86); }
+  60% { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/*
+ * Motion durations, named for what they mean rather than how long they are.
+ * Kept beside the scale in :root above; see that comment for why durations
+ * cannot live in @theme.
+ */
+:root {
+  --motion-breathe: 2400ms;
+  --motion-activity: 900ms;
+  --motion-attention: 1800ms;
+  --motion-flow: 900ms;
+  --motion-settle: 420ms;
+}
+
+/*
+ * Semantic motion classes.
+ *
+ * Written as real CSS rather than Tailwind theme tokens on purpose. Only some
+ * `--*` namespaces emit utilities in Tailwind v4, and a token in a namespace
+ * that does not emits NOTHING, silently -- the bug already documented at the
+ * top of this file. A plain class cannot fail that way.
+ */
+.motion-working { animation: state-breathe var(--motion-breathe) var(--ease-standard) infinite; }
+.motion-tool { animation: state-activity var(--motion-activity) var(--ease-standard) infinite; }
+.motion-waiting { animation: state-attention var(--motion-attention) var(--ease-standard) infinite; }
+.motion-flow { animation: state-flow var(--motion-flow) linear infinite; }
+.motion-success { animation: state-settle var(--motion-settle) var(--ease-standard) 1; }
+
+/*
+ * WCAG 2.3.3 — suppress motion when the user has requested reduced motion.
+ *
+ * Duration collapse rather than `animation: none`: none would revert an element
+ * to its unanimated declared style, which for a dot mid-breath is whatever the
+ * base rule says, while collapsing the duration holds the final keyframe. Every
+ * keyframe above ends at its resting state precisely so this lands correctly.
+ */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  /*
+   * The attention ring is the one case duration collapse cannot settle: its
+   * resting frame is a zero-width shadow, so it would vanish rather than
+   * resolve. A static ring keeps the "this one needs you" emphasis without any
+   * movement at all.
+   */
+  .motion-waiting {
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--state-waiting) 40%, transparent) !important;
   }
 }
