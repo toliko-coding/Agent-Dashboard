@@ -40,9 +40,12 @@ async function mountMetrics(opts: {
    */
   vi.doMock('@/features/localscope', async () => {
     const { ref, shallowRef } = await import('vue')
-    const { EMPTY_SNAPSHOT, formatAge } = await import('@/features/localscope/snapshot')
+    // Pure helpers come from the real module: mocking them would test the
+    // mock's idea of "stale · 3m ago" rather than the app's.
+    const { EMPTY_SNAPSHOT, formatAge, freshnessNote } = await import('@/features/localscope/snapshot')
     return {
       formatAge,
+      freshnessNote,
       useLocalMachine: () => ({
         snapshot: shallowRef(opts.snapshot ?? EMPTY_SNAPSHOT),
         loaded: ref(opts.snapshot !== undefined),

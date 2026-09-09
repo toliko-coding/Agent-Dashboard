@@ -3,8 +3,13 @@
  *
  * Hand-mirrored from @localscope/shared (packages/shared/src) rather than
  * imported: LocalScope is a separate repository and pnpm workspace, and this
- * app must build without it present. Keep these in sync by hand — the fields
- * below are the ones the dashboard reads, not necessarily the whole model.
+ * app must build without it present.
+ *
+ * What remains here is only what the one surviving direct consumer needs — the
+ * `all=true` process opt-in in client.ts. Everything else the dashboard shows
+ * is normalized in the Go backend and typed in snapshot.ts, so the collector's
+ * envelope no longer reaches a component. Types for endpoints that moved were
+ * deleted with their pollers rather than kept as an unused mirror to drift.
  *
  * The load-bearing convention, which LocalScope states explicitly in its own
  * summary.ts: a count of `null` means NOT COLLECTED, never zero. Zero
@@ -27,13 +32,8 @@ export interface CollectorResult<T> {
   durationMs: number
 }
 
-/** Trust level for inferred (not observed) fields. `low` must be shown as such. */
-export type Confidence = 'high' | 'medium' | 'low'
-
 export type Runtime
   = | 'node' | 'python' | 'java' | 'go' | 'ruby' | 'php' | 'dotnet' | 'unknown'
-
-export type BindScope = 'loopback' | 'all' | 'specific'
 
 export interface ProjectRef {
   id: string
@@ -44,28 +44,6 @@ export interface ProjectRef {
   manifest: string | null
   git: { isRepo: boolean, branch: string | null }
   frameworks: string[]
-}
-
-export interface LocalService {
-  id: string
-  port: number
-  address: string
-  bindScope: BindScope
-  protocol: 'tcp'
-  ipVersion: 'ipv4' | 'ipv6'
-  pid: number
-  processName: string
-  command: string
-  cwd: string | null
-  runtime: Runtime
-  kind: string
-  /** Human label for the card title, e.g. 'Vite Development Server'. */
-  label: string
-  url: string | null
-  project: ProjectRef | null
-  /** Applies to kind/label/project — NOT to port/pid. */
-  confidence: Confidence
-  startedAt: string | null
 }
 
 export type RelevanceReason
@@ -93,30 +71,6 @@ export interface ProcessSnapshot {
   processes: DevProcess[]
   /** Every process on the machine, including filtered-out ones. */
   total: number
-}
-
-export type DevicePlatform = 'android' | 'ios'
-export type DeviceForm = 'emulator' | 'simulator' | 'physical'
-export type DeviceState = 'online' | 'offline' | 'unauthorized' | 'unavailable'
-
-export interface DevDevice {
-  id: string
-  serial: string
-  platform: DevicePlatform
-  form: DeviceForm
-  state: DeviceState
-  model: string | null
-  osVersion: string | null
-  details: Record<string, string>
-}
-
-/** Counts backing the Overview cards. `null` = not collected, never zero. */
-export interface SystemSummary {
-  services: { running: number | null }
-  processes: { relevant: number | null, total: number | null }
-  devices: { connected: number | null }
-  network: { active: number | null }
-  projects: { active: number | null }
 }
 
 /**

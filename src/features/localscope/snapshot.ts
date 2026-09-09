@@ -199,6 +199,34 @@ export const EMPTY_SERVICES: MachineServices = {
   items: null,
 }
 
+/** One emulator, simulator or physical device. */
+export interface MachineDevice {
+  id: string
+  serial: string
+  /** android or ios. */
+  platform: string
+  /** emulator, simulator or physical. */
+  form: string
+  /** online, offline, unauthorized or unavailable. */
+  state: string
+  /** Null when the adapter could not read it — an unauthorized device says little. */
+  model: string | null
+  osVersion: string | null
+}
+
+/**
+ * Devices carry one thing the other lists do not.
+ *
+ * `items: []` means the adapters looked and found none — but that is only a
+ * measurement when they actually ran. `connected` is the count when it is real
+ * and null when no adapter ran, so "0 devices" is never claimed for a machine
+ * that was never asked. Zero emulators and no Android SDK are different facts.
+ */
+export interface MachineDevices extends Freshness {
+  items: MachineDevice[] | null
+  connected: number | null
+}
+
 export const EMPTY_PROCESSES: MachineProcesses = {
   source: 'unavailable',
   collectedAt: null,
@@ -208,7 +236,38 @@ export const EMPTY_PROCESSES: MachineProcesses = {
   total: null,
 }
 
+export const EMPTY_DEVICES: MachineDevices = {
+  source: 'unavailable',
+  collectedAt: null,
+  ageMs: null,
+  degraded: [],
+  items: null,
+  connected: null,
+}
+
 /** True when the reading carries a list that was observed at some point. */
 export function hasItems(r: { items: unknown[] | null }): boolean {
   return r.items !== null
+}
+
+/**
+ * The one-line qualifier a reading needs when it is not simply current.
+ *
+ * Staleness outranks degradation for the same reason it does in the backend:
+ * "one source had trouble" must not stand in for "this may no longer describe
+ * the machine". Null means the reading is current and complete, and needs no
+ * qualifier at all.
+ *
+ * Shared because the Overview cards, the System Map and every section of the
+ * LocalScope page ask the same question, and three phrasings of "stale" would
+ * read as three different states.
+ */
+export function freshnessNote(reading: Freshness): string | null {
+  if (reading.source === 'stale') {
+    const age = formatAge(reading.ageMs)
+    return age === null ? 'stale' : `stale · ${age}`
+  }
+  if (reading.degraded.length > 0)
+    return `partial · ${reading.degraded.map(d => d.source).join(', ')}`
+  return null
 }

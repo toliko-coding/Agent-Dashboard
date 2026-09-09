@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import MetricCard from '@/components/ui/MetricCard.vue'
 import { useProjects } from '@/composables/useProjects'
 import { useAgents } from '@/features/agents'
-import { formatAge, useLocalMachine } from '@/features/localscope'
+import { freshnessNote, useLocalMachine } from '@/features/localscope'
 import { matchesStatusFilter } from '@/utils/agentStatusFilter'
 
 /*
@@ -70,30 +70,17 @@ function collectorMessage(notCollected = 'Not collected yet'): string {
  * machine right now" into "the machine has nothing on it" — but it must never
  * be shown as if it were current, so every stale card carries its age.
  */
-const staleHint = computed(() => {
-  if (snapshot.value.source !== 'stale')
-    return null
-  const age = formatAge(snapshot.value.ageMs)
-  return age === null ? 'stale' : `stale · ${age}`
-})
-
-/** Names the degraded sources so a partial reading explains itself. */
-const degradedHint = computed(() => {
-  if (snapshot.value.source !== 'degraded' || snapshot.value.degraded.length === 0)
-    return null
-  return `partial · ${snapshot.value.degraded.map(d => d.source).join(', ')}`
-})
+const readingHint = computed(() => freshnessNote(snapshot.value))
 
 /**
- * Hint precedence: staleness first, because it qualifies the number itself;
- * then degradation; then the card's own descriptive hint.
+ * Hint precedence: the reading's own qualifier first — staleness or a degraded
+ * source qualifies the number itself — then the card's descriptive hint.
+ *
+ * freshnessNote is shared with the LocalScope page rather than restated here,
+ * so "stale · 3m ago" means one thing across every surface.
  */
 function hintFor(own: string | undefined, count: number | null): string | undefined {
-  if (staleHint.value)
-    return staleHint.value
-  if (degradedHint.value)
-    return degradedHint.value
-  return count ? own : undefined
+  return readingHint.value ?? (count ? own : undefined)
 }
 
 const servicesCount = computed(() => snapshot.value.counts.services)

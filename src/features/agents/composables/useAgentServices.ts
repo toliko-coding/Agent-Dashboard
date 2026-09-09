@@ -72,15 +72,21 @@ export function useAgentServices(agent: (() => Agent) | Agent) {
    *
    * A stale list still counts as available: it names services that were running
    * moments ago, which is far closer to the truth than showing none.
+   *
+   * Tested with isArray rather than `!== null` so that anything which is not a
+   * list — a response that did not match the contract — is treated as "not
+   * known" too. That is the same claim as an unreachable collector, and it
+   * keeps a malformed body from reaching the correlation as if it were data.
    */
-  const available = computed(() => resource.data.value.items !== null)
-
-  const services = computed<MachineService[]>(() => {
-    const items = resource.data.value.items
-    if (items === null)
-      return []
-    return servicesForAgent(items, toValue(agent).cwd)
+  const items = computed(() => {
+    const value = resource.data.value.items
+    return Array.isArray(value) ? value : null
   })
+
+  const available = computed(() => items.value !== null)
+
+  const services = computed<MachineService[]>(() =>
+    items.value === null ? [] : servicesForAgent(items.value, toValue(agent).cwd))
 
   return { available, services }
 }

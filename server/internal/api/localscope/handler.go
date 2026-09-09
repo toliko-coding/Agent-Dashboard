@@ -69,6 +69,8 @@ type Handler struct {
 	lastServices     lastReading[[]Service]
 	lastProcesses    lastReading[[]Process]
 	lastProcessTotal lastReading[*int]
+	lastDevices      lastReading[[]Device]
+	lastConnected    lastReading[*int]
 }
 
 // New builds a Handler for the collector at host:port (expected to be
@@ -106,6 +108,7 @@ func (h *Handler) Mount(r chi.Router) {
 	// far larger and are only wanted while a view that shows them is open.
 	r.Get("/api/localscope/services", h.services)
 	r.Get("/api/localscope/processes", h.processes)
+	r.Get("/api/localscope/devices", h.devices)
 }
 
 func (h *Handler) proxy(w http.ResponseWriter, r *http.Request) {

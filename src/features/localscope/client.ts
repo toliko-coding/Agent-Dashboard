@@ -1,12 +1,18 @@
-import type { CollectorResult, DevDevice, LocalService, ProcessSnapshot, SystemSummary } from './types'
+import type { CollectorResult, ProcessSnapshot } from './types'
 
 /*
- * The single place that knows how to reach LocalScope.
+ * The single place that knows how to reach LocalScope directly.
  *
- * Everything above this file deals in typed models; nothing else in the
- * dashboard knows the collector's URL shape, its envelope, or that it is a
- * separate process at all. LocalScope owns system collection — this app only
- * consumes it, and must never re-implement ps/lsof/adb parsing.
+ * It has exactly one consumer left: the LocalScope page's "show all processes"
+ * opt-in. Everything else — the machine snapshot, services, processes and
+ * devices — goes through the dashboard's own normalized endpoints, which
+ * translate the collector's envelope in the backend so no component ever sees
+ * it.
+ *
+ * `all=true` stays here on purpose rather than moving to a normalized endpoint.
+ * It bypasses LocalScope's relevance filter AND its cache, turning one request
+ * into an uncached full process scan, so it must remain what it is: an explicit
+ * on-demand action, never anything polled.
  *
  * Reachability: the collector binds 127.0.0.1 and answers
  * `Access-Control-Allow-Origin: null`, so the browser cannot call it directly.
@@ -57,13 +63,7 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<CollectorResu
 }
 
 export const localScopeClient = {
-  health: (signal?: AbortSignal) => get<unknown>('/health', signal),
-  summary: (signal?: AbortSignal) => get<SystemSummary>('/system/summary', signal),
-  /** Listening ports. `all` bypasses LocalScope's relevance filter. */
-  services: (all = false, signal?: AbortSignal) =>
-    get<LocalService[]>(`/system/ports${all ? '?all=true' : ''}`, signal),
-  /** Developer processes. `all` returns every process on the machine. */
-  processes: (all = false, signal?: AbortSignal) =>
-    get<ProcessSnapshot>(`/system/processes${all ? '?all=true' : ''}`, signal),
-  devices: (signal?: AbortSignal) => get<DevDevice[]>('/system/devices', signal),
+  /** Every process on the machine, relevance filter and cache bypassed. */
+  allProcesses: (signal?: AbortSignal) =>
+    get<ProcessSnapshot>('/system/processes?all=true', signal),
 }

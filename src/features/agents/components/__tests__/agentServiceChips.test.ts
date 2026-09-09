@@ -164,7 +164,14 @@ describe('agentServiceChips — shared resource', () => {
   it('issues one request no matter how many cards mount', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
-      json: async () => ({ data: [svc({ id: 'a', discoveredProject: { rootPath: '/gh/LocalScope' } })], degraded: [], collectedAt: '', durationMs: 1 }),
+      // The dashboard's normalized envelope, which is what this resource reads.
+      json: async () => ({
+        source: 'ok',
+        collectedAt: null,
+        ageMs: null,
+        degraded: [],
+        items: [svc({ id: 'a', discoveredProject: { rootPath: '/gh/LocalScope' } })],
+      }),
     }))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -197,7 +204,7 @@ describe('agentServiceChips — shared resource', () => {
     vi.useFakeTimers()
     const fetchMock = vi.fn(async () => ({
       ok: true,
-      json: async () => ({ data: [], degraded: [], collectedAt: '', durationMs: 1 }),
+      json: async () => ({ source: 'ok', collectedAt: null, ageMs: null, degraded: [], items: [] }),
     }))
     vi.stubGlobal('fetch', fetchMock)
 
