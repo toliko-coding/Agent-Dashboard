@@ -9,6 +9,12 @@ type ptyHub struct {
 	mu   sync.Mutex
 	sb   *scrollback
 	subs map[chan []byte]struct{}
+	// paste tracks whether the application has enabled bracketed paste. It
+	// lives here because this is already the one place every byte of pty
+	// output passes through, so no second parser and no second tap on the
+	// stream is needed — and because a hub belongs to exactly one pty, which
+	// is what keeps the capability from leaking between agents.
+	paste pasteModeScanner
 }
 
 func newPtyHub(scrollbackBytes int) *ptyHub {
@@ -17,6 +23,7 @@ func newPtyHub(scrollbackBytes int) *ptyHub {
 
 // Write is io.Writer: called from the pty read loop.
 func (h *ptyHub) Write(p []byte) (int, error) {
+	h.paste.Feed(p)
 	_, _ = h.sb.Write(p)
 	h.mu.Lock()
 	for ch := range h.subs {
@@ -30,6 +37,13 @@ func (h *ptyHub) Write(p []byte) (int, error) {
 	}
 	h.mu.Unlock()
 	return len(p), nil
+}
+
+// BracketedPasteEnabled reports whether the application on this pty has turned
+// on bracketed paste, and therefore whether a message may be delivered as a
+// paste rather than as raw keystrokes.
+func (h *ptyHub) BracketedPasteEnabled() bool {
+	return h.paste.Enabled()
 }
 
 // Snapshot returns the current scrollback bytes, so callers (e.g. the

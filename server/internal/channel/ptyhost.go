@@ -161,14 +161,45 @@ func ptyMux(ptmx *ptyWriter, hub *ptyHub, token *rotatingToken) *http.ServeMux {
 			http.Error(w, `{"error":"missing message"}`, http.StatusBadRequest)
 			return
 		}
+		/*
+		 * Deliver as a bracketed paste when the application has asked for it.
+		 *
+		 * Raw keystroke injection loses almost all of a large message: measured
+		 * against a real Claude Code session, 16 KB arrived as 32 characters and
+		 * 1 KB as 2, an exact suffix, with the surviving length equal to
+		 * bytes/512. The same payloads framed as a paste arrived byte-for-byte
+		 * intact. Delay was not the variable — 250/500/1000/1500 ms produced
+		 * identical loss.
+		 *
+		 * The capability is observed, not assumed: if the application never
+		 * enabled mode 2004, the markers themselves would arrive as literal
+		 * keystrokes, so that case keeps today's raw write unchanged.
+		 */
+		text := []byte(payload.Message)
+		if hub.BracketedPasteEnabled() {
+			// A payload carrying the terminator would close the frame early and
+			// hand the remainder to the application as key input — the user's
+			// own text acting as terminal commands. The protocol offers no way
+			// to escape it inside a paste, so this is refused rather than sent
+			// mangled or silently trimmed.
+			if containsPasteTerminator(payload.Message) {
+				http.Error(w, `{"error":"message contains a bracketed-paste terminator and cannot be delivered safely"}`,
+					http.StatusUnprocessableEntity)
+				return
+			}
+			text = wrapBracketedPaste(payload.Message)
+		}
+
 		// Inject the text, then submit with a carriage return written SEPARATELY
 		// after a short delay. Claude's TUI debounces pasted input, so a CR
 		// coalesced into the same write is absorbed as a literal newline in the
 		// prompt (typed-but-not-submitted) instead of triggering submit. Splitting
 		// the write mirrors the tmux path, which sends the text then a separate Enter.
 		// One job: no other writer can slip between the text and the CR and get
-		// its bytes submitted as part of this prompt.
-		if err := ptmx.WriteParts(injectSubmitDelay, []byte(payload.Message), []byte("\r")); err != nil {
+		// its bytes submitted as part of this prompt — and, with framing, none can
+		// land inside the paste frame either, which would make another writer's
+		// bytes part of this prompt's content.
+		if err := ptmx.WriteParts(injectSubmitDelay, text, []byte("\r")); err != nil {
 			http.Error(w, `{"error":"write failed"}`, http.StatusInternalServerError)
 			return
 		}
