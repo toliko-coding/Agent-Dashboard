@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import type { MachineProcess } from '../snapshot'
+import type { DevProcess } from '../types'
 import { computed, ref } from 'vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import ViewPlaceholder from '@/components/ViewPlaceholder.vue'
 import { localScopeClient } from '../client'
 import {
   useLocalScopeDevices,
-  useLocalScopeProcesses,
-  useLocalScopeServices,
   useLocalScopeSummary,
 } from '../composables/useLocalScope'
+import { useMachineProcesses, useMachineServices } from '../composables/useMachineLists'
+import { formatAge } from '../snapshot'
 import { relevanceLabel } from '../types'
 import ServiceCard from './ServiceCard.vue'
 
@@ -18,11 +20,45 @@ import ServiceCard from './ServiceCard.vue'
  * classification and no project correlation is repeated on this side.
  */
 const summary = useLocalScopeSummary()
-const services = useLocalScopeServices()
-const processes = useLocalScopeProcesses()
+/*
+ * Services and processes come through the dashboard's own normalized
+ * endpoints; devices and the page's connection banner still read the raw
+ * client, which this phase deliberately leaves alone.
+ */
+const services = useMachineServices()
+const processes = useMachineProcesses()
 const devices = useLocalScopeDevices()
 
 const connected = computed(() => summary.reachable.value === true)
+
+/*
+ * A list is KNOWN only when the collector actually produced one. `items: null`
+ * means we do not know it — an unreachable collector says nothing about the
+ * machine — while `[]` means the collector looked and found none. The page must
+ * not render the first as the second.
+ */
+const serviceItems = computed(() => services.data.value.items)
+const processItems = computed(() => processes.data.value.items)
+
+/** A short badge for a reading that is not simply current. */
+function freshnessNote(source: string, ageMs: number | null): string | null {
+  if (source === 'stale') {
+    const age = formatAge(ageMs)
+    return age === null ? 'stale' : `stale · ${age}`
+  }
+  return null
+}
+
+function degradedNote(degraded: { source: string }[]): string | null {
+  return degraded.length === 0 ? null : `partial · ${degraded.map(d => d.source).join(', ')}`
+}
+
+const servicesNote = computed(() =>
+  freshnessNote(services.data.value.source, services.data.value.ageMs)
+  ?? degradedNote(services.data.value.degraded))
+const processesNote = computed(() =>
+  freshnessNote(processes.data.value.source, processes.data.value.ageMs)
+  ?? degradedNote(processes.data.value.degraded))
 
 /*
  * LocalScope filters hundreds of macOS processes down to the developer-relevant
@@ -49,8 +85,43 @@ async function toggleAllProcesses(): Promise<void> {
   }
 }
 
-const allShown = computed(() =>
-  (showAllProcesses.value ? allProcesses.value?.processes : processes.data.value?.processes) ?? [])
+/*
+ * The unfiltered list is still fetched through the raw client with `all=true`.
+ * That flag bypasses LocalScope's relevance filter and its cache, so it is kept
+ * off the normalized endpoints entirely and remains what it always was: an
+ * explicit, on-demand opt-in rather than anything polled.
+ */
+/**
+ * Adapts a raw collector row to the normalized shape so the list below renders
+ * one type. Only the `all=true` escape hatch needs this — everything polled
+ * arrives normalized from the dashboard's own endpoint.
+ */
+function fromRaw(p: DevProcess): MachineProcess {
+  return {
+    id: p.id,
+    pid: p.pid,
+    ppid: p.ppid,
+    name: p.name,
+    command: p.command,
+    cwd: p.cwd,
+    runtime: p.runtime,
+    cpuPercent: p.cpuPercent,
+    memoryBytes: p.memoryBytes,
+    elapsedSeconds: p.elapsedSeconds,
+    startedAt: p.startedAt,
+    ports: p.ports,
+    relevanceReasons: p.relevanceReasons,
+    // The raw client's mirrored ProjectRef predates LocalScope's `repo` field,
+    // so this one adapter cannot supply it. Null is honest here: it means "not
+    // known from this source", and only the `all=true` rows take this path.
+    discoveredProject: p.project === null
+      ? null
+      : { ...p.project, repo: null },
+  }
+}
+
+const allShown = computed<MachineProcess[]>(() =>
+  (showAllProcesses.value ? allProcesses.value?.processes.map(fromRaw) : processItems.value) ?? [])
 
 /*
  * The list is capped for rendering. With "show all" on a busy machine this is
@@ -62,8 +133,8 @@ const RENDER_CAP = 60
 const shownProcesses = computed(() => allShown.value.slice(0, RENDER_CAP))
 const hiddenCount = computed(() => Math.max(0, allShown.value.length - RENDER_CAP))
 
-const processTotal = computed(() => processes.data.value?.total ?? null)
-const relevantCount = computed(() => processes.data.value?.processes.length ?? null)
+const processTotal = computed(() => processes.data.value.total)
+const relevantCount = computed(() => processItems.value?.length ?? null)
 
 const deviceList = computed(() => devices.data.value ?? [])
 
@@ -102,15 +173,22 @@ function stateTone(state: string): string {
           <h2 class="text-[13px] font-semibold text-fg">
             Local Services
           </h2>
-          <span class="text-[11px] text-fg-faint font-mono">
-            {{ services.data.value?.length ?? 0 }} listening
+          <span v-if="serviceItems" class="text-[11px] text-fg-faint font-mono">
+            {{ serviceItems.length }} listening
+          </span>
+          <span v-if="servicesNote" data-testid="services-freshness" class="text-[11px] text-warning-text font-mono">
+            {{ servicesNote }}
           </span>
         </header>
-        <p v-if="(services.data.value?.length ?? 0) === 0" class="text-[12px] text-fg-mute">
+        <!-- Not knowing the list and knowing it is empty are different claims. -->
+        <p v-if="!serviceItems" data-testid="services-unknown" class="text-[12px] text-fg-mute">
+          Service list unavailable — LocalScope has not reported one.
+        </p>
+        <p v-else-if="serviceItems.length === 0" class="text-[12px] text-fg-mute">
           No listening development services right now.
         </p>
         <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="localscope-services">
-          <ServiceCard v-for="s in services.data.value ?? []" :key="s.id" :service="s" />
+          <ServiceCard v-for="s in serviceItems" :key="s.id" :service="s" />
         </div>
       </section>
 
@@ -122,6 +200,9 @@ function stateTone(state: string): string {
           </h2>
           <span v-if="relevantCount !== null && processTotal !== null" class="text-[11px] text-fg-faint font-mono">
             {{ showAllProcesses ? allShown.length : relevantCount }} of {{ processTotal }}
+          </span>
+          <span v-if="processesNote" data-testid="processes-freshness" class="text-[11px] text-warning-text font-mono">
+            {{ processesNote }}
           </span>
           <button
             type="button"
@@ -138,6 +219,10 @@ function stateTone(state: string): string {
           Loading every process…
         </p>
 
+        <p v-else-if="!processItems && !showAllProcesses" data-testid="processes-unknown" class="text-[12px] text-fg-mute">
+          Process list unavailable — LocalScope has not reported one.
+        </p>
+
         <ul v-else class="flex flex-col gap-1" data-testid="localscope-processes">
           <li
             v-for="p in shownProcesses"
@@ -150,8 +235,8 @@ function stateTone(state: string): string {
               <span v-if="p.ports.length" class="text-[10px] font-mono text-accent shrink-0">
                 :{{ p.ports.join(', :') }}
               </span>
-              <span v-if="p.project" class="ml-auto text-[10px] text-fg-mute truncate shrink-0">
-                {{ p.project.name }}
+              <span v-if="p.discoveredProject" class="ml-auto text-[10px] text-fg-mute truncate shrink-0">
+                {{ p.discoveredProject.name }}
               </span>
             </div>
             <!-- A dev command line can be thousands of characters (bundler

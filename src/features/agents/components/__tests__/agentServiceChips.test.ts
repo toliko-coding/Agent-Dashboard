@@ -8,16 +8,27 @@ function agentAt(cwd: string, id = cwd): Agent {
 }
 
 function svc(over: Record<string, unknown>) {
-  return { id: 's', port: 5173, label: 'Vite Development Server', cwd: null, project: null, ...over }
+  return { id: 's', port: 5173, label: 'Vite Development Server', cwd: null, discoveredProject: null, ...over }
 }
 
+/*
+ * `reachable: false` now means the normalized list is unknown — items: null —
+ * which is the same claim the raw resource's reachable flag used to carry.
+ */
 async function mountChips(agent: Agent, state: { reachable?: boolean | null, error?: string | null, data?: any[] | null } = {}) {
   vi.resetModules()
+  const known = state.reachable !== false && !state.error
   vi.doMock('@/features/localscope', () => ({
-    useLocalScopeServices: () => ({
-      data: { value: state.data === undefined ? [] : state.data },
-      error: { value: state.error ?? null },
-      reachable: { value: state.reachable === undefined ? true : state.reachable },
+    useMachineServices: () => ({
+      data: {
+        value: {
+          source: known ? 'ok' : 'unavailable',
+          collectedAt: null,
+          ageMs: null,
+          degraded: [],
+          items: known ? (state.data === undefined ? [] : state.data) : null,
+        },
+      },
       loaded: { value: true },
       refetch: async () => {},
     }),
@@ -30,8 +41,8 @@ describe('agentServiceChips', () => {
   it('shows a port chip per correlated service', async () => {
     const w = await mountChips(agentAt('/gh/LocalScope'), {
       data: [
-        svc({ id: 'a', port: 5173, project: { rootPath: '/gh/LocalScope' } }),
-        svc({ id: 'b', port: 7317, project: { rootPath: '/gh/LocalScope' } }),
+        svc({ id: 'a', port: 5173, discoveredProject: { rootPath: '/gh/LocalScope' } }),
+        svc({ id: 'b', port: 7317, discoveredProject: { rootPath: '/gh/LocalScope' } }),
       ],
     })
     expect(w.get('[data-testid="agent-service-5173"]').text()).toContain(':5173')
@@ -40,7 +51,7 @@ describe('agentServiceChips', () => {
 
   it('caps the chips and counts the rest, keeping the card compact', async () => {
     const w = await mountChips(agentAt('/gh/P'), {
-      data: [1, 2, 3, 4].map(n => svc({ id: `s${n}`, port: 3000 + n, project: { rootPath: '/gh/P' } })),
+      data: [1, 2, 3, 4].map(n => svc({ id: `s${n}`, port: 3000 + n, discoveredProject: { rootPath: '/gh/P' } })),
     })
     expect(w.findAll('[data-testid^="agent-service-3"]')).toHaveLength(2)
     expect(w.get('[data-testid="agent-service-overflow"]').text()).toBe('+2')
@@ -48,7 +59,7 @@ describe('agentServiceChips', () => {
 
   it('renders nothing when the project has no service', async () => {
     const w = await mountChips(agentAt('/gh/Quiet'), {
-      data: [svc({ id: 'a', project: { rootPath: '/gh/Elsewhere' } })],
+      data: [svc({ id: 'a', discoveredProject: { rootPath: '/gh/Elsewhere' } })],
     })
     expect(w.find('[data-testid="agent-service-chips"]').exists()).toBe(false)
     // Specifically not a zero: nothing here can distinguish "collected and none
@@ -79,7 +90,7 @@ describe('agentServiceChips', () => {
    */
   it('links a chip to the URL LocalScope reported', async () => {
     const w = await mountChips(agentAt('/gh/LocalScope'), {
-      data: [svc({ id: 'a', port: 5173, url: 'http://localhost:5173', project: { rootPath: '/gh/LocalScope' } })],
+      data: [svc({ id: 'a', port: 5173, url: 'http://localhost:5173', discoveredProject: { rootPath: '/gh/LocalScope' } })],
     })
     const chip = w.get('[data-testid="agent-service-5173"]')
     expect(chip.element.tagName).toBe('A')
@@ -91,7 +102,7 @@ describe('agentServiceChips', () => {
 
   it('does not link — or invent a URL for — a service with none', async () => {
     const w = await mountChips(agentAt('/gh/LocalScope'), {
-      data: [svc({ id: 'b', port: 5432, label: 'database', url: null, project: { rootPath: '/gh/LocalScope' } })],
+      data: [svc({ id: 'b', port: 5432, label: 'database', url: null, discoveredProject: { rootPath: '/gh/LocalScope' } })],
     })
     const chip = w.get('[data-testid="agent-service-5432"]')
     expect(chip.element.tagName).not.toBe('A')
@@ -102,13 +113,19 @@ describe('agentServiceChips', () => {
   // The card opens the workspace on click; a chip must not do both.
   it('keeps a chip click off the surrounding card', async () => {
     const onCard = vi.fn()
-    const state = { data: [svc({ id: 'a', port: 5173, url: 'http://localhost:5173', project: { rootPath: '/gh/X' } })] }
+    const state = { data: [svc({ id: 'a', port: 5173, url: 'http://localhost:5173', discoveredProject: { rootPath: '/gh/X' } })] }
     vi.resetModules()
     vi.doMock('@/features/localscope', () => ({
-      useLocalScopeServices: () => ({
-        data: { value: state.data },
-        error: { value: null },
-        reachable: { value: true },
+      useMachineServices: () => ({
+        data: {
+          value: {
+            source: 'ok',
+            collectedAt: null,
+            ageMs: null,
+            degraded: [],
+            items: state.data,
+          },
+        },
         loaded: { value: true },
         refetch: async () => {},
       }),
@@ -125,7 +142,7 @@ describe('agentServiceChips', () => {
 
   it('describes the services for assistive tech', async () => {
     const w = await mountChips(agentAt('/gh/LocalScope'), {
-      data: [svc({ id: 'a', port: 5173, project: { rootPath: '/gh/LocalScope' } })],
+      data: [svc({ id: 'a', port: 5173, discoveredProject: { rootPath: '/gh/LocalScope' } })],
     })
     expect(w.get('.sr-only').text()).toContain('Vite Development Server on port 5173')
   })
@@ -147,7 +164,7 @@ describe('agentServiceChips — shared resource', () => {
   it('issues one request no matter how many cards mount', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
-      json: async () => ({ data: [svc({ id: 'a', project: { rootPath: '/gh/LocalScope' } })], degraded: [], collectedAt: '', durationMs: 1 }),
+      json: async () => ({ data: [svc({ id: 'a', discoveredProject: { rootPath: '/gh/LocalScope' } })], degraded: [], collectedAt: '', durationMs: 1 }),
     }))
     vi.stubGlobal('fetch', fetchMock)
 

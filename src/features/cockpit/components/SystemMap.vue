@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useProjects } from '@/composables/useProjects'
 import { useSystemResources } from '@/composables/useSystemResources'
 import { useAgents } from '@/features/agents'
-import { useLocalScopeSummary } from '@/features/localscope'
+import { useLocalMachine } from '@/features/localscope'
 import CockpitPanel from './CockpitPanel.vue'
 
 /*
@@ -24,18 +24,28 @@ const { agents } = useAgents({ autoStart: false })
 const { projects } = useProjects()
 const resources = useSystemResources()
 
-// LocalScope drives the three right-hand nodes. When its collector is running
-// they carry real counts; when it is absent they stay dashed and say so.
-const localScope = useLocalScopeSummary()
-const lsConnected = computed(() => localScope.reachable.value === true)
+/*
+ * LocalScope drives the three right-hand nodes, through the dashboard's own
+ * normalized snapshot — the same object and the same poller the Overview reads.
+ *
+ * Sharing it is the point: two surfaces deriving machine state from separate
+ * readings of the same collector could show different counts at the same
+ * moment, which is a bug the user would have no way to explain.
+ */
+const { snapshot: machine } = useLocalMachine()
+const lsConnected = computed(() => machine.value.source !== 'unavailable')
 
-/** LocalScope reports null for "not collected"; only a number is a real count. */
+/**
+ * A count is real only when the collector produced it. `null` means it was not
+ * measured — never zero — and a stale reading keeps its value while saying so.
+ */
 function collectorNode(count: number | null | undefined, unit: string) {
   if (!lsConnected.value)
     return { sub: 'Not connected', available: false }
   if (count === null || count === undefined)
     return { sub: 'Not collected', available: false }
-  return { sub: `${count} ${unit}`, available: true }
+  const suffix = machine.value.source === 'stale' ? ' (stale)' : ''
+  return { sub: `${count} ${unit}${suffix}`, available: true }
 }
 
 const machineLabel = computed(() => resources.info.value?.cpu.model?.trim() || 'Local machine')
@@ -81,12 +91,12 @@ const sources = computed<MapNode[]>(() => [
 ])
 
 const outputs = computed<MapNode[]>(() => {
-  const s = localScope.data.value
-  const services = collectorNode(s?.services.running, 'listening')
-  const devices = collectorNode(s?.devices.connected, 'connected')
-  // Network has no collector even when LocalScope runs, so this stays dashed
-  // until that lands — driven by its own null, not hardcoded here.
-  const network = collectorNode(s?.network.active, 'active')
+  const c = machine.value.counts
+  const services = collectorNode(c.services, 'listening')
+  const devices = collectorNode(c.devices, 'connected')
+  // A real count: LocalScope collects outbound connections. It reads "not
+  // collected" only when that collector actually degraded.
+  const network = collectorNode(c.network, 'active')
   return [
     { id: 'services', label: 'Local Services', ...services, x: 400, y: 22 },
     { id: 'emulators', label: 'Devices', ...devices, x: 400, y: 90 },

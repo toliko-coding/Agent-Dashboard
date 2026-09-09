@@ -132,6 +132,11 @@ export const RELEVANCE_LABELS: Record<RelevanceReason, string> = {
   'container': 'Container process',
 }
 
-export function relevanceLabel(reason: RelevanceReason): string {
-  return RELEVANCE_LABELS[reason] ?? reason
+/*
+ * Takes a plain string, not the RelevanceReason union: the normalized process
+ * model carries reasons as strings, because a reason LocalScope adds later must
+ * still render — as itself — rather than failing to type-check or vanishing.
+ */
+export function relevanceLabel(reason: string): string {
+  return RELEVANCE_LABELS[reason as RelevanceReason] ?? reason
 }

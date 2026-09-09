@@ -16,12 +16,21 @@ let state: { reachable: boolean | null, error: string | null, data: any[] | null
 const resourceCalls = { count: 0 }
 
 vi.mock('@/features/localscope', () => ({
-  useLocalScopeServices: () => {
+  useMachineServices: () => {
     resourceCalls.count++
+    // A list is known only when the collector actually reported one; the old
+    // reachable/error pair collapses into items being null.
+    const known = state.reachable === true && state.error === null && state.data !== null
     return {
-      data: { value: state.data },
-      error: { value: state.error },
-      reachable: { value: state.reachable },
+      data: {
+        value: {
+          source: known ? 'ok' : 'unavailable',
+          collectedAt: null,
+          ageMs: null,
+          degraded: [],
+          items: known ? state.data : null,
+        },
+      },
       loaded: { value: state.reachable !== null },
       refetch: async () => {},
     }
@@ -29,7 +38,7 @@ vi.mock('@/features/localscope', () => ({
 }))
 
 function svc(over: Record<string, unknown>) {
-  return { id: 's', port: 5173, label: 'Vite Development Server', cwd: null, project: null, ...over }
+  return { id: 's', port: 5173, label: 'Vite Development Server', cwd: null, discoveredProject: null, ...over }
 }
 
 function agentAt(cwd: string): Agent {
@@ -59,8 +68,8 @@ describe('useAgentServices', () => {
   it('correlates two services running in the agent project', async () => {
     const { result, w } = await correlate('/gh/LocalScope', {
       data: [
-        svc({ id: 'a', port: 5173, project: { rootPath: '/gh/LocalScope' } }),
-        svc({ id: 'b', port: 7317, project: { rootPath: '/gh/LocalScope/packages/collector' } }),
+        svc({ id: 'a', port: 5173, discoveredProject: { rootPath: '/gh/LocalScope' } }),
+        svc({ id: 'b', port: 7317, discoveredProject: { rootPath: '/gh/LocalScope/packages/collector' } }),
       ],
     })
     expect(result.available.value).toBe(true)
@@ -70,7 +79,7 @@ describe('useAgentServices', () => {
 
   it('correlates nothing when the project runs no service', async () => {
     const { result, w } = await correlate('/gh/Quiet', {
-      data: [svc({ id: 'a', project: { rootPath: '/gh/Other' } })],
+      data: [svc({ id: 'a', discoveredProject: { rootPath: '/gh/Other' } })],
     })
     expect(result.available.value).toBe(true)
     expect(result.services.value).toEqual([])
@@ -99,7 +108,7 @@ describe('useAgentServices', () => {
 
   it('ignores a service from an unrelated project', async () => {
     const { result, w } = await correlate('/gh/LocalScope', {
-      data: [svc({ id: 'x', port: 3000, project: { rootPath: '/gh/WalletRadar_web' } })],
+      data: [svc({ id: 'x', port: 3000, discoveredProject: { rootPath: '/gh/WalletRadar_web' } })],
     })
     expect(result.services.value).toEqual([])
     w.unmount()
@@ -111,7 +120,7 @@ describe('useAgentServices', () => {
    */
   it('does not correlate a sibling directory sharing a prefix', async () => {
     const { result, w } = await correlate('/gh/LocalScope', {
-      data: [svc({ id: 'y', project: { rootPath: '/gh/LocalScope-docs' } })],
+      data: [svc({ id: 'y', discoveredProject: { rootPath: '/gh/LocalScope-docs' } })],
     })
     expect(result.services.value).toEqual([])
     w.unmount()
@@ -119,7 +128,7 @@ describe('useAgentServices', () => {
 
   it('correlates upward too — agent in a subdirectory of the service project', async () => {
     const { result, w } = await correlate('/gh/LocalScope/packages/web', {
-      data: [svc({ id: 'z', project: { rootPath: '/gh/LocalScope' } })],
+      data: [svc({ id: 'z', discoveredProject: { rootPath: '/gh/LocalScope' } })],
     })
     expect(result.services.value.map(s => s.id)).toEqual(['z'])
     w.unmount()
@@ -137,7 +146,7 @@ describe('useAgentServices', () => {
     state = {
       reachable: true,
       error: null,
-      data: [svc({ id: 'shared', project: { rootPath: '/gh/LocalScope' } })],
+      data: [svc({ id: 'shared', discoveredProject: { rootPath: '/gh/LocalScope' } })],
     }
     vi.resetModules()
     const { useAgentServices } = await import('../useAgentServices')

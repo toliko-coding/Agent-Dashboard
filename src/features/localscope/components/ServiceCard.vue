@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LocalService } from '../types'
+import type { MachineService } from '../snapshot'
 import AppCard from '@/components/ui/AppCard.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 
@@ -11,7 +11,7 @@ import CopyButton from '@/components/ui/CopyButton.vue'
  * `confidence` covers label/kind/project, NOT port/pid. A low-confidence guess
  * is marked so nothing inferred is read as observed.
  */
-defineProps<{ service: LocalService }>()
+defineProps<{ service: MachineService }>()
 </script>
 
 <template>
@@ -21,7 +21,7 @@ defineProps<{ service: LocalService }>()
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-1.5 min-w-0">
             <span class="text-[13px] font-semibold text-fg truncate">
-              {{ service.project?.name ?? service.processName }}
+              {{ service.discoveredProject?.name ?? service.processName }}
             </span>
             <span
               v-if="service.confidence === 'low'"
@@ -92,16 +92,16 @@ defineProps<{ service: LocalService }>()
         </div>
       </dl>
 
-      <div v-if="service.project" class="flex items-center gap-1 min-w-0">
+      <div v-if="service.discoveredProject" class="flex items-center gap-1 min-w-0">
         <!-- dir="rtl" keeps the END of a long path visible, which is the part
              that identifies the project; plain truncate would cut it off. -->
         <span
           class="text-[10px] text-fg-faint font-mono truncate text-left"
           dir="rtl"
-          :title="service.project.rootPath"
-        >{{ service.project.displayPath }}</span>
-        <span v-if="service.project.git.branch" class="text-[10px] text-fg-mute shrink-0">· {{ service.project.git.branch }}</span>
-        <CopyButton :value="service.project.rootPath" label="project path" />
+          :title="service.discoveredProject.rootPath"
+        >{{ service.discoveredProject.displayPath }}</span>
+        <span v-if="service.discoveredProject.git.branch" class="text-[10px] text-fg-mute shrink-0">· {{ service.discoveredProject.git.branch }}</span>
+        <CopyButton :value="service.discoveredProject.rootPath" label="project path" />
       </div>
     </div>
   </AppCard>

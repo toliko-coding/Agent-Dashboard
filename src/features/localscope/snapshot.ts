@@ -95,3 +95,120 @@ export function formatAge(ageMs: number | null): string | null {
     return `${minutes}m ago`
   return `${Math.floor(minutes / 60)}h ago`
 }
+
+/*
+ * Normalized lists.
+ *
+ * Same freshness vocabulary as the snapshot, deliberately: a surface that shows
+ * counts and one that shows rows must not need two different ideas of what
+ * "stale" means.
+ */
+
+/** Shared by every normalized LocalScope response. */
+export interface Freshness {
+  source: SnapshotSource
+  collectedAt: string | null
+  ageMs: number | null
+  degraded: LocalMachineDegradation[]
+}
+
+/**
+ * A project LocalScope inferred from a working directory.
+ *
+ * Named apart from a project the user registered here: they answer different
+ * questions and disagree on monorepos. Nothing may treat this as a dashboard
+ * project id until the two are reconciled.
+ */
+export interface DiscoveredProject {
+  id: string
+  name: string
+  /** The manifest's own name, often unrelated to the folder. */
+  packageName: string | null
+  rootPath: string
+  /** rootPath with $HOME collapsed to ~. */
+  displayPath: string
+  manifest: string | null
+  git: { isRepo: boolean, branch: string | null }
+  /** The enclosing repository when the root is not itself the repo root. */
+  repo: { name: string, rootPath: string } | null
+  frameworks: string[]
+}
+
+/** A listening port, in developer terms. */
+export interface MachineService {
+  id: string
+  pid: number
+  port: number
+  address: string
+  protocol: string
+  bindScope: string
+  ipVersion: string
+  processName: string
+  /** LocalScope's sanitized argv, passed through — never rebuilt here. */
+  command: string
+  cwd: string | null
+  runtime: string
+  kind: string
+  label: string
+  url: string | null
+  discoveredProject: DiscoveredProject | null
+  /** Qualifies kind, label and discoveredProject — never port or pid. */
+  confidence: string
+  startedAt: string | null
+}
+
+/** A development process LocalScope considered relevant. */
+export interface MachineProcess {
+  id: string
+  pid: number
+  ppid: number
+  name: string
+  command: string
+  cwd: string | null
+  runtime: string
+  /** Null when ps did not report it — not 0. */
+  cpuPercent: number | null
+  memoryBytes: number | null
+  elapsedSeconds: number | null
+  startedAt: string | null
+  ports: number[]
+  relevanceReasons: string[]
+  discoveredProject: DiscoveredProject | null
+}
+
+/**
+ * `items` is null when the list is not known and `[]` when the collector looked
+ * and found none. Collapsing the two would report an unreachable collector as a
+ * machine with nothing running on it.
+ */
+export interface MachineServices extends Freshness {
+  items: MachineService[] | null
+}
+
+export interface MachineProcesses extends Freshness {
+  items: MachineProcess[] | null
+  /** Every process on the machine, so a filtered list can say "38 of 818". */
+  total: number | null
+}
+
+export const EMPTY_SERVICES: MachineServices = {
+  source: 'unavailable',
+  collectedAt: null,
+  ageMs: null,
+  degraded: [],
+  items: null,
+}
+
+export const EMPTY_PROCESSES: MachineProcesses = {
+  source: 'unavailable',
+  collectedAt: null,
+  ageMs: null,
+  degraded: [],
+  items: null,
+  total: null,
+}
+
+/** True when the reading carries a list that was observed at some point. */
+export function hasItems(r: { items: unknown[] | null }): boolean {
+  return r.items !== null
+}

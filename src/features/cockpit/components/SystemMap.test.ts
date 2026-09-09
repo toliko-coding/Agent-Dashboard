@@ -11,20 +11,47 @@ vi.mock('@/composables/useSystemResources', () => ({
   useSystemResources: () => ({ info: { value: { cpu: { model: 'Apple M1' } } }, error: { value: null } }),
 }))
 
-// Overridden per-test via mockLocalScope(); defaults to collector absent.
-let lsState: { reachable: boolean | null, data: any } = { reachable: false, data: null }
+/*
+ * The map now reads the dashboard's normalized snapshot — the same object and
+ * the same poller the Overview uses. `reachable: false` maps onto the snapshot
+ * saying `unavailable`.
+ */
+const NO_COUNTS = {
+  services: null,
+  processesRelevant: null,
+  processesTotal: null,
+  devices: null,
+  network: null,
+  projects: null,
+}
+let lsSnapshot: any = { source: 'unavailable', collectedAt: null, ageMs: null, degraded: [], counts: NO_COUNTS }
 vi.mock('@/features/localscope', () => ({
-  useLocalScopeSummary: () => ({
-    data: { value: lsState.data },
-    error: { value: null },
-    reachable: { value: lsState.reachable },
-    loaded: { value: lsState.reachable !== null },
+  useLocalMachine: () => ({
+    snapshot: { value: lsSnapshot },
+    loaded: { value: true },
     refetch: async () => {},
   }),
 }))
 
-function mockLocalScope(next: { reachable: boolean | null, data?: any }) {
-  lsState = { reachable: next.reachable, data: next.data ?? null }
+function mockLocalScope(next: { reachable: boolean | null, data?: any, source?: string }) {
+  const counts = next.data
+    ? {
+        ...NO_COUNTS,
+        services: next.data.services?.running ?? null,
+        processesRelevant: next.data.processes?.relevant ?? null,
+        processesTotal: next.data.processes?.total ?? null,
+        devices: next.data.devices?.connected ?? null,
+        network: next.data.network?.active ?? null,
+        projects: next.data.projects?.active ?? null,
+      }
+    : NO_COUNTS
+  lsSnapshot = {
+    source: next.source ?? (next.reachable === true ? 'ok' : 'unavailable'),
+    collectedAt: next.reachable === true ? '2026-01-01T00:00:00Z' : null,
+    ageMs: next.reachable === true ? 1000 : null,
+    degraded: [],
+    counts,
+  }
 }
 
 const stubs = { CockpitPanel: { template: '<div><slot /></div>' } }
@@ -102,5 +129,53 @@ describe('systemMap', () => {
   it('keeps the diagram in a horizontally scrollable container', async () => {
     const w = await mountMap()
     expect(w.get('[data-testid="system-map"]').classes()).toContain('overflow-x-auto')
+  })
+})
+
+/*
+ * The map and the Overview must derive machine state from the SAME normalized
+ * snapshot. Two surfaces reading the collector separately could show different
+ * counts at the same moment, which the user would have no way to explain.
+ */
+describe('systemMap — normalized snapshot', () => {
+  it('consumes useLocalMachine, not the raw summary poller', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const src = readFileSync(resolve(process.cwd(), 'src/features/cockpit/components/SystemMap.vue'), 'utf8')
+    expect(src).toContain('useLocalMachine')
+    expect(src).not.toContain('useLocalScopeSummary')
+    expect(src).not.toContain('CollectorResult')
+  })
+
+  it('reads the same counts the Overview does, from one snapshot shape', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const overview = readFileSync(resolve(process.cwd(), 'src/features/cockpit/components/OverviewMetrics.vue'), 'utf8')
+    const map = readFileSync(resolve(process.cwd(), 'src/features/cockpit/components/SystemMap.vue'), 'utf8')
+    // Both reach for counts on the snapshot rather than interpreting an
+    // envelope of their own.
+    expect(overview).toContain('useLocalMachine')
+    expect(map).toContain('useLocalMachine')
+    expect(overview).toContain('.counts')
+    expect(map).toContain('.counts')
+  })
+
+  it('shows a stale reading with its value, marked stale', async () => {
+    mockLocalScope({
+      reachable: true,
+      source: 'stale',
+      data: { services: { running: 4 }, devices: { connected: 1 }, network: { active: 22 } },
+    })
+    const w = await mountMap()
+    expect(w.text()).toContain('4 listening (stale)')
+    expect(w.text()).toContain('1 connected (stale)')
+  })
+
+  it('does not turn an unavailable collector into zero counts', async () => {
+    mockLocalScope({ reachable: false })
+    const w = await mountMap()
+    expect(w.text()).toContain('Not connected')
+    expect(w.text()).not.toContain('0 listening')
+    expect(w.text()).not.toContain('0 connected')
   })
 })

@@ -4,10 +4,16 @@ import { describe, expect, it, vi } from 'vitest'
 
 let servicesData: any[] = []
 vi.mock('@/features/localscope', () => ({
-  useLocalScopeServices: () => ({
-    data: { value: servicesData },
-    error: { value: null },
-    reachable: { value: true },
+  useMachineServices: () => ({
+    data: {
+      value: {
+        source: 'ok',
+        collectedAt: null,
+        ageMs: null,
+        degraded: [],
+        items: servicesData,
+      },
+    },
     loaded: { value: true },
     refetch: async () => {},
   }),
@@ -70,7 +76,7 @@ describe('agentDiagram', () => {
    */
   it('links a LocalScope service running in the agent\'s project', async () => {
     const w = await mountDiagram({}, [
-      { id: 's1', label: 'Vite Development Server', port: 5173, cwd: '/gh/LocalScope', project: { rootPath: '/gh/LocalScope' } },
+      { id: 's1', label: 'Vite Development Server', port: 5173, cwd: '/gh/LocalScope', discoveredProject: { rootPath: '/gh/LocalScope' } },
     ])
     const leaf = w.get('[data-testid="diagram-leaf-svc-s1"]')
     expect(leaf.text()).toContain(':5173')
@@ -78,7 +84,7 @@ describe('agentDiagram', () => {
 
   it('does not link a service from an unrelated project', async () => {
     const w = await mountDiagram({}, [
-      { id: 's2', label: 'Other Server', port: 3000, cwd: '/gh/Something-Else', project: { rootPath: '/gh/Something-Else' } },
+      { id: 's2', label: 'Other Server', port: 3000, cwd: '/gh/Something-Else', discoveredProject: { rootPath: '/gh/Something-Else' } },
     ])
     expect(w.find('[data-testid="diagram-leaf-svc-s2"]').exists()).toBe(false)
   })

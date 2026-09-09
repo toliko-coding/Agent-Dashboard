@@ -4,10 +4,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { axe } from '@/utils/testA11y'
 
 vi.mock('@/features/localscope', () => ({
-  useLocalScopeServices: () => ({
-    data: { value: [] },
-    error: { value: null },
-    reachable: { value: false },
+  // Collector absent: the list is unknown, which is items: null — not [].
+  useMachineServices: () => ({
+    data: {
+      value: { source: 'unavailable', collectedAt: null, ageMs: null, degraded: [], items: null },
+    },
     loaded: { value: true },
     refetch: async () => {},
   }),

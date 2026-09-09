@@ -18,9 +18,10 @@ export {
   useLocalScopeSummary,
 } from './composables/useLocalScope'
 export { useLocalScopeReachable } from './composables/useLocalScopeResource'
-export { EMPTY_SNAPSHOT, formatAge, hasReading } from './snapshot'
+export { useMachineProcesses, useMachineServices } from './composables/useMachineLists'
+export { EMPTY_PROCESSES, EMPTY_SERVICES, EMPTY_SNAPSHOT, formatAge, hasItems, hasReading } from './snapshot'
 
-export type { LocalMachineCounts, LocalMachineDegradation, LocalMachineSnapshot, SnapshotSource } from './snapshot'
+export type { DiscoveredProject, Freshness, LocalMachineCounts, LocalMachineDegradation, LocalMachineSnapshot, MachineProcess, MachineProcesses, MachineService, MachineServices, SnapshotSource } from './snapshot'
 export { relevanceLabel } from './types'
 export type {
   DevDevice,
