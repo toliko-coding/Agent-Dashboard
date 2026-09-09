@@ -35,6 +35,7 @@ import (
 	apimemory "github.com/lx-wnk/agent-dashboard/server/internal/api/memory"
 	apiobsidian "github.com/lx-wnk/agent-dashboard/server/internal/api/obsidian"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/onboarding"
+	"github.com/lx-wnk/agent-dashboard/server/internal/api/orchestrations"
 	planapi "github.com/lx-wnk/agent-dashboard/server/internal/api/plan"
 	apiplugins "github.com/lx-wnk/agent-dashboard/server/internal/api/plugins"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/presets"
@@ -205,6 +206,11 @@ type RouterDeps struct {
 	ChannelReply           *agents.ChannelReplyHandler
 	ChannelStageOutput     *agents.ChannelStageOutputHandler
 	PermissionPresetRepo   repo.PermissionPresetRepo
+	// TaskRepo and DependencyRepo back the derived orchestration view. Both are
+	// optional: when either is nil the routes are not mounted at all, rather
+	// than mounted and answering empty.
+	TaskRepo               repo.TaskRepo
+	DependencyRepo         repo.DependencyRepo
 	GrantsHandler          *grants.Handler
 	PluginRegistry         *plugin.Registry
 	PluginLifecycleHandler *apiplugins.LifecycleHandler
@@ -446,6 +452,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 		// mounted in the hook/MCP bearer-token bypass group.
 		if deps.GrantsHandler != nil {
 			deps.GrantsHandler.Mount(r)
+		}
+
+		// Orchestrations: a derived, read-only view over tasks and dependencies.
+		// It owns no table and grants no new authority — visibility reuses the
+		// task list's own user scoping, so it cannot widen what a caller sees.
+		if deps.TaskRepo != nil && deps.DependencyRepo != nil {
+			orchestrations.New(deps.TaskRepo, deps.DependencyRepo, deps.Config.BypassAuth).Mount(r)
 		}
 
 		// Read-only proxy to the optional LocalScope collector, so the SPA can

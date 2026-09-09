@@ -19,6 +19,11 @@ type DependencyRepo interface {
 	ListDownstream(ctx context.Context, taskID string) ([]*ent.TaskDependency, error)
 	// RemoveByID removes a single dependency row by its primary key.
 	RemoveByID(ctx context.Context, id string) error
+	// ListForTasks returns every dependency whose task_id is in ids, in one
+	// query. The orchestration view needs the edges of a whole tree at once;
+	// calling ListUpstream per task would be N+1 against a set the caller
+	// already holds.
+	ListForTasks(ctx context.Context, ids []string) ([]*ent.TaskDependency, error)
 }
 
 type entDependencyRepo struct{ client *ent.Client }
@@ -70,6 +75,19 @@ func (r *entDependencyRepo) ListDownstream(ctx context.Context, taskID string) (
 		return nil, fmt.Errorf("dependency.ListDownstream: %w", err)
 	}
 	return deps, nil
+}
+
+func (r *entDependencyRepo) ListForTasks(ctx context.Context, ids []string) ([]*ent.TaskDependency, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	rows, err := r.client.TaskDependency.Query().
+		Where(entdep.TaskIDIn(ids...)).
+		All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("taskDependency.ListForTasks: %w", err)
+	}
+	return rows, nil
 }
 
 func (r *entDependencyRepo) RemoveByID(ctx context.Context, id string) error {

@@ -952,6 +952,17 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 		onboardingHandler = onboarding.NewHandler(settingsSvc, apiKeyRepo)
 	}
 
+	// Repos behind the derived orchestration view. Built here rather than inside
+	// the router so the nil-client case stays a true-nil interface: handing the
+	// router repo.NewTaskRepo(nil) would produce a non-nil interface holding a
+	// nil client, which passes the router's guard and then panics on first read.
+	var orchTaskRepo repo.TaskRepo
+	var orchDependencyRepo repo.DependencyRepo
+	if entClient != nil {
+		orchTaskRepo = repo.NewTaskRepo(entClient)
+		orchDependencyRepo = repo.NewDependencyRepo(entClient)
+	}
+
 	var trackerHandler *trackerapi.Handler
 	if pluginSettingsSvc != nil {
 		trackerHandler = trackerapi.NewHandler(pluginSettingsSvc, nil, nil)
@@ -982,6 +993,8 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 		RemotesHandler:         remotesHandler,
 		PresetsHandler:         presetsHandler,
 		PermissionPresetRepo:   permissionPresetRepo,
+		TaskRepo:               orchTaskRepo,
+		DependencyRepo:         orchDependencyRepo,
 		GrantsHandler:          grantsHandler,
 		SystemPromptsHandler:   systemPromptsHandler,
 		PromptTemplatesHandler: promptTemplatesHandler,
