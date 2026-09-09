@@ -23891,55 +23891,56 @@ func (m *SystemPromptMutation) ResetEdge(name string) error {
 // TaskMutation represents an operation that mutates the Task nodes in the graph.
 type TaskMutation struct {
 	config
-	op                       Op
-	typ                      string
-	id                       *string
-	slug                     *string
-	title                    *string
-	description              *string
-	cwd                      *string
-	worktree_path            *string
-	source_branch            *string
-	target_branch            *string
-	current_stage            *string
-	priority                 *string
-	user_id                  *string
-	parent_task_id           *string
-	max_iterations           *int
-	addmax_iterations        *int
-	token_budget             *int
-	addtoken_budget          *int
-	cost_budget_cents        *int
-	addcost_budget_cents     *int
-	stage_timeout_seconds    *int
-	addstage_timeout_seconds *int
-	silver_bullet            *bool
-	plan_mode                *bool
-	autonomy                 *string
-	metadata                 *map[string]interface{}
-	project_id               *string
-	spawner_id               *string
-	routine_id               *string
-	rank                     *float64
-	addrank                  *float64
-	created_at               *time.Time
-	updated_at               *time.Time
-	clearedFields            map[string]struct{}
-	stage_runs               map[string]struct{}
-	removedstage_runs        map[string]struct{}
-	clearedstage_runs        bool
-	permissions              map[string]struct{}
-	removedpermissions       map[string]struct{}
-	clearedpermissions       bool
-	dependencies             map[string]struct{}
-	removeddependencies      map[string]struct{}
-	cleareddependencies      bool
-	dependents               map[string]struct{}
-	removeddependents        map[string]struct{}
-	cleareddependents        bool
-	done                     bool
-	oldValue                 func(context.Context) (*Task, error)
-	predicates               []predicate.Task
+	op                        Op
+	typ                       string
+	id                        *string
+	slug                      *string
+	title                     *string
+	description               *string
+	cwd                       *string
+	worktree_path             *string
+	source_branch             *string
+	target_branch             *string
+	current_stage             *string
+	priority                  *string
+	user_id                   *string
+	parent_task_id            *string
+	delegated_by_stage_run_id *string
+	max_iterations            *int
+	addmax_iterations         *int
+	token_budget              *int
+	addtoken_budget           *int
+	cost_budget_cents         *int
+	addcost_budget_cents      *int
+	stage_timeout_seconds     *int
+	addstage_timeout_seconds  *int
+	silver_bullet             *bool
+	plan_mode                 *bool
+	autonomy                  *string
+	metadata                  *map[string]interface{}
+	project_id                *string
+	spawner_id                *string
+	routine_id                *string
+	rank                      *float64
+	addrank                   *float64
+	created_at                *time.Time
+	updated_at                *time.Time
+	clearedFields             map[string]struct{}
+	stage_runs                map[string]struct{}
+	removedstage_runs         map[string]struct{}
+	clearedstage_runs         bool
+	permissions               map[string]struct{}
+	removedpermissions        map[string]struct{}
+	clearedpermissions        bool
+	dependencies              map[string]struct{}
+	removeddependencies       map[string]struct{}
+	cleareddependencies       bool
+	dependents                map[string]struct{}
+	removeddependents         map[string]struct{}
+	cleareddependents         bool
+	done                      bool
+	oldValue                  func(context.Context) (*Task, error)
+	predicates                []predicate.Task
 }
 
 var _ ent.Mutation = (*TaskMutation)(nil)
@@ -24518,6 +24519,55 @@ func (m *TaskMutation) ParentTaskIDCleared() bool {
 func (m *TaskMutation) ResetParentTaskID() {
 	m.parent_task_id = nil
 	delete(m.clearedFields, task.FieldParentTaskID)
+}
+
+// SetDelegatedByStageRunID sets the "delegated_by_stage_run_id" field.
+func (m *TaskMutation) SetDelegatedByStageRunID(s string) {
+	m.delegated_by_stage_run_id = &s
+}
+
+// DelegatedByStageRunID returns the value of the "delegated_by_stage_run_id" field in the mutation.
+func (m *TaskMutation) DelegatedByStageRunID() (r string, exists bool) {
+	v := m.delegated_by_stage_run_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDelegatedByStageRunID returns the old "delegated_by_stage_run_id" field's value of the Task entity.
+// If the Task object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskMutation) OldDelegatedByStageRunID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDelegatedByStageRunID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDelegatedByStageRunID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDelegatedByStageRunID: %w", err)
+	}
+	return oldValue.DelegatedByStageRunID, nil
+}
+
+// ClearDelegatedByStageRunID clears the value of the "delegated_by_stage_run_id" field.
+func (m *TaskMutation) ClearDelegatedByStageRunID() {
+	m.delegated_by_stage_run_id = nil
+	m.clearedFields[task.FieldDelegatedByStageRunID] = struct{}{}
+}
+
+// DelegatedByStageRunIDCleared returns if the "delegated_by_stage_run_id" field was cleared in this mutation.
+func (m *TaskMutation) DelegatedByStageRunIDCleared() bool {
+	_, ok := m.clearedFields[task.FieldDelegatedByStageRunID]
+	return ok
+}
+
+// ResetDelegatedByStageRunID resets all changes to the "delegated_by_stage_run_id" field.
+func (m *TaskMutation) ResetDelegatedByStageRunID() {
+	m.delegated_by_stage_run_id = nil
+	delete(m.clearedFields, task.FieldDelegatedByStageRunID)
 }
 
 // SetMaxIterations sets the "max_iterations" field.
@@ -25468,7 +25518,7 @@ func (m *TaskMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TaskMutation) Fields() []string {
-	fields := make([]string, 0, 25)
+	fields := make([]string, 0, 26)
 	if m.slug != nil {
 		fields = append(fields, task.FieldSlug)
 	}
@@ -25501,6 +25551,9 @@ func (m *TaskMutation) Fields() []string {
 	}
 	if m.parent_task_id != nil {
 		fields = append(fields, task.FieldParentTaskID)
+	}
+	if m.delegated_by_stage_run_id != nil {
+		fields = append(fields, task.FieldDelegatedByStageRunID)
 	}
 	if m.max_iterations != nil {
 		fields = append(fields, task.FieldMaxIterations)
@@ -25574,6 +25627,8 @@ func (m *TaskMutation) Field(name string) (ent.Value, bool) {
 		return m.UserID()
 	case task.FieldParentTaskID:
 		return m.ParentTaskID()
+	case task.FieldDelegatedByStageRunID:
+		return m.DelegatedByStageRunID()
 	case task.FieldMaxIterations:
 		return m.MaxIterations()
 	case task.FieldTokenBudget:
@@ -25633,6 +25688,8 @@ func (m *TaskMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldUserID(ctx)
 	case task.FieldParentTaskID:
 		return m.OldParentTaskID(ctx)
+	case task.FieldDelegatedByStageRunID:
+		return m.OldDelegatedByStageRunID(ctx)
 	case task.FieldMaxIterations:
 		return m.OldMaxIterations(ctx)
 	case task.FieldTokenBudget:
@@ -25746,6 +25803,13 @@ func (m *TaskMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetParentTaskID(v)
+		return nil
+	case task.FieldDelegatedByStageRunID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDelegatedByStageRunID(v)
 		return nil
 	case task.FieldMaxIterations:
 		v, ok := value.(int)
@@ -25956,6 +26020,9 @@ func (m *TaskMutation) ClearedFields() []string {
 	if m.FieldCleared(task.FieldParentTaskID) {
 		fields = append(fields, task.FieldParentTaskID)
 	}
+	if m.FieldCleared(task.FieldDelegatedByStageRunID) {
+		fields = append(fields, task.FieldDelegatedByStageRunID)
+	}
 	if m.FieldCleared(task.FieldTokenBudget) {
 		fields = append(fields, task.FieldTokenBudget)
 	}
@@ -26008,6 +26075,9 @@ func (m *TaskMutation) ClearField(name string) error {
 		return nil
 	case task.FieldParentTaskID:
 		m.ClearParentTaskID()
+		return nil
+	case task.FieldDelegatedByStageRunID:
+		m.ClearDelegatedByStageRunID()
 		return nil
 	case task.FieldTokenBudget:
 		m.ClearTokenBudget()
@@ -26070,6 +26140,9 @@ func (m *TaskMutation) ResetField(name string) error {
 		return nil
 	case task.FieldParentTaskID:
 		m.ResetParentTaskID()
+		return nil
+	case task.FieldDelegatedByStageRunID:
+		m.ResetDelegatedByStageRunID()
 		return nil
 	case task.FieldMaxIterations:
 		m.ResetMaxIterations()

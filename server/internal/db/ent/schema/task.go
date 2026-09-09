@@ -28,6 +28,24 @@ func (Task) Fields() []ent.Field {
 		field.String("priority").Default("medium"),
 		field.String("user_id").Optional().Nillable(),
 		field.String("parent_task_id").Optional().Nillable(),
+		// delegated_by_stage_run_id records WHICH agent run created this task,
+		// where parent_task_id records only which task it belongs under. It is
+		// provenance, so it is Immutable and is never taken from the request
+		// body — the server sets it from the caller's own stage-run credential
+		// (mcp.CallerResolver). A caller-supplied value could claim any agent
+		// delegated the work.
+		//
+		// Nil is the honest reading for every task that exists today and for
+		// every task a human creates: nobody delegated it. No backfill invents
+		// a value.
+		//
+		// Delegation DEPTH is deliberately not stored beside it: it is derivable
+		// from the parent chain, phases 1-2 walk that tree anyway, and a column
+		// with no writer would be a second truth to keep in sync. See
+		// orchestration.Derive for the traversal (which carries the cycle guard
+		// this schema does not have — parent_task_id is write-once in practice
+		// but is not declared Immutable).
+		field.String("delegated_by_stage_run_id").Optional().Nillable().Immutable(),
 		field.Int("max_iterations").Default(20),
 		field.Int("token_budget").Optional().Nillable(),
 		field.Int("cost_budget_cents").Optional().Nillable(),

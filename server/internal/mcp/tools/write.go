@@ -245,6 +245,25 @@ func registerCreateTask(registry mcp.ToolRegistry, d WriteDeps) {
 			if v := mcp.OptionalString(args, "parentTaskId"); v != "" {
 				in.ParentTaskID = &v
 			}
+			/*
+			 * Delegation provenance, set from the caller's OWN credential and
+			 * never from args: a caller-supplied value could claim that any
+			 * agent delegated this work, which is exactly what the audit trail
+			 * must not be able to say falsely. There is deliberately no
+			 * "delegatedByStageRunId" input, and one sent anyway is ignored
+			 * because nothing reads it.
+			 *
+			 * Empty for a user-scoped key, which is every caller that can reach
+			 * create_task today — StageRunScopes excludes tasks:write, so a
+			 * spawned agent cannot call this at all. The wiring exists so that
+			 * provenance is correct by construction the moment an agent-facing
+			 * delegation capability is introduced, rather than being retrofitted
+			 * onto a tool that had already been creating tasks without it.
+			 */
+			if info := mcp.AuthFromContext(ctx); info != nil && info.StageRunID != "" {
+				runID := info.StageRunID
+				in.DelegatedByStageRunID = &runID
+			}
 			if f, ok := mcp.OptionalFloat64(args, "maxIterations"); ok {
 				v := int(f)
 				in.MaxIterations = v

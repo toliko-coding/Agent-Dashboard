@@ -61,3 +61,15 @@ func TestStageRunAllowedTools_OmitsTheEscalationScopes(t *testing.T) {
 			"%q is gated by scope %q, which a stage-run key must never carry", tool, mcp.ToolScopeMap[tool])
 	}
 }
+
+// TestStageRunScopes_IsExactlyTheApprovedSet pins the scope set itself, not
+// just its projection. The orchestration work adds a derived, read-only view of
+// delegation — it grants no new agent authority, and this test fails loudly if
+// a later change quietly adds one (agent:delegate and tasks:write being the two
+// that would turn the view into a capability).
+func TestStageRunScopes_IsExactlyTheApprovedSet(t *testing.T) {
+	require.ElementsMatch(t, []string{
+		"tasks:read", "agent:coord",
+		"memory:read", "memory:write", "obsidian:read", "obsidian:write",
+	}, mcp.StageRunScopes)
+}

@@ -40,6 +40,8 @@ type Task struct {
 	UserID *string `json:"user_id,omitempty"`
 	// ParentTaskID holds the value of the "parent_task_id" field.
 	ParentTaskID *string `json:"parent_task_id,omitempty"`
+	// DelegatedByStageRunID holds the value of the "delegated_by_stage_run_id" field.
+	DelegatedByStageRunID *string `json:"delegated_by_stage_run_id,omitempty"`
 	// MaxIterations holds the value of the "max_iterations" field.
 	MaxIterations int `json:"max_iterations,omitempty"`
 	// TokenBudget holds the value of the "token_budget" field.
@@ -138,7 +140,7 @@ func (*Task) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case task.FieldMaxIterations, task.FieldTokenBudget, task.FieldCostBudgetCents, task.FieldStageTimeoutSeconds:
 			values[i] = new(sql.NullInt64)
-		case task.FieldID, task.FieldSlug, task.FieldTitle, task.FieldDescription, task.FieldCwd, task.FieldWorktreePath, task.FieldSourceBranch, task.FieldTargetBranch, task.FieldCurrentStage, task.FieldPriority, task.FieldUserID, task.FieldParentTaskID, task.FieldAutonomy, task.FieldProjectID, task.FieldSpawnerID, task.FieldRoutineID:
+		case task.FieldID, task.FieldSlug, task.FieldTitle, task.FieldDescription, task.FieldCwd, task.FieldWorktreePath, task.FieldSourceBranch, task.FieldTargetBranch, task.FieldCurrentStage, task.FieldPriority, task.FieldUserID, task.FieldParentTaskID, task.FieldDelegatedByStageRunID, task.FieldAutonomy, task.FieldProjectID, task.FieldSpawnerID, task.FieldRoutineID:
 			values[i] = new(sql.NullString)
 		case task.FieldCreatedAt, task.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -234,6 +236,13 @@ func (_m *Task) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ParentTaskID = new(string)
 				*_m.ParentTaskID = value.String
+			}
+		case task.FieldDelegatedByStageRunID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field delegated_by_stage_run_id", values[i])
+			} else if value.Valid {
+				_m.DelegatedByStageRunID = new(string)
+				*_m.DelegatedByStageRunID = value.String
 			}
 		case task.FieldMaxIterations:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -425,6 +434,11 @@ func (_m *Task) String() string {
 	builder.WriteString(", ")
 	if v := _m.ParentTaskID; v != nil {
 		builder.WriteString("parent_task_id=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DelegatedByStageRunID; v != nil {
+		builder.WriteString("delegated_by_stage_run_id=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

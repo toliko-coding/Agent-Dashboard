@@ -34,30 +34,34 @@ type TaskRepo interface {
 }
 
 type CreateTaskInput struct {
-	ID                  string
-	Slug                string
-	Title               string
-	Description         *string
-	Cwd                 string
-	WorktreePath        *string
-	SourceBranch        *string
-	TargetBranch        *string
-	ParentTaskID        *string
-	UserID              *string
-	MaxIterations       int
-	TokenBudget         *int
-	CostBudgetCents     *int
-	StageTimeoutSeconds int
-	SilverBullet        bool
-	PlanMode            *bool
-	Priority            string
-	CurrentStage        string
-	Autonomy            *string
-	Metadata            map[string]any
-	ProjectID           *string
-	SpawnerID           *string
-	RoutineID           *string
-	Rank                *float64
+	ID           string
+	Slug         string
+	Title        string
+	Description  *string
+	Cwd          string
+	WorktreePath *string
+	SourceBranch *string
+	TargetBranch *string
+	ParentTaskID *string
+	// DelegatedByStageRunID is provenance and is set by the server from the
+	// caller's own stage-run credential — never from a request body, which
+	// could claim any agent delegated the work. Nil for human-created tasks.
+	DelegatedByStageRunID *string
+	UserID                *string
+	MaxIterations         int
+	TokenBudget           *int
+	CostBudgetCents       *int
+	StageTimeoutSeconds   int
+	SilverBullet          bool
+	PlanMode              *bool
+	Priority              string
+	CurrentStage          string
+	Autonomy              *string
+	Metadata              map[string]any
+	ProjectID             *string
+	SpawnerID             *string
+	RoutineID             *string
+	Rank                  *float64
 }
 
 type UpdateTaskInput struct {
@@ -125,6 +129,9 @@ func (r *entTaskRepo) Create(ctx context.Context, in CreateTaskInput) (*ent.Task
 	}
 	if in.ParentTaskID != nil {
 		q = q.SetParentTaskID(*in.ParentTaskID)
+	}
+	if in.DelegatedByStageRunID != nil {
+		q = q.SetDelegatedByStageRunID(*in.DelegatedByStageRunID)
 	}
 	if in.UserID != nil {
 		q = q.SetUserID(*in.UserID)

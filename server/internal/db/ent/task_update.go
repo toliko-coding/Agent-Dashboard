@@ -727,6 +727,9 @@ func (_u *TaskUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.ParentTaskIDCleared() {
 		_spec.ClearField(task.FieldParentTaskID, field.TypeString)
 	}
+	if _u.mutation.DelegatedByStageRunIDCleared() {
+		_spec.ClearField(task.FieldDelegatedByStageRunID, field.TypeString)
+	}
 	if value, ok := _u.mutation.MaxIterations(); ok {
 		_spec.SetField(task.FieldMaxIterations, field.TypeInt, value)
 	}
@@ -1727,6 +1730,9 @@ func (_u *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) {
 	}
 	if _u.mutation.ParentTaskIDCleared() {
 		_spec.ClearField(task.FieldParentTaskID, field.TypeString)
+	}
+	if _u.mutation.DelegatedByStageRunIDCleared() {
+		_spec.ClearField(task.FieldDelegatedByStageRunID, field.TypeString)
 	}
 	if value, ok := _u.mutation.MaxIterations(); ok {
 		_spec.SetField(task.FieldMaxIterations, field.TypeInt, value)

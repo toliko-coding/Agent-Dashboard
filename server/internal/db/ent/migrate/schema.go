@@ -903,6 +903,7 @@ var (
 		{Name: "priority", Type: field.TypeString, Default: "medium"},
 		{Name: "user_id", Type: field.TypeString, Nullable: true},
 		{Name: "parent_task_id", Type: field.TypeString, Nullable: true},
+		{Name: "delegated_by_stage_run_id", Type: field.TypeString, Nullable: true},
 		{Name: "max_iterations", Type: field.TypeInt, Default: 20},
 		{Name: "token_budget", Type: field.TypeInt, Nullable: true},
 		{Name: "cost_budget_cents", Type: field.TypeInt, Nullable: true},
@@ -937,12 +938,12 @@ var (
 			{
 				Name:    "task_project_id",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[20]},
+				Columns: []*schema.Column{TasksColumns[21]},
 			},
 			{
 				Name:    "task_silver_bullet_priority_rank_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[16], TasksColumns[9], TasksColumns[23], TasksColumns[24]},
+				Columns: []*schema.Column{TasksColumns[17], TasksColumns[9], TasksColumns[24], TasksColumns[25]},
 			},
 		},
 	}

@@ -36,6 +36,8 @@ const (
 	FieldUserID = "user_id"
 	// FieldParentTaskID holds the string denoting the parent_task_id field in the database.
 	FieldParentTaskID = "parent_task_id"
+	// FieldDelegatedByStageRunID holds the string denoting the delegated_by_stage_run_id field in the database.
+	FieldDelegatedByStageRunID = "delegated_by_stage_run_id"
 	// FieldMaxIterations holds the string denoting the max_iterations field in the database.
 	FieldMaxIterations = "max_iterations"
 	// FieldTokenBudget holds the string denoting the token_budget field in the database.
@@ -118,6 +120,7 @@ var Columns = []string{
 	FieldPriority,
 	FieldUserID,
 	FieldParentTaskID,
+	FieldDelegatedByStageRunID,
 	FieldMaxIterations,
 	FieldTokenBudget,
 	FieldCostBudgetCents,
@@ -232,6 +235,11 @@ func ByUserID(opts ...sql.OrderTermOption) OrderOption {
 // ByParentTaskID orders the results by the parent_task_id field.
 func ByParentTaskID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldParentTaskID, opts...).ToFunc()
+}
+
+// ByDelegatedByStageRunID orders the results by the delegated_by_stage_run_id field.
+func ByDelegatedByStageRunID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDelegatedByStageRunID, opts...).ToFunc()
 }
 
 // ByMaxIterations orders the results by the max_iterations field.

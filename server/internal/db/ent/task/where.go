@@ -120,6 +120,11 @@ func ParentTaskID(v string) predicate.Task {
 	return predicate.Task(sql.FieldEQ(FieldParentTaskID, v))
 }
 
+// DelegatedByStageRunID applies equality check predicate on the "delegated_by_stage_run_id" field. It's identical to DelegatedByStageRunIDEQ.
+func DelegatedByStageRunID(v string) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldDelegatedByStageRunID, v))
+}
+
 // MaxIterations applies equality check predicate on the "max_iterations" field. It's identical to MaxIterationsEQ.
 func MaxIterations(v int) predicate.Task {
 	return predicate.Task(sql.FieldEQ(FieldMaxIterations, v))
@@ -958,6 +963,81 @@ func ParentTaskIDEqualFold(v string) predicate.Task {
 // ParentTaskIDContainsFold applies the ContainsFold predicate on the "parent_task_id" field.
 func ParentTaskIDContainsFold(v string) predicate.Task {
 	return predicate.Task(sql.FieldContainsFold(FieldParentTaskID, v))
+}
+
+// DelegatedByStageRunIDEQ applies the EQ predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDEQ(v string) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldDelegatedByStageRunID, v))
+}
+
+// DelegatedByStageRunIDNEQ applies the NEQ predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDNEQ(v string) predicate.Task {
+	return predicate.Task(sql.FieldNEQ(FieldDelegatedByStageRunID, v))
+}
+
+// DelegatedByStageRunIDIn applies the In predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDIn(vs ...string) predicate.Task {
+	return predicate.Task(sql.FieldIn(FieldDelegatedByStageRunID, vs...))
+}
+
+// DelegatedByStageRunIDNotIn applies the NotIn predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDNotIn(vs ...string) predicate.Task {
+	return predicate.Task(sql.FieldNotIn(FieldDelegatedByStageRunID, vs...))
+}
+
+// DelegatedByStageRunIDGT applies the GT predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDGT(v string) predicate.Task {
+	return predicate.Task(sql.FieldGT(FieldDelegatedByStageRunID, v))
+}
+
+// DelegatedByStageRunIDGTE applies the GTE predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDGTE(v string) predicate.Task {
+	return predicate.Task(sql.FieldGTE(FieldDelegatedByStageRunID, v))
+}
+
+// DelegatedByStageRunIDLT applies the LT predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDLT(v string) predicate.Task {
+	return predicate.Task(sql.FieldLT(FieldDelegatedByStageRunID, v))
+}
+
+// DelegatedByStageRunIDLTE applies the LTE predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDLTE(v string) predicate.Task {
+	return predicate.Task(sql.FieldLTE(FieldDelegatedByStageRunID, v))
+}
+
+// DelegatedByStageRunIDContains applies the Contains predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDContains(v string) predicate.Task {
+	return predicate.Task(sql.FieldContains(FieldDelegatedByStageRunID, v))
+}
+
+// DelegatedByStageRunIDHasPrefix applies the HasPrefix predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDHasPrefix(v string) predicate.Task {
+	return predicate.Task(sql.FieldHasPrefix(FieldDelegatedByStageRunID, v))
+}
+
+// DelegatedByStageRunIDHasSuffix applies the HasSuffix predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDHasSuffix(v string) predicate.Task {
+	return predicate.Task(sql.FieldHasSuffix(FieldDelegatedByStageRunID, v))
+}
+
+// DelegatedByStageRunIDIsNil applies the IsNil predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDIsNil() predicate.Task {
+	return predicate.Task(sql.FieldIsNull(FieldDelegatedByStageRunID))
+}
+
+// DelegatedByStageRunIDNotNil applies the NotNil predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDNotNil() predicate.Task {
+	return predicate.Task(sql.FieldNotNull(FieldDelegatedByStageRunID))
+}
+
+// DelegatedByStageRunIDEqualFold applies the EqualFold predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDEqualFold(v string) predicate.Task {
+	return predicate.Task(sql.FieldEqualFold(FieldDelegatedByStageRunID, v))
+}
+
+// DelegatedByStageRunIDContainsFold applies the ContainsFold predicate on the "delegated_by_stage_run_id" field.
+func DelegatedByStageRunIDContainsFold(v string) predicate.Task {
+	return predicate.Task(sql.FieldContainsFold(FieldDelegatedByStageRunID, v))
 }
 
 // MaxIterationsEQ applies the EQ predicate on the "max_iterations" field.

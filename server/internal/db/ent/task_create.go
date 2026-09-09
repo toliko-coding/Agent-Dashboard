@@ -156,6 +156,20 @@ func (_c *TaskCreate) SetNillableParentTaskID(v *string) *TaskCreate {
 	return _c
 }
 
+// SetDelegatedByStageRunID sets the "delegated_by_stage_run_id" field.
+func (_c *TaskCreate) SetDelegatedByStageRunID(v string) *TaskCreate {
+	_c.mutation.SetDelegatedByStageRunID(v)
+	return _c
+}
+
+// SetNillableDelegatedByStageRunID sets the "delegated_by_stage_run_id" field if the given value is not nil.
+func (_c *TaskCreate) SetNillableDelegatedByStageRunID(v *string) *TaskCreate {
+	if v != nil {
+		_c.SetDelegatedByStageRunID(*v)
+	}
+	return _c
+}
+
 // SetMaxIterations sets the "max_iterations" field.
 func (_c *TaskCreate) SetMaxIterations(v int) *TaskCreate {
 	_c.mutation.SetMaxIterations(v)
@@ -610,6 +624,10 @@ func (_c *TaskCreate) createSpec() (*Task, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ParentTaskID(); ok {
 		_spec.SetField(task.FieldParentTaskID, field.TypeString, value)
 		_node.ParentTaskID = &value
+	}
+	if value, ok := _c.mutation.DelegatedByStageRunID(); ok {
+		_spec.SetField(task.FieldDelegatedByStageRunID, field.TypeString, value)
+		_node.DelegatedByStageRunID = &value
 	}
 	if value, ok := _c.mutation.MaxIterations(); ok {
 		_spec.SetField(task.FieldMaxIterations, field.TypeInt, value)
@@ -1195,6 +1213,9 @@ func (u *TaskUpsertOne) UpdateNewValues() *TaskUpsertOne {
 	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
 		if _, exists := u.create.mutation.ID(); exists {
 			s.SetIgnore(task.FieldID)
+		}
+		if _, exists := u.create.mutation.DelegatedByStageRunID(); exists {
+			s.SetIgnore(task.FieldDelegatedByStageRunID)
 		}
 		if _, exists := u.create.mutation.CreatedAt(); exists {
 			s.SetIgnore(task.FieldCreatedAt)
@@ -1874,6 +1895,9 @@ func (u *TaskUpsertBulk) UpdateNewValues() *TaskUpsertBulk {
 		for _, b := range u.create.builders {
 			if _, exists := b.mutation.ID(); exists {
 				s.SetIgnore(task.FieldID)
+			}
+			if _, exists := b.mutation.DelegatedByStageRunID(); exists {
+				s.SetIgnore(task.FieldDelegatedByStageRunID)
 			}
 			if _, exists := b.mutation.CreatedAt(); exists {
 				s.SetIgnore(task.FieldCreatedAt)
