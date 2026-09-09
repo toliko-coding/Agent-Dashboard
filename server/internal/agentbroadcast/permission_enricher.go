@@ -2,6 +2,7 @@ package agentbroadcast
 
 import (
 	"context"
+	"time"
 
 	sdk "github.com/lx-wnk/agent-dashboard/sdk"
 	"github.com/lx-wnk/agent-dashboard/server/internal/merger"
@@ -17,7 +18,7 @@ type PermissionBridgeReader interface {
 	// ReconcileTerminalNotice clears a terminal-prompt notice once the session
 	// has answered it. The notification hook fires when a prompt opens and
 	// never when it closes, so the transcript is what reports the decision.
-	ReconcileTerminalNotice(sessionID, currentToolUseID string)
+	ReconcileTerminalNotice(sessionID, currentToolUseID string, lastActivity time.Time)
 }
 
 // NewPermissionBridgeEnricher annotates each agent with the permission prompts
@@ -53,7 +54,12 @@ func NewPermissionBridgeEnricher(bridge PermissionBridgeReader) merger.Enricher 
 			if agents[i].PendingToolUse != nil {
 				pending = agents[i].PendingToolUse.ID
 			}
-			bridge.ReconcileTerminalNotice(sid, pending)
+			// LastActivity is the fallback signal for the common case where the
+			// pending call is not visible: the parser reads only a tail window,
+			// so a tool_use that has scrolled out of it leaves PendingToolUse
+			// nil while the call is genuinely still pending.
+			lastActivity, _ := time.Parse(time.RFC3339, agents[i].LastActivity)
+			bridge.ReconcileTerminalNotice(sid, pending, lastActivity)
 
 			held, atTerminal, terminalToolUseID, armed := bridge.StateForSession(sid)
 			// A held hook call goes in its own field, never into

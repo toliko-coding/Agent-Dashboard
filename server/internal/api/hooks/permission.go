@@ -107,11 +107,22 @@ type permissionNotice struct {
 	// within a second, so the call ceasing to be the pending one is the session
 	// itself reporting that the prompt is gone.
 	//
-	// Empty means "not latched yet": the notice arrives a few seconds after the
-	// tool_use is written, and the first tick that sees both fills this in.
+	// Empty when the pending call is not visible — see sinceActivity.
 	blockedOn string
-	// latched guards against a notice that arrives while nothing is pending,
-	// which must not be treated as "already resolved" on its very first tick.
+	// sinceActivity is the session's last transcript activity when the notice
+	// latched. It is the fallback signal, and it is needed because blockedOn is
+	// not always available: the parser reads only the last 32KB of a transcript,
+	// so a tool_use that has scrolled out of that window leaves PendingToolUse
+	// nil even though the call is genuinely pending. Live verification caught
+	// exactly that — an AskUserQuestion whose notice never latched and so never
+	// cleared.
+	//
+	// Nothing is written to a transcript while a prompt is open (measured across
+	// every approve, reject and answer captured), so activity moving past this
+	// point is the session reporting that it was answered.
+	sinceActivity time.Time
+	// latched marks the notice as having recorded its baseline, so the very
+	// first tick is never mistaken for a resolution.
 	latched bool
 }
 
@@ -600,7 +611,9 @@ func (b *HookEnforcer) StateForSession(sessionID string) (held []sdk.PendingPerm
  * answered it.
  *
  * currentToolUseID is the agent's unresolved transcript tool_use this tick, or
- * "" when it has none. The notification hook fires when a prompt OPENS and
+ * "" when it has none — which happens more often than it looks, because the
+ * parser only reads the last 32KB of a transcript. lastActivity is that
+ * session's latest transcript timestamp, and carries the fallback. The notification hook fires when a prompt OPENS and
  * never when it is answered, so without this the notice could only age out —
  * a latched state with a long TTL, which reports someone as blocked for minutes
  * after they have already decided.
@@ -615,27 +628,39 @@ func (b *HookEnforcer) StateForSession(sessionID string) (held []sdk.PendingPerm
  * tool_use immediately after a decision, so "some call is pending" would keep a
  * stale notice alive forever. Identity is what makes it correct.
  */
-func (b *HookEnforcer) ReconcileTerminalNotice(sessionID, currentToolUseID string) {
+func (b *HookEnforcer) ReconcileTerminalNotice(sessionID, currentToolUseID string, lastActivity time.Time) {
 	b.mu.Lock()
 	notice, ok := b.notices[sessionID]
 	if !ok {
 		b.mu.Unlock()
 		return
 	}
-	switch {
-	case !notice.latched:
-		// First tick that can see the call. A notice with nothing pending is
-		// left unlatched rather than cleared: the transcript may simply not
-		// have been re-read yet, and the TTL remains the backstop.
-		if currentToolUseID != "" {
-			notice.blockedOn = currentToolUseID
-			notice.latched = true
-			b.notices[sessionID] = notice
-		}
+	if !notice.latched {
+		// Record the baseline this notice will be measured against. Both halves
+		// are captured: the pending call when it is visible, and the transcript
+		// position either way.
+		notice.blockedOn = currentToolUseID
+		notice.sinceActivity = lastActivity
+		notice.latched = true
+		b.notices[sessionID] = notice
 		b.mu.Unlock()
 		return
-	case currentToolUseID == notice.blockedOn:
-		// Still waiting on the same call.
+	}
+
+	resolved := false
+	if notice.blockedOn != "" {
+		// The precise rule: watch the one call the prompt is about. A different
+		// pending call also counts — Claude usually issues the next tool_use
+		// immediately after a decision, so "something is pending" would keep a
+		// stale notice alive forever.
+		resolved = currentToolUseID != notice.blockedOn
+	} else {
+		// No visible call to watch, so fall back to the transcript moving on.
+		// Deliberately not "any output": a prompt blocks the session, so there
+		// is nothing to write until it is answered.
+		resolved = lastActivity.After(notice.sinceActivity)
+	}
+	if !resolved {
 		b.mu.Unlock()
 		return
 	}

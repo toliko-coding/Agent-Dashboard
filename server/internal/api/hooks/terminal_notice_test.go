@@ -20,6 +20,10 @@ import (
  * answering an AskUserQuestion. That is the signal these tests pin.
  */
 
+// base is a fixed transcript timestamp: tests of the tool-id rule hold it
+// still so the activity fallback cannot be what clears the notice.
+var base = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
 func newTestEnforcer(now *time.Time) *HookEnforcer {
 	b := NewHookEnforcer(func() {})
 	b.nowFn = func() time.Time { return *now }
@@ -40,15 +44,15 @@ func TestTerminalNotice_ClearsWhenTheBlockingCallIsResolved(t *testing.T) {
 	require.True(t, atTerminal(t, b, "s1"), "a notice must show immediately")
 
 	// First tick sees the call the prompt is about.
-	b.ReconcileTerminalNotice("s1", "toolu_A")
+	b.ReconcileTerminalNotice("s1", "toolu_A", base)
 	require.True(t, atTerminal(t, b, "s1"), "still waiting on the same call")
 
 	// Same call, still pending: nothing changes.
-	b.ReconcileTerminalNotice("s1", "toolu_A")
+	b.ReconcileTerminalNotice("s1", "toolu_A", base)
 	require.True(t, atTerminal(t, b, "s1"))
 
 	// Answered: the transcript resolves that call, so nothing is pending.
-	b.ReconcileTerminalNotice("s1", "")
+	b.ReconcileTerminalNotice("s1", "", base)
 	require.False(t, atTerminal(t, b, "s1"), "an answered prompt must clear promptly")
 }
 
@@ -59,36 +63,66 @@ func TestTerminalNotice_ClearsWhenADifferentCallBecomesPending(t *testing.T) {
 	b := newTestEnforcer(&now)
 
 	b.noteTerminalPrompt("s1")
-	b.ReconcileTerminalNotice("s1", "toolu_A")
+	b.ReconcileTerminalNotice("s1", "toolu_A", base)
 	require.True(t, atTerminal(t, b, "s1"))
 
-	b.ReconcileTerminalNotice("s1", "toolu_B")
+	b.ReconcileTerminalNotice("s1", "toolu_B", base)
 	require.False(t, atTerminal(t, b, "s1"), "a different pending call means the old prompt is gone")
 }
 
-// The notice arrives a few seconds after the tool_use is written (measured:
-// 6.6s), so a tick that sees nothing pending yet must not be read as
-// "already resolved".
-func TestTerminalNotice_DoesNotClearBeforeItHasLatched(t *testing.T) {
+// When the pending call is not visible — the parser reads only a 32KB tail, so
+// a tool_use that has scrolled out of it leaves PendingToolUse nil — the notice
+// falls back to the transcript moving on. Live verification caught the earlier
+// rule here: a notice that refused to latch without a call never cleared at all.
+func TestTerminalNotice_ClearsOnActivityWhenNoCallIsVisible(t *testing.T) {
 	now := time.Now()
 	b := newTestEnforcer(&now)
 
 	b.noteTerminalPrompt("s1")
-	b.ReconcileTerminalNotice("s1", "")
-	b.ReconcileTerminalNotice("s1", "")
-	require.True(t, atTerminal(t, b, "s1"), "an unlatched notice must survive until it sees a call")
+	// Latches with no call, recording where the transcript stood.
+	b.ReconcileTerminalNotice("s1", "", base)
+	require.True(t, atTerminal(t, b, "s1"), "the baseline tick must not clear it")
 
-	b.ReconcileTerminalNotice("s1", "toolu_A")
+	// Still quiet: a prompt blocks the session, so nothing is written.
+	b.ReconcileTerminalNotice("s1", "", base)
 	require.True(t, atTerminal(t, b, "s1"))
-	b.ReconcileTerminalNotice("s1", "")
+
+	// Answered: the transcript advances.
+	b.ReconcileTerminalNotice("s1", "", base.Add(2*time.Second))
+	require.False(t, atTerminal(t, b, "s1"), "activity past the baseline means it was answered")
+}
+
+// A visible call is the stronger signal and takes precedence: activity moving
+// on while the SAME call is still pending must not clear it.
+func TestTerminalNotice_VisibleCallOutranksActivity(t *testing.T) {
+	now := time.Now()
+	b := newTestEnforcer(&now)
+
+	b.noteTerminalPrompt("s1")
+	b.ReconcileTerminalNotice("s1", "toolu_A", base)
+	b.ReconcileTerminalNotice("s1", "toolu_A", base.Add(time.Minute))
+	require.True(t, atTerminal(t, b, "s1"), "the same call is still pending")
+
+	b.ReconcileTerminalNotice("s1", "", base.Add(time.Minute))
 	require.False(t, atTerminal(t, b, "s1"))
+}
+
+// The very first tick is a baseline, never a resolution.
+func TestTerminalNotice_FirstTickIsAlwaysABaseline(t *testing.T) {
+	now := time.Now()
+	b := newTestEnforcer(&now)
+
+	b.noteTerminalPrompt("s1")
+	// Even with an already-advanced clock, the first tick only records.
+	b.ReconcileTerminalNotice("s1", "", base.Add(time.Hour))
+	require.True(t, atTerminal(t, b, "s1"))
 }
 
 func TestTerminalNotice_ReconcileIsHarmlessWithoutANotice(t *testing.T) {
 	now := time.Now()
 	b := newTestEnforcer(&now)
-	b.ReconcileTerminalNotice("s1", "toolu_A")
-	b.ReconcileTerminalNotice("s1", "")
+	b.ReconcileTerminalNotice("s1", "toolu_A", base)
+	b.ReconcileTerminalNotice("s1", "", base)
 	require.False(t, atTerminal(t, b, "s1"))
 }
 
@@ -99,10 +133,10 @@ func TestTerminalNotice_IsPerSession(t *testing.T) {
 
 	b.noteTerminalPrompt("s1")
 	b.noteTerminalPrompt("s2")
-	b.ReconcileTerminalNotice("s1", "toolu_A")
-	b.ReconcileTerminalNotice("s2", "toolu_B")
+	b.ReconcileTerminalNotice("s1", "toolu_A", base)
+	b.ReconcileTerminalNotice("s2", "toolu_B", base)
 
-	b.ReconcileTerminalNotice("s1", "")
+	b.ReconcileTerminalNotice("s1", "", base)
 	require.False(t, atTerminal(t, b, "s1"))
 	require.True(t, atTerminal(t, b, "s2"), "another session's prompt is untouched")
 }
@@ -129,9 +163,9 @@ func TestTerminalNotice_ClearsLongBeforeTheTTL(t *testing.T) {
 	b := newTestEnforcer(&now)
 
 	b.noteTerminalPrompt("s1")
-	b.ReconcileTerminalNotice("s1", "toolu_A")
+	b.ReconcileTerminalNotice("s1", "toolu_A", base)
 	now = now.Add(3 * time.Second)
-	b.ReconcileTerminalNotice("s1", "")
+	b.ReconcileTerminalNotice("s1", "", base)
 
 	require.False(t, atTerminal(t, b, "s1"))
 	require.Less(t, 3*time.Second, permissionNoticeTTL)

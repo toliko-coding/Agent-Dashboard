@@ -1,6 +1,8 @@
 package agentbroadcast_test
 
 import (
+	"time"
+
 	"context"
 	"testing"
 
@@ -26,7 +28,7 @@ func (f *fakeBridge) StateForSession(sessionID string) ([]sdk.PendingPermission,
 
 func (f *fakeBridge) SweepExpired() { f.swept++ }
 
-func (f *fakeBridge) ReconcileTerminalNotice(sessionID, currentToolUseID string) {
+func (f *fakeBridge) ReconcileTerminalNotice(sessionID, currentToolUseID string, _ time.Time) {
 	f.reconciled = append(f.reconciled, [2]string{sessionID, currentToolUseID})
 }
 
