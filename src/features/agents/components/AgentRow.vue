@@ -64,7 +64,7 @@ async function handleResolve(outcome: 'granted' | 'denied') {
 
 <template>
   <div
-    class="rounded-md overflow-hidden border bg-card transition-[border-color] duration-fast"
+    class="rounded-md overflow-hidden border bg-card transition-[border-color] duration-[var(--duration-fast)] ease-standard"
     :class="borderClass"
   >
     <!-- Dense single-line row -->

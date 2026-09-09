@@ -74,3 +74,43 @@ describe('useSystemResources', () => {
     expect(result.refetch).toBeTypeOf('function')
   })
 })
+
+/*
+ * Regression guard for a 429 found in Phase 4 manual verification.
+ *
+ * This composable used to allocate fresh refs and its own interval per caller.
+ * With one consumer that was invisible; once the status bar, the sidebar
+ * machine card, the overview panel and the system map all wanted the same
+ * numbers, four independent pollers hit /api/system on mount in the same tick,
+ * the server's per-IP rate limiter answered 429, and every panel rendered
+ * empty. State and the timer are now module-level and ref-counted.
+ */
+describe('useSystemResources — shared singleton', () => {
+  const Consumer = defineComponent({
+    setup() {
+      useSystemResources()
+      return {}
+    },
+    template: '<div />',
+  })
+
+  it('issues one request when several components mount together', async () => {
+    const wrappers = [mount(Consumer), mount(Consumer), mount(Consumer), mount(Consumer)]
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(vi.mocked(globalThis.fetch).mock.calls.length).toBe(1)
+    wrappers.forEach(w => w.unmount())
+  })
+
+  it('shares one result set across consumers', async () => {
+    const w = mount(Consumer)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // A second consumer reads the value the first one already loaded.
+    const { result } = withSetup(() => useSystemResources())
+    expect(result.info.value?.cpu.model).toBe('Apple M1')
+    w.unmount()
+  })
+})

@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import { useSidebar } from '../../composables/useSidebar'
 import { useViewState } from '../../composables/useViewState'
 import { NAV_GROUPS, NAV_ITEMS } from '../../utils/navConfig'
+import MachineCard from './MachineCard.vue'
 import NavItem from './NavItem.vue'
 import SidebarFooter from './SidebarFooter.vue'
 
@@ -104,7 +105,6 @@ function selectView(view: ActiveView): void {
           v-for="(g, gi) in grouped"
           :key="g.group"
           class="flex flex-col gap-0.5"
-          :class="{ 'mt-auto': gi === grouped.length - 1 }"
         >
           <div v-if="expanded" class="px-2 pt-3 pb-1 text-[9px] uppercase tracking-wider text-fg-faint font-bold">
             {{ g.group }}
@@ -134,7 +134,34 @@ function selectView(view: ActiveView): void {
             </template>
           </NavItem>
         </div>
+
+        <!--
+          System group. Settings opens a modal rather than switching the active
+          view, so it is rendered here instead of living in NAV_ITEMS (which is
+          typed to ActiveView). It is never `active` for the same reason.
+        -->
+        <div class="flex flex-col gap-0.5">
+          <div v-if="expanded" class="px-2 pt-3 pb-1 text-[9px] uppercase tracking-wider text-fg-faint font-bold">
+            System
+          </div>
+          <div
+            v-else
+            aria-hidden="true"
+            data-testid="nav-group-divider"
+            class="h-px w-6 bg-line self-center my-2"
+          />
+          <NavItem
+            icon="⚙"
+            label="Settings"
+            data-testid="nav-settings"
+            :active="false"
+            :expanded="expanded"
+            @select="emit('openSettings')"
+          />
+        </div>
       </div>
+
+      <MachineCard :expanded="expanded" />
 
       <SidebarFooter
         :expanded="expanded"
@@ -143,7 +170,6 @@ function selectView(view: ActiveView): void {
         @open-sessions="emit('openSessions')"
         @toggle-theme="emit('toggleTheme')"
         @install="emit('install')"
-        @open-settings="emit('openSettings')"
       />
     </nav>
   </div>

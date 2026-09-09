@@ -42,6 +42,7 @@ func provideRouterConfig(cfg config.Config, settingsSvc *settings.Service, oauth
 		InjectRateWindowMs: settingsSvc.Int("inject.rateWindowMs"),
 		AuthPluginSecret:   cfg.AuthPluginSecret,
 		PluginLoginURL:     pluginLoginURL,
+		LocalScopePort:     cfg.LocalScopePort,
 	}
 }
 

@@ -47,6 +47,12 @@ type Config struct {
 	// "reexec" (default) replaces the process image in place (no supervisor needed);
 	// "exit" exits 0 so an external supervisor (systemd/launchd/wrapper) restarts it.
 	RestartMode string `koanf:"restart_mode"`
+	// LocalScopePort is the loopback port of the optional LocalScope collector,
+	// proxied read-only under /localscope so the SPA can reach it same-origin.
+	// Matches LocalScope's own default (its LOCALSCOPE_PORT, 7317). Set 0 to
+	// disable the proxy entirely; the UI then shows "not connected", exactly as
+	// it does when the collector is simply not running.
+	LocalScopePort int `koanf:"localscope_port"`
 }
 
 // Defaults returns a Config populated with safe defaults.
@@ -58,6 +64,8 @@ func Defaults() Config {
 		DBPath:       home + "/.claude/dashboard-tasks.db",
 		WorktreeRoot: home + "/" + worktree.DefaultRootDirName,
 		RestartMode:  "reexec",
+		// The collector binds loopback only; the proxy never reaches off-box.
+		LocalScopePort: 7317,
 	}
 }
 

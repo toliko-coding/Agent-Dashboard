@@ -106,6 +106,11 @@ func (h *Handler) registerMCP(w http.ResponseWriter, r *http.Request) error {
 	args := []string{"mcp", "add", "--scope", "user", "--transport", "http", mcp.ServerName, url, "--header", header}
 	command := fmt.Sprintf("claude mcp add --scope user --transport http %s %s --header %q", mcp.ServerName, url, header)
 
+	// Best-effort: `claude mcp add` errors on a name that's already registered
+	// (e.g. a prior successful run, or the token rotation above racing another
+	// tab's attempt), which would otherwise fail every retry forever. Removing
+	// first is a no-op error when nothing is registered yet.
+	_ = h.run(r.Context(), "claude", "mcp", "remove", "--scope", "user", mcp.ServerName)
 	ok := h.run(r.Context(), "claude", args...) == nil
 
 	apierr.WriteJSON(w, http.StatusOK, map[string]any{"ok": ok, "command": command})

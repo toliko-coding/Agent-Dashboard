@@ -22,13 +22,12 @@ describe('sidebarFooter', () => {
     expect(w.find('[role="progressbar"]').exists()).toBe(false)
   })
 
-  // Settings sat in the topbar between #187 and the toolbar restructure; it is
-  // back beside the other global actions now that the topbar keeps only the
-  // view title, its CTA, and the offline badge.
-  it('emits openSettings from the gear button', async () => {
+  // Settings sat in the topbar (#187), then moved here, and now lives in the
+  // sidebar's System nav group so the rail has exactly one Settings entry.
+  // AppSidebar covers the emit; this asserts the footer no longer duplicates it.
+  it('has no settings button — it lives in the sidebar System group', () => {
     const w = mount(SidebarFooter, { props: base })
-    await w.get('[data-testid="footer-settings"]').trigger('click')
-    expect(w.emitted('openSettings')).toHaveLength(1)
+    expect(w.find('[data-testid="footer-settings"]').exists()).toBe(false)
   })
 
   it('hides install button unless canInstall', () => {

@@ -213,7 +213,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) error {
 	out := make([]projectView, len(rows))
 	for i, row := range rows {
 		count := row.FolderCount
-		out[i] = toProjectView(row.Project, &count, nil, "")
+		// Folders are already loaded: ListWithFolderCount eager-loads the edge
+		// with WithFolders() and previously discarded everything but the count.
+		// Including them costs no extra query and no N+1, and it is what lets a
+		// caller associate a running agent with a project by path containment —
+		// the folder paths are the only reliable link, since Agent.projectName
+		// is just basename(cwd) and collides across unrelated checkouts.
+		folders, _ := row.Project.Edges.FoldersOrErr()
+		out[i] = toProjectView(row.Project, &count, folders, row.Project.ID)
 	}
 	apierr.WriteJSON(w, http.StatusOK, out)
 	return nil

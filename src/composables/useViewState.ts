@@ -1,13 +1,39 @@
 import type { AgentGroup, AgentSort } from '../utils/agentGroup'
+import type { AgentStatusFilter } from '../utils/agentStatusFilter'
 import { ref, watch } from 'vue'
 import { AGENT_GROUP_OPTIONS, AGENT_SORT_OPTIONS, resolveGroup } from '../utils/agentGroup'
+import { AGENT_STATUS_FILTERS } from '../utils/agentStatusFilter'
 
-export type ActiveView = 'cockpit' | 'dashboard' | 'workflows' | 'pipeline' | 'cost' | 'schedules' | 'eval'
+/*
+ * View ids are storage keys (localStorage 'agent-active-view'), so the two
+ * renamed destinations keep their original ids: 'cockpit' is presented as
+ * "Overview" and 'dashboard' as "Agents". Renaming the ids instead would strand
+ * every existing user on the readInitial() fallback below.
+ */
+export type ActiveView
+  = | 'cockpit' | 'dashboard' | 'projects' | 'localscope'
+    | 'pipeline' | 'schedules' | 'workflows'
+    | 'terminal' | 'system'
+    | 'cost' | 'eval'
 export type DashboardLayout = 'cards' | 'list'
 
-const ACTIVE_VIEWS: ActiveView[] = ['cockpit', 'dashboard', 'workflows', 'pipeline', 'cost', 'schedules', 'eval']
+/** Every valid view id. Exported so callers can assert a destination is real. */
+export const ACTIVE_VIEWS: ActiveView[] = [
+  'cockpit',
+  'dashboard',
+  'projects',
+  'localscope',
+  'pipeline',
+  'schedules',
+  'workflows',
+  'terminal',
+  'system',
+  'cost',
+  'eval',
+]
 const AGENT_SORT_VALUES: AgentSort[] = AGENT_SORT_OPTIONS.map(o => o.value)
 const AGENT_GROUP_VALUES: AgentGroup[] = AGENT_GROUP_OPTIONS.map(o => o.value)
+const AGENT_STATUS_FILTER_VALUES: AgentStatusFilter[] = AGENT_STATUS_FILTERS.map(o => o.value)
 
 function readInitial(): { view: ActiveView, layout: DashboardLayout } {
   const ls = typeof localStorage !== 'undefined' ? localStorage : null
@@ -88,6 +114,12 @@ function readStoredSpawner(): string {
   return ls?.getItem('agent-dashboard-spawner') ?? 'all'
 }
 
+function readStoredStatus(): AgentStatusFilter {
+  const ls = typeof localStorage !== 'undefined' ? localStorage : null
+  const v = ls?.getItem('agent-dashboard-status')
+  return v && AGENT_STATUS_FILTER_VALUES.includes(v as AgentStatusFilter) ? (v as AgentStatusFilter) : 'all'
+}
+
 const initial = readInitial()
 const activeView = ref<ActiveView>(initial.view)
 const dashboardLayout = ref<DashboardLayout>(initial.layout)
@@ -96,6 +128,7 @@ const dashboardGroup = ref<AgentGroup>(readStoredGroup())
 const dashboardProject = ref<string>(readStoredProject())
 const dashboardSpawner = ref<string>(readStoredSpawner())
 const parkedGroup = ref<AgentGroup | null>(readParkedGroup())
+const dashboardStatus = ref<AgentStatusFilter>(readStoredStatus())
 
 // Filtering to one spawner takes "Spawner" out of the grouping options. Parking
 // the choice keeps dashboardGroup a value the control can actually show — so
@@ -146,7 +179,11 @@ watch(dashboardSpawner, (v) => {
   if (typeof localStorage !== 'undefined')
     localStorage.setItem('agent-dashboard-spawner', v)
 }, { flush: 'sync' })
+watch(dashboardStatus, (v) => {
+  if (typeof localStorage !== 'undefined')
+    localStorage.setItem('agent-dashboard-status', v)
+}, { flush: 'sync' })
 
 export function useViewState() {
-  return { activeView, dashboardLayout, dashboardSort, dashboardGroup, setDashboardGroup, dashboardProject, dashboardSpawner }
+  return { activeView, dashboardLayout, dashboardSort, dashboardGroup, setDashboardGroup, dashboardProject, dashboardSpawner, dashboardStatus }
 }

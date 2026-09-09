@@ -55,23 +55,24 @@ const usageConsumptionText = computed<string>(() => {
   return `5h ${formatM(w5h.tokens)} · 7d ${formatM(w7d.tokens)}`
 })
 
-// Resource-pressure thresholds in percent. One definition, so the usage bar and
-// the numeric readout can never disagree about what counts as warning/danger.
-// NOTE: barColor below still uses its own, older pair (85/60) — aligning it is a
-// visual change to an existing element and is left as a deliberate decision.
+// Usage-budget thresholds in percent. The CPU/MEM/DISK pressure colouring that
+// used to live here moved to MachineCard with this same 75/90 pair; the old
+// second copy of these thresholds (85/60, used only by the removed CPU strip)
+// went with it, so there is now one definition per surface and no drift.
 const WARN_PCT = 75
 const DANGER_PCT = 90
 
-function barColor(pct: number): string {
-  return pct > 85 ? 'bg-danger' : pct > 60 ? 'bg-warning' : 'bg-success'
-}
-
-function metricTextClass(pct: number): string {
-  if (pct >= DANGER_PCT)
-    return 'text-danger-text'
-  if (pct >= WARN_PCT)
-    return 'text-warning-text'
-  return ''
+function formatUptime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0)
+    return '—'
+  const d = Math.floor(seconds / 86400)
+  const h = Math.floor((seconds % 86400) / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  if (d > 0)
+    return `${d}d ${h}h`
+  if (h > 0)
+    return `${h}h ${m}m`
+  return `${m}m`
 }
 
 function usageBarColor(): string {
@@ -103,12 +104,16 @@ function formatDelta(d: number | null): string {
   </div>
 
   <div v-else class="shrink-0 border-t border-line bg-card">
+    <!--
+      CPU / MEM / DISK deliberately live in the sidebar MachineCard now and are
+      NOT repeated here. This panel keeps only what the MachineCard does not
+      show: load average, host uptime and the build version.
+    -->
     <div v-if="openSegment === 'system'" data-testid="panel-system" class="px-4 py-3 border-b border-line text-[12px] text-fg-mute">
-      <div v-if="systemInfo" class="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono">
-        <div>CPU <span :class="metricTextClass(systemInfo.cpu.usage)">{{ Math.round(systemInfo.cpu.usage) }}%</span> · {{ systemInfo.cpu.cores }} cores</div>
-        <div>MEM <span data-testid="mem-pct" :class="metricTextClass(systemInfo.memory.usagePercent)">{{ Math.round(systemInfo.memory.usagePercent) }}%</span></div>
-        <div>DISK <span :class="metricTextClass(systemInfo.disk.usagePercent)">{{ Math.round(systemInfo.disk.usagePercent) }}%</span></div>
+      <div v-if="systemInfo" class="grid grid-cols-2 sm:grid-cols-3 gap-3 font-mono">
         <div>LOAD {{ systemInfo.loadAvg.map(l => l.toFixed(2)).join(' ') }}</div>
+        <div>CORES {{ systemInfo.cpu.cores }}</div>
+        <div>UP {{ formatUptime(systemInfo.uptime) }}</div>
       </div>
       <div v-if="version" data-testid="build-version" class="mt-2 pt-2 border-t border-line font-mono">
         BUILD {{ version }}
@@ -170,15 +175,12 @@ function formatDelta(d: number | null): string {
         data-testid="seg-system"
         class="flex items-center gap-3 hover:text-fg rounded px-1 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-card"
         :aria-expanded="openSegment === 'system'"
-        aria-label="Toggle system metrics detail"
+        aria-label="Toggle system detail"
         @click="toggleSegment('system')"
       >
-        <span v-if="systemInfo" class="flex items-center gap-1">CPU
-          <span class="inline-block w-10 h-1.5 bg-raised rounded-full overflow-hidden align-middle">
-            <span class="block h-full rounded-full" :class="barColor(systemInfo.cpu.usage)" :style="{ width: `${systemInfo.cpu.usage}%` }" /></span>
-          <span :class="metricTextClass(systemInfo.cpu.usage)">{{ Math.round(systemInfo.cpu.usage) }}%</span></span>
-        <span v-if="systemInfo">MEM <span data-testid="mem-pct-strip" :class="metricTextClass(systemInfo.memory.usagePercent)">{{ Math.round(systemInfo.memory.usagePercent) }}%</span></span>
-        <span v-if="systemInfo">DISK <span :class="metricTextClass(systemInfo.disk.usagePercent)">{{ Math.round(systemInfo.disk.usagePercent) }}%</span></span>
+        <span class="text-fg-faint">LOAD</span>
+        <span v-if="systemInfo" data-testid="load-strip" class="text-fg tabular-nums">{{ systemInfo.loadAvg[0]?.toFixed(2) ?? '—' }}</span>
+        <span v-else class="text-fg-faint">—</span>
       </button>
       <span class="w-px h-3.5 bg-line" aria-hidden="true" />
       <button

@@ -47,6 +47,11 @@ const EvalView = defineAsyncComponent(() => import('@/features/analytics/compone
 const PipelineBoard = defineAsyncComponent(() => import('@/features/pipeline/components/PipelineBoard.vue'))
 const WorkflowsView = defineAsyncComponent(() => import('@/features/workflows/components/WorkflowsView.vue'))
 const SchedulesView = defineAsyncComponent(() => import('./components/SchedulesView.vue'))
+// New Phase 2 destinations. Async for the same entry-chunk budget reason as above.
+const ProjectsView = defineAsyncComponent(() => import('@/features/projects/components/ProjectsView.vue'))
+const LocalScopeView = defineAsyncComponent(() => import('@/features/localscope/components/LocalScopeView.vue'))
+const TerminalView = defineAsyncComponent(() => import('@/features/terminal/components/TerminalView.vue'))
+const SystemView = defineAsyncComponent(() => import('@/features/system/components/SystemView.vue'))
 // Heavy modal loaded on demand — split into its own chunk (includes DependencyGraph + StageCostWaterfall).
 const TaskModal = defineAsyncComponent(() => import('@/features/pipeline/components/TaskModal.vue'))
 // Modal/panel components that drag in marked + dompurify (RefinementChat) and diff (EditGateModal) —
@@ -60,6 +65,9 @@ const { homedir, loadServerConfig } = useServerConfig()
 const { status: onboardingStatus, fetchStatus: fetchOnboardingStatus, visible: showOnboarding, show: showOnboardingFlow, hide: hideOnboardingFlow } = useOnboarding()
 const showLogin = computed(() => authEnabled.value && !user.value)
 const loginPageRef = ref<InstanceType<typeof LoginPage> | null>(null)
+// The topbar's search affordance opens the existing Spotlight dialog rather
+// than owning a second search implementation.
+const spotlightRef = ref<InstanceType<typeof SpotlightSearch> | null>(null)
 // Move focus to the login control when the auth gate appears (SC 2.4.3)
 watch(showLogin, (visible) => {
   if (visible)
@@ -278,7 +286,12 @@ onMounted(() => usageComposable.start())
       </template>
 
       <template #topbar>
-        <AppTopbar :active-view="activeView">
+        <AppTopbar
+          :active-view="activeView"
+          :live="live"
+          :user-label="user?.login"
+          @open-search="spotlightRef?.open()"
+        >
           <template #cta>
             <button
               v-if="activeView === 'pipeline'"
@@ -308,7 +321,7 @@ onMounted(() => usageComposable.start())
           Error: {{ error }}
         </p>
 
-        <CockpitView v-else-if="activeView === 'cockpit'" />
+        <CockpitView v-else-if="activeView === 'cockpit'" @new-agent="showSpawnDialog = true" />
 
         <DashboardView
           v-else-if="activeView === 'dashboard'"
@@ -328,6 +341,10 @@ onMounted(() => usageComposable.start())
         <CostAnalyticsView v-else-if="activeView === 'cost'" />
         <SchedulesView v-else-if="activeView === 'schedules'" />
         <EvalView v-else-if="activeView === 'eval'" />
+        <ProjectsView v-else-if="activeView === 'projects'" />
+        <LocalScopeView v-else-if="activeView === 'localscope'" />
+        <TerminalView v-else-if="activeView === 'terminal'" />
+        <SystemView v-else-if="activeView === 'system'" />
         <WorkflowsView
           v-else-if="activeView === 'workflows'"
           @navigate="(sessionId) => { const a = agents.find(x => x.sessionId === sessionId); if (a) selectAgent(a) }"
@@ -397,6 +414,7 @@ onMounted(() => usageComposable.start())
     <EditGateModal />
     <ServerReconnectOverlay />
     <SpotlightSearch
+      ref="spotlightRef"
       @navigate-task="task => openTask(task)"
       @navigate-agent="agent => selectAgent(agent)"
     />

@@ -20,6 +20,7 @@ vi.mock('@/features/agents', async () => {
       dismissAgent: vi.fn(),
     }),
     AgentCardGrid: { name: 'AgentCardGrid', template: '<div data-testid="agent-card-grid" />' },
+    AgentStatusFilterBar: { name: 'AgentStatusFilterBar', template: '<div data-testid="agent-status-filters" />' },
     AgentTable: { name: 'AgentTable', template: '<div data-testid="agent-table" />' },
     AgentTriageBand: { name: 'AgentTriageBand', template: '<div data-testid="triage-band" />' },
     EmptyAgentState: { name: 'EmptyAgentState', template: '<div data-testid="empty-state" />' },

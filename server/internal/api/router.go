@@ -31,6 +31,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/grants"
 	apihistory "github.com/lx-wnk/agent-dashboard/server/internal/api/history"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/hooks"
+	"github.com/lx-wnk/agent-dashboard/server/internal/api/localscope"
 	apimemory "github.com/lx-wnk/agent-dashboard/server/internal/api/memory"
 	apiobsidian "github.com/lx-wnk/agent-dashboard/server/internal/api/obsidian"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/onboarding"
@@ -107,6 +108,16 @@ type RouterConfig struct {
 	// AuthRateLimiterConfig configures the per-IP rate limiter applied to auth,
 	// MCP, and bulk-resolve endpoints. The zero value uses safe defaults (10 r/s, burst 20).
 	AuthRateLimiterConfig IPRateLimiterConfig
+	// BrowseRateLimiterConfig configures the per-IP limiter on the browser-facing
+	// protected group. It is deliberately separate from AuthRateLimiterConfig:
+	// that one is sized against auth-probing and SHA-256 amplification, whereas
+	// this group carries an ordinary page load. The zero value uses defaults
+	// sized for a real dashboard mount (60 r/s, burst 120) — see the comment at
+	// the middleware's use site.
+	BrowseRateLimiterConfig IPRateLimiterConfig
+	// LocalScopePort is the loopback port of the optional LocalScope collector.
+	// Zero disables the read-only /localscope proxy.
+	LocalScopePort int
 }
 
 // RouterDeps holds all dependencies injected into the router.
@@ -220,6 +231,34 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// Build the per-IP rate limiter once; it owns its cleanup goroutine.
 	// serverCtx cancels the goroutine on shutdown.
 	authRateLimiter := NewIPRateLimiter(serverCtx, deps.Config.AuthRateLimiterConfig)
+	/*
+	 * A second, separately-sized limiter for the browser-facing group.
+	 *
+	 * The strict limiter's own contract is "high-cost endpoints such as auth,
+	 * MCP, and bulk-resolve" — abuse surfaces where 10 r/s is generous. It was
+	 * additionally applied to every protected read, which is a different kind of
+	 * traffic: opening the dashboard issues ~18 requests within 30ms (measured),
+	 * so a legitimate cold load spent almost the entire burst of 20 and the
+	 * remainder — including all four SSE streams — was refused with 429. Because
+	 * useSseResource treats a closed stream as a fallback-to-polling for
+	 * SSE_RETRY_DELAY_MS (30s), every cold load degraded live updates to polling
+	 * for half a minute. Being per-IP on a loopback single-user dashboard made it
+	 * worse: every browser tab draws on the same bucket, so two tabs exceeded it
+	 * deterministically.
+	 *
+	 * This is a scoping fix, not a weakening: auth, MCP and agent-ingress keep
+	 * the strict limiter below, exactly where its docstring places it. The
+	 * browser group gets a budget above its real mount cost and still bounded, so
+	 * a runaway client is still capped.
+	 */
+	browseCfg := deps.Config.BrowseRateLimiterConfig
+	if browseCfg.Rate <= 0 {
+		browseCfg.Rate = 60
+	}
+	if browseCfg.Burst <= 0 {
+		browseCfg.Burst = 120
+	}
+	browseRateLimiter := NewIPRateLimiter(serverCtx, browseCfg)
 
 	// Global middleware (applied to every request, including hooks/MCP/channel-reply)
 	// StripForwardedHeaders must be FIRST so no downstream middleware ever sees
@@ -307,8 +346,10 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Use(RequireSameOriginForMutations)
 		// F-SEC-010: per-IP rate limit on all protected endpoints — catches
 		// bulk-resolve, permission-request creation, and any other high-cost
-		// pipeline paths. 10 r/s burst 20 is well above normal UI usage.
-		r.Use(authRateLimiter)
+		// pipeline paths. Sized for a browser mount rather than for auth probing
+		// (see browseRateLimiter above); the strict limiter still guards auth,
+		// MCP and agent-ingress.
+		r.Use(browseRateLimiter)
 		if !deps.Config.BypassAuth {
 			r.Use(authpkg.RequireAuth(deps.Config.JWTSecret))
 		}
@@ -406,6 +447,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 		if deps.GrantsHandler != nil {
 			deps.GrantsHandler.Mount(r)
 		}
+
+		// Read-only proxy to the optional LocalScope collector, so the SPA can
+		// reach it same-origin in the embedded build exactly as Vite does in
+		// dev. Inside the protected group: it exposes this machine's process and
+		// port table, which is at least as sensitive as the rest of this group.
+		// New(...) returns nil when the port is 0, and Mount is then a no-op.
+		localscope.New("127.0.0.1", deps.Config.LocalScopePort).Mount(r)
 
 		if deps.SystemPromptsHandler != nil {
 			deps.SystemPromptsHandler.Mount(r)

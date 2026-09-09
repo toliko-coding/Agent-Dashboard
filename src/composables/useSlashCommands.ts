@@ -237,7 +237,20 @@ export function emptyCommandSet(): DynamicCommandSet {
   return { commands: [], builtinsMayBeStale: false }
 }
 
-const dynamicCommandCache = new Map<string, DynamicCommandSet>()
+/*
+ * Caches the in-flight PROMISE, not just the resolved value.
+ *
+ * Caching only the result deduplicates sequential callers but not simultaneous
+ * ones: every agent card carries a PromptInput, so opening the roster mounted
+ * several at once, all of them missed the still-empty cache, and each fired its
+ * own /api/slash-commands request — enough to trip the server's per-IP rate
+ * limiter (observed as HTTP 429 on four concurrent requests). Storing the
+ * promise means the first caller performs the fetch and the rest await it.
+ *
+ * A failed lookup is evicted so a transient error is retried rather than
+ * cached as a permanent empty command set.
+ */
+const dynamicCommandCache = new Map<string, Promise<DynamicCommandSet>>()
 
 function scopeKey(scope: DynamicCommandScope): string {
   // Prefix per identifier kind so distinct namespaces (a session id, a spawner
@@ -253,9 +266,17 @@ function scopeKey(scope: DynamicCommandScope): string {
 
 export async function fetchDynamicCommands(scope: DynamicCommandScope): Promise<DynamicCommandSet> {
   const key = scopeKey(scope)
-  if (dynamicCommandCache.has(key))
-    return dynamicCommandCache.get(key)!
+  const cached = dynamicCommandCache.get(key)
+  if (cached)
+    return cached
 
+  const pending = loadDynamicCommands(scope)
+  dynamicCommandCache.set(key, pending)
+  return pending
+}
+
+async function loadDynamicCommands(scope: DynamicCommandScope): Promise<DynamicCommandSet> {
+  const key = scopeKey(scope)
   const params = new URLSearchParams()
   if (scope.sessionId)
     params.set('sessionId', scope.sessionId)
@@ -266,8 +287,11 @@ export async function fetchDynamicCommands(scope: DynamicCommandScope): Promise<
 
   try {
     const res = await fetch(`/api/slash-commands?${params.toString()}`)
-    if (!res.ok)
+    if (!res.ok) {
+      // Not cached: a 429 or a transient 5xx must not pin an empty result.
+      dynamicCommandCache.delete(key)
       return emptyCommandSet()
+    }
     const data = await res.json() as DynamicCommandsResponse
     const set: DynamicCommandSet = {
       commands: (data.commands ?? []).map(c => ({
@@ -278,10 +302,10 @@ export async function fetchDynamicCommands(scope: DynamicCommandScope): Promise<
       builtinsMayBeStale: !!data.builtinsMayBeStale,
       engineVersion: data.engineVersion,
     }
-    dynamicCommandCache.set(key, set)
     return set
   }
   catch {
+    dynamicCommandCache.delete(key)
     return emptyCommandSet()
   }
 }

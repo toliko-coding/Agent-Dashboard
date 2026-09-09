@@ -130,3 +130,78 @@ describe('agentModal session context', () => {
     expect(w.html()).not.toContain('agent-terminal')
   })
 })
+
+/*
+ * Agent workspace behaviour (Phase 5). The drawer's Overview/Transcript tabs
+ * are gone — intelligence sits beside the conversation now — but the honesty
+ * cases they guarded still matter: the reference design showed Pause / Stop and
+ * a "Phase N/7", none of which the backend can support for a spawned agent.
+ */
+describe('agentModal — workspace', () => {
+  function workspace(agent: Agent = baseAgent) {
+    return mount(AgentModal, {
+      props: { agent },
+      global: { stubs: { ...stubs, AgentIntelligencePanel: true } },
+    })
+  }
+
+  it('renders a large workspace rather than a narrow drawer', () => {
+    const w = workspace()
+    const box = w.get('[data-testid="agent-workspace"]')
+    // Sized from the viewport, and explicitly not the old 560px panel.
+    expect(box.classes().join(' ')).toContain('w-[min(1500px,96vw)]')
+    expect(w.find('[data-testid="agent-details-panel"]').exists()).toBe(false)
+  })
+
+  it('gives the conversation its own labelled region', () => {
+    const w = workspace()
+    expect(w.find('section[aria-label="Conversation"]').exists()).toBe(true)
+  })
+
+  it('exposes no pause or stop action — no such endpoint exists', () => {
+    const w = workspace()
+    const text = w.text().toLowerCase()
+    expect(text).not.toContain('pause')
+    expect(text).not.toContain('stop')
+  })
+
+  // A "Phase 3/7" for a plain agent would be invented; only pipeline-linked
+  // agents have a real stage. TodoWrite items are shown as tasks instead.
+  it('omits task counts entirely when the session wrote no TodoWrite items', () => {
+    const w = workspace()
+    expect(w.find('[data-testid="header-tasks"]').exists()).toBe(false)
+    expect(w.text().toLowerCase()).not.toContain('phase')
+  })
+
+  it('shows task progress as a completed ratio, never as a phase', () => {
+    const w = workspace({
+      ...baseAgent,
+      tasks: [
+        { id: '1', subject: 'a', status: 'completed' },
+        { id: '2', subject: 'b', status: 'completed' },
+        { id: '3', subject: 'c', status: 'in_progress' },
+      ],
+    } as Agent)
+    const tasks = w.get('[data-testid="header-tasks"]')
+    expect(tasks.text()).toContain('2 / 3')
+    expect(tasks.text().toLowerCase()).not.toContain('phase')
+  })
+
+  it('warns that a session started outside the dashboard resumes rather than injects', () => {
+    const w = workspace({ ...baseAgent, liveInjectable: false } as Agent)
+    expect(w.find('[data-testid="agent-resume-note"]').exists()).toBe(true)
+  })
+
+  it('says a remote session cannot be messaged, and offers no prompt box', () => {
+    const w = workspace({ ...baseAgent, machine: 'build-box' } as Agent)
+    expect(w.get('[data-testid="agent-unreachable-note"]').text()).toContain('build-box')
+    expect(w.findComponent({ name: 'PromptInput' }).exists()).toBe(false)
+  })
+
+  it('shows a Started time derived from uptime, not an invented estimate', () => {
+    const w = workspace()
+    expect(w.text()).toContain('Started')
+    expect(w.text().toLowerCase()).not.toContain('est.')
+    expect(w.text().toLowerCase()).not.toContain('remaining')
+  })
+})

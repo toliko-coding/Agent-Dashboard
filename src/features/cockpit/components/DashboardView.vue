@@ -7,8 +7,9 @@ import DashboardToolbar from '@/components/shell/DashboardToolbar.vue'
 import { useNow } from '@/composables/useNow'
 import { useSpawners } from '@/composables/useSpawners'
 import { useViewState } from '@/composables/useViewState'
-import { AgentCardGrid, AgentTable, AgentTriageBand, EmptyAgentState, useAgents } from '@/features/agents'
+import { AgentCardGrid, AgentStatusFilterBar, AgentTable, AgentTriageBand, EmptyAgentState, useAgents } from '@/features/agents'
 import { groupAgents, sortAgents } from '@/utils/agentGroup'
+import { matchesStatusFilter, statusFilterCounts } from '@/utils/agentStatusFilter'
 import { friendlyProjectName } from '@/utils/friendlyProjectName'
 
 defineProps<{
@@ -23,7 +24,7 @@ const emit = defineEmits<{
 // autoStart: false, exactly as App.vue calls it — useAgents holds module-level
 // state, so this is the same stream App.vue already started, not a second one.
 const { agents, filteredAgents, attentionAgents, pendingCapabilityDecisions, searchQuery, selectAgent, dismissAgent } = useAgents({ autoStart: false })
-const { dashboardLayout, dashboardSort, dashboardGroup, setDashboardGroup, dashboardProject, dashboardSpawner } = useViewState()
+const { dashboardLayout, dashboardSort, dashboardGroup, setDashboardGroup, dashboardProject, dashboardSpawner, dashboardStatus } = useViewState()
 const { spawners } = useSpawners()
 const { nowMs } = useNow()
 
@@ -37,7 +38,20 @@ const rosterAgents = computed(() => {
     base = base.filter(a => a.projectName === dashboardProject.value)
   if (dashboardSpawner.value !== 'all')
     base = base.filter(a => a.spawnerId === dashboardSpawner.value)
+  if (dashboardStatus.value !== 'all')
+    base = base.filter(a => matchesStatusFilter(a, dashboardStatus.value))
   return sortAgents(base, dashboardSort.value, nowMs.value)
+})
+
+// Counts come from the project/spawner-filtered set rather than the whole
+// roster, so a chip never promises agents the other filters have already hidden.
+const statusCounts = computed(() => {
+  let base = filteredAgents.value
+  if (dashboardProject.value !== 'all')
+    base = base.filter(a => a.projectName === dashboardProject.value)
+  if (dashboardSpawner.value !== 'all')
+    base = base.filter(a => a.spawnerId === dashboardSpawner.value)
+  return statusFilterCounts(base)
 })
 const rosterGroups = computed(() => groupAgents(rosterAgents.value, dashboardGroup.value))
 const projectOptions = computed(() => [
@@ -81,6 +95,11 @@ defineExpose({ rosterAgents })
     @update:sort-by="dashboardSort = $event"
     @update:group-by="setDashboardGroup($event)"
     @update:search-query="searchQuery = $event"
+  />
+  <AgentStatusFilterBar
+    v-model="dashboardStatus"
+    :counts="statusCounts"
+    class="mb-3"
   />
   <template v-if="dashboardLayout === 'list'">
     <EmptyAgentState v-if="rosterAgents.length === 0" :search-query="searchQuery" />
