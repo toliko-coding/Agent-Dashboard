@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import MetricCard from '@/components/ui/MetricCard.vue'
 import { useProjects } from '@/composables/useProjects'
 import { useAgents } from '@/features/agents'
-import { useLocalScopeSummary } from '@/features/localscope'
+import { formatAge, useLocalMachine } from '@/features/localscope'
 import { matchesStatusFilter } from '@/utils/agentStatusFilter'
 
 /*
@@ -33,23 +33,26 @@ const agentState = computed(() => listState(agentsLoading.value, agentsError.val
 const projectState = computed(() => listState(projectsLoading.value, projectsError.value, projects.value.length))
 
 /*
- * LocalScope-backed metrics.
+ * Machine metrics, from the dashboard's own normalized snapshot.
  *
- * LocalScope's own contract carries the same distinction this row enforces: a
- * count of `null` means NOT COLLECTED, never zero (see its summary.ts). So the
- * mapping is direct — null becomes `notAsked`, a number becomes `ready`/`empty`
- * — and nothing here has to invent a fallback.
+ * This row no longer speaks to LocalScope. It reads GET
+ * /api/localscope/snapshot, so it knows nothing about the collector's envelope
+ * or that it is a separate process — the backend owns that translation, and a
+ * change to LocalScope's contract lands there rather than here.
+ *
+ * The null-vs-zero rule travels the whole way: LocalScope reports `null` for a
+ * category it did not measure, the normalizer preserves it, and `notAsked`
+ * renders an em dash. A count of 0 is a real measurement and renders as 0.
  */
-const summary = useLocalScopeSummary()
+const { snapshot, loaded: machineLoaded } = useLocalMachine()
 
-/** Turns a LocalScope count into a panel state, honouring null-vs-zero. */
+/** Turns a snapshot count into a panel state, honouring null-vs-zero. */
 function collectorState(count: number | null | undefined): PanelState {
-  if (summary.reachable.value === false)
-    return 'notAsked'
-  if (summary.error.value)
-    return 'failed'
-  if (!summary.loaded.value)
+  if (!machineLoaded.value)
     return 'loading'
+  // Nothing usable at all: the machine is unknown, not empty.
+  if (snapshot.value.source === 'unavailable')
+    return 'notAsked'
   if (count === null || count === undefined)
     return 'notAsked'
   return count === 0 ? 'empty' : 'ready'
@@ -57,14 +60,45 @@ function collectorState(count: number | null | undefined): PanelState {
 
 /** The reason line shown when a metric is unavailable. */
 function collectorMessage(notCollected = 'Not collected yet'): string {
-  if (summary.reachable.value === false)
+  if (snapshot.value.source === 'unavailable')
     return 'LocalScope not connected'
-  return summary.error.value ?? notCollected
+  return notCollected
 }
 
-const servicesCount = computed(() => summary.data.value?.services.running ?? null)
-const devicesCount = computed(() => summary.data.value?.devices.connected ?? null)
-const networkCount = computed(() => summary.data.value?.network.active ?? null)
+/*
+ * A stale reading keeps its value — discarding it would turn "I cannot see the
+ * machine right now" into "the machine has nothing on it" — but it must never
+ * be shown as if it were current, so every stale card carries its age.
+ */
+const staleHint = computed(() => {
+  if (snapshot.value.source !== 'stale')
+    return null
+  const age = formatAge(snapshot.value.ageMs)
+  return age === null ? 'stale' : `stale · ${age}`
+})
+
+/** Names the degraded sources so a partial reading explains itself. */
+const degradedHint = computed(() => {
+  if (snapshot.value.source !== 'degraded' || snapshot.value.degraded.length === 0)
+    return null
+  return `partial · ${snapshot.value.degraded.map(d => d.source).join(', ')}`
+})
+
+/**
+ * Hint precedence: staleness first, because it qualifies the number itself;
+ * then degradation; then the card's own descriptive hint.
+ */
+function hintFor(own: string | undefined, count: number | null): string | undefined {
+  if (staleHint.value)
+    return staleHint.value
+  if (degradedHint.value)
+    return degradedHint.value
+  return count ? own : undefined
+}
+
+const servicesCount = computed(() => snapshot.value.counts.services)
+const devicesCount = computed(() => snapshot.value.counts.devices)
+const networkCount = computed(() => snapshot.value.counts.network)
 </script>
 
 <template>
@@ -90,7 +124,7 @@ const networkCount = computed(() => summary.data.value?.network.active ?? null)
       icon="▤"
       :state="collectorState(servicesCount)"
       :value="servicesCount ?? undefined"
-      :hint="servicesCount ? 'listening' : undefined"
+      :hint="hintFor('listening', servicesCount)"
       :message="collectorMessage()"
     />
     <MetricCard
@@ -98,19 +132,20 @@ const networkCount = computed(() => summary.data.value?.network.active ?? null)
       icon="▣"
       :state="collectorState(devicesCount)"
       :value="devicesCount ?? undefined"
-      :hint="devicesCount ? 'connected' : undefined"
+      :hint="hintFor('connected', devicesCount)"
       :message="collectorMessage('Device adapters unavailable')"
     />
     <!--
-      Network stays unavailable even when LocalScope is running: it has the
-      model but no collector yet, so its summary reports network.active as
-      null. This card flips to real data the moment that lands, unchanged.
+      Network is a real count: LocalScope collects outbound connections and
+      reports them as summary.network.active. It reads "not collected" only
+      when that collector actually degraded.
     -->
     <MetricCard
       label="Network"
       icon="◍"
       :state="collectorState(networkCount)"
       :value="networkCount ?? undefined"
+      :hint="hintFor('active', networkCount)"
       :message="collectorMessage()"
     />
   </div>

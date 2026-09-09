@@ -7,9 +7,8 @@ async function mountMetrics(opts: {
   agentsLoading?: boolean
   agentsError?: string | null
   projectsError?: string | null
-  /** LocalScope collector state. undefined = not yet resolved (loading). */
-  lsReachable?: boolean
-  lsSummary?: any
+  /** Normalized snapshot. undefined = first response not yet in (loading). */
+  snapshot?: any
 }) {
   vi.resetModules()
   // Real refs, so the component's template sees the same auto-unwrapping it
@@ -34,20 +33,49 @@ async function mountMetrics(opts: {
       }),
     }
   })
+  /*
+   * The row now consumes the dashboard's own snapshot, so the mock is that
+   * shape. Nothing here mentions CollectorResult, which is the point of the
+   * migration: the Overview no longer knows LocalScope's envelope exists.
+   */
   vi.doMock('@/features/localscope', async () => {
     const { ref, shallowRef } = await import('vue')
+    const { EMPTY_SNAPSHOT, formatAge } = await import('@/features/localscope/snapshot')
     return {
-      useLocalScopeSummary: () => ({
-        data: shallowRef(opts.lsSummary ?? null),
-        error: ref(null),
-        reachable: ref(opts.lsReachable ?? null),
-        loaded: ref(opts.lsReachable !== undefined),
+      formatAge,
+      useLocalMachine: () => ({
+        snapshot: shallowRef(opts.snapshot ?? EMPTY_SNAPSHOT),
+        loaded: ref(opts.snapshot !== undefined),
         refetch: async () => {},
       }),
     }
   })
   const C = (await import('./OverviewMetrics.vue')).default
   return mount(C)
+}
+
+/** Builds a normalized snapshot, defaulting every count to unknown. */
+function snap(over: {
+  source?: string
+  ageMs?: number | null
+  degraded?: any[]
+  counts?: Partial<Record<string, number | null>>
+} = {}) {
+  return {
+    source: over.source ?? 'ok',
+    collectedAt: '2026-01-01T00:00:00Z',
+    ageMs: over.ageMs ?? 1200,
+    degraded: over.degraded ?? [],
+    counts: {
+      services: null,
+      processesRelevant: null,
+      processesTotal: null,
+      devices: null,
+      network: null,
+      projects: null,
+      ...(over.counts ?? {}),
+    },
+  }
 }
 
 function state(w: any, testid: string) {
@@ -87,7 +115,7 @@ describe('overviewMetrics', () => {
     const w = await mountMetrics({
       agents: [{ status: 'idle' }],
       projects: [{ id: 'p' }],
-      lsReachable: false,
+      snapshot: snap({ source: 'unavailable', ageMs: null }),
     })
     for (const id of ['metric-local-services', 'metric-devices', 'metric-network']) {
       expect(state(w, id)).toBe('notAsked')
@@ -100,14 +128,7 @@ describe('overviewMetrics', () => {
     const w = await mountMetrics({
       agents: [{ status: 'idle' }],
       projects: [{ id: 'p' }],
-      lsReachable: true,
-      lsSummary: {
-        services: { running: 4 },
-        processes: { relevant: 13, total: 782 },
-        devices: { connected: 1 },
-        network: { active: null },
-        projects: { active: 2 },
-      },
+      snapshot: snap({ counts: { services: 4, processesRelevant: 13, processesTotal: 782, devices: 1, projects: 2 } }),
     })
     expect(state(w, 'metric-local-services')).toBe('ready')
     expect(w.get('[data-testid="metric-local-services"]').text()).toContain('4')
@@ -115,18 +136,11 @@ describe('overviewMetrics', () => {
     expect(w.get('[data-testid="metric-devices"]').text()).toContain('1')
   })
 
-  // LocalScope reports null for a collector it has not built; that must stay
-  // unavailable even though LocalScope itself is connected and healthy.
-  it('keeps network unavailable when LocalScope reports null for it', async () => {
+  // A count LocalScope did not measure stays unknown even though the
+  // collector itself is connected and healthy.
+  it('keeps a null count unavailable while the collector is healthy', async () => {
     const w = await mountMetrics({
-      lsReachable: true,
-      lsSummary: {
-        services: { running: 4 },
-        processes: { relevant: 1, total: 2 },
-        devices: { connected: 0 },
-        network: { active: null },
-        projects: { active: 1 },
-      },
+      snapshot: snap({ counts: { services: 4, devices: 0, network: null } }),
     })
     expect(state(w, 'metric-network')).toBe('notAsked')
     expect(w.get('[data-testid="metric-network"]').text()).not.toContain('0')
@@ -138,5 +152,97 @@ describe('overviewMetrics', () => {
     const w = await mountMetrics({ agents: [], projects: [] })
     expect(w.text().toLowerCase()).not.toContain('health')
     expect(w.text()).not.toContain('Good')
+  })
+})
+
+/*
+ * The normalized-snapshot migration.
+ *
+ * The distinction these protect: an unreachable collector says nothing about
+ * the machine, so it must never render as a machine with nothing on it.
+ */
+describe('overviewMetrics — normalized machine snapshot', () => {
+  it('renders a measured zero as 0', async () => {
+    const w = await mountMetrics({ snapshot: snap({ counts: { services: 0, devices: 0, network: 0 } }) })
+    for (const id of ['metric-local-services', 'metric-devices', 'metric-network']) {
+      expect(state(w, id)).toBe('empty')
+      expect(w.get(`[data-testid="${id}"]`).text()).toContain('0')
+    }
+  })
+
+  it('does not render an unknown count as 0', async () => {
+    const w = await mountMetrics({ snapshot: snap({ counts: { services: null } }) })
+    expect(state(w, 'metric-local-services')).toBe('notAsked')
+    expect(w.get('[data-testid="metric-local-services"]').text()).not.toContain('0')
+  })
+
+  it('tells a measured zero apart from an unknown, side by side', async () => {
+    const w = await mountMetrics({ snapshot: snap({ counts: { devices: 0, network: null } }) })
+    expect(state(w, 'metric-devices')).toBe('empty')
+    expect(state(w, 'metric-network')).toBe('notAsked')
+  })
+
+  it('takes the network count from the snapshot', async () => {
+    const w = await mountMetrics({ snapshot: snap({ counts: { network: 22 } }) })
+    expect(state(w, 'metric-network')).toBe('ready')
+    expect(w.get('[data-testid="metric-network"]').text()).toContain('22')
+  })
+
+  // The failure this whole phase exists to prevent.
+  it('an unavailable collector does not look like an empty machine', async () => {
+    const w = await mountMetrics({ snapshot: snap({ source: 'unavailable', ageMs: null }) })
+    for (const id of ['metric-local-services', 'metric-devices', 'metric-network']) {
+      expect(state(w, id)).toBe('notAsked')
+      expect(w.get(`[data-testid="${id}"]`).text()).not.toContain('0')
+      expect(w.get(`[data-testid="${id}"]`).text()).toContain('LocalScope not connected')
+    }
+  })
+
+  it('keeps a stale reading but labels it as stale, with its age', async () => {
+    const w = await mountMetrics({
+      snapshot: snap({ source: 'stale', ageMs: 185_000, counts: { services: 4, devices: 1, network: 22 } }),
+    })
+    // The value survives — discarding it would turn "cannot see the machine"
+    // into "the machine is empty".
+    expect(state(w, 'metric-local-services')).toBe('ready')
+    expect(w.get('[data-testid="metric-local-services"]').text()).toContain('4')
+    // …but it is never presented as current.
+    expect(w.get('[data-testid="metric-local-services"]').text()).toContain('stale')
+    expect(w.get('[data-testid="metric-local-services"]').text()).toContain('3m ago')
+  })
+
+  it('shows a degraded reading with the source that failed, not as healthy', async () => {
+    const w = await mountMetrics({
+      snapshot: snap({
+        source: 'degraded',
+        degraded: [{ source: 'adb', reason: 'adb is not installed', kind: 'missing' }],
+        counts: { services: 4, devices: null },
+      }),
+    })
+    expect(state(w, 'metric-local-services')).toBe('ready')
+    expect(w.get('[data-testid="metric-local-services"]').text()).toContain('partial')
+    expect(w.get('[data-testid="metric-local-services"]').text()).toContain('adb')
+    // The count that was not measured is still unknown, not zero.
+    expect(state(w, 'metric-devices')).toBe('notAsked')
+  })
+
+  it('is loading, not zero, before the first response', async () => {
+    const w = await mountMetrics({})
+    for (const id of ['metric-local-services', 'metric-devices', 'metric-network'])
+      expect(state(w, id)).toBe('loading')
+  })
+
+  // The migration seam itself: the Overview must not parse LocalScope's
+  // envelope any more.
+  it('does not consume the raw collector envelope', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const src = readFileSync(
+      resolve(process.cwd(), 'src/features/cockpit/components/OverviewMetrics.vue'),
+      'utf8',
+    )
+    expect(src).not.toContain('CollectorResult')
+    expect(src).not.toContain('useLocalScopeSummary')
+    expect(src).toContain('useLocalMachine')
   })
 })

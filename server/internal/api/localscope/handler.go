@@ -62,6 +62,9 @@ const maxResponseBytes = 8 << 20 // 8 MiB
 type Handler struct {
 	baseURL string
 	client  *http.Client
+	// last is the most recent successful snapshot, so an unreachable collector
+	// can be reported as stale rather than as a machine with nothing on it.
+	last lastGood
 }
 
 // New builds a Handler for the collector at host:port (expected to be
@@ -92,6 +95,9 @@ func (h *Handler) Mount(r chi.Router) {
 		return
 	}
 	r.Get("/localscope/*", h.proxy)
+	// The dashboard's own normalized view. Separate from the proxy on purpose:
+	// the proxy forwards LocalScope's contract, this speaks the dashboard's.
+	r.Get("/api/localscope/snapshot", h.snapshot)
 }
 
 func (h *Handler) proxy(w http.ResponseWriter, r *http.Request) {
