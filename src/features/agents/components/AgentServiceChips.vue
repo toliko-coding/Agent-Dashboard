@@ -19,6 +19,11 @@ import { useAgentServices } from '../composables/useAgentServices'
  * The count is per-agent by construction — it is the correlated subset, never
  * a machine-wide total, so a card can never display the whole machine's
  * service or connection count as if it belonged to one agent.
+ *
+ * A chip is a link ONLY when LocalScope reported a real `url`. It never builds
+ * one from the port: the collector sets `url` to null precisely when the
+ * listener is not HTTP-ish, so inventing `http://localhost:<port>` would send
+ * the user at a database or an inspector socket.
  */
 const props = defineProps<{ agent: Agent }>()
 
@@ -31,6 +36,15 @@ const overflow = computed(() => Math.max(0, services.value.length - MAX_CHIPS))
 
 const label = computed(() =>
   `${services.value.length} local ${services.value.length === 1 ? 'service' : 'services'} in this project: ${services.value.map(s => `${s.label} on port ${s.port}`).join(', ')}`)
+
+/** Per-chip accessible name — the anchor needs its own, not the group's. */
+function chipLabel(s: { label: string, port: number, url: string | null }): string {
+  return s.url
+    ? `Open ${s.label} at ${s.url}`
+    : `${s.label} on port ${s.port}`
+}
+
+const CHIP_CLASS = 'inline-flex items-center gap-1 rounded px-1 py-0.5 bg-success-soft text-success-text text-[10px] font-mono leading-none'
 </script>
 
 <template>
@@ -41,15 +55,39 @@ const label = computed(() =>
     :title="label"
   >
     <span class="sr-only">{{ label }}</span>
-    <span
-      v-for="s in shown"
-      :key="s.id"
-      :data-testid="`agent-service-${s.port}`"
-      class="inline-flex items-center gap-1 rounded px-1 py-0.5 bg-success-soft text-success-text text-[10px] font-mono leading-none"
-      aria-hidden="true"
-    >
-      <span class="size-1.5 rounded-full bg-success-dot shrink-0" />:{{ s.port }}
-    </span>
+
+    <template v-for="s in shown" :key="s.id">
+      <!--
+        Opening the service is the useful action, and an anchor gives it
+        keyboard access, middle-click and "open in new tab" for free. `.stop`
+        keeps the click off the card, which would otherwise open the workspace
+        behind the new tab.
+      -->
+      <a
+        v-if="s.url"
+        :href="s.url"
+        target="_blank"
+        rel="noopener noreferrer"
+        :data-testid="`agent-service-${s.port}`"
+        :class="`${CHIP_CLASS} hover:brightness-110 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent transition-[filter] duration-[var(--duration-fast)] ease-standard`"
+        :aria-label="chipLabel(s)"
+        @click.stop
+        @keydown.enter.stop
+      >
+        <span class="size-1.5 rounded-full bg-success-dot shrink-0" aria-hidden="true" />:{{ s.port }}
+      </a>
+
+      <!-- No URL reported: a listener that is not HTTP-ish. Shown, not linked. -->
+      <span
+        v-else
+        :data-testid="`agent-service-${s.port}`"
+        :class="CHIP_CLASS"
+        :title="chipLabel(s)"
+      >
+        <span class="size-1.5 rounded-full bg-success-dot shrink-0" aria-hidden="true" />:{{ s.port }}
+      </span>
+    </template>
+
     <span
       v-if="overflow > 0"
       class="text-[10px] font-mono text-fg-faint"

@@ -71,6 +71,58 @@ describe('agentServiceChips', () => {
     expect(w.find('[data-testid="agent-service-chips"]').exists()).toBe(false)
   })
 
+  /*
+   * Interaction: a chip opens the service, but only when LocalScope actually
+   * reported a URL. The collector sets url to null for a non-HTTP listener, so
+   * building http://localhost:<port> would point the user at a database or an
+   * inspector socket.
+   */
+  it('links a chip to the URL LocalScope reported', async () => {
+    const w = await mountChips(agentAt('/gh/LocalScope'), {
+      data: [svc({ id: 'a', port: 5173, url: 'http://localhost:5173', project: { rootPath: '/gh/LocalScope' } })],
+    })
+    const chip = w.get('[data-testid="agent-service-5173"]')
+    expect(chip.element.tagName).toBe('A')
+    expect(chip.attributes('href')).toBe('http://localhost:5173')
+    expect(chip.attributes('target')).toBe('_blank')
+    expect(chip.attributes('rel')).toContain('noopener')
+    expect(chip.attributes('aria-label')).toContain('Open Vite Development Server')
+  })
+
+  it('does not link — or invent a URL for — a service with none', async () => {
+    const w = await mountChips(agentAt('/gh/LocalScope'), {
+      data: [svc({ id: 'b', port: 5432, label: 'database', url: null, project: { rootPath: '/gh/LocalScope' } })],
+    })
+    const chip = w.get('[data-testid="agent-service-5432"]')
+    expect(chip.element.tagName).not.toBe('A')
+    expect(w.html()).not.toContain('localhost:5432')
+    expect(chip.attributes('title')).toContain('database on port 5432')
+  })
+
+  // The card opens the workspace on click; a chip must not do both.
+  it('keeps a chip click off the surrounding card', async () => {
+    const onCard = vi.fn()
+    const state = { data: [svc({ id: 'a', port: 5173, url: 'http://localhost:5173', project: { rootPath: '/gh/X' } })] }
+    vi.resetModules()
+    vi.doMock('@/features/localscope', () => ({
+      useLocalScopeServices: () => ({
+        data: { value: state.data },
+        error: { value: null },
+        reachable: { value: true },
+        loaded: { value: true },
+        refetch: async () => {},
+      }),
+    }))
+    const Chips = (await import('../AgentServiceChips.vue')).default
+    const w = mount({
+      components: { Chips },
+      setup: () => ({ onCard, agent: agentAt('/gh/X') }),
+      template: '<div @click="onCard"><Chips :agent="agent" /></div>',
+    })
+    await w.get('[data-testid="agent-service-5173"]').trigger('click')
+    expect(onCard).not.toHaveBeenCalled()
+  })
+
   it('describes the services for assistive tech', async () => {
     const w = await mountChips(agentAt('/gh/LocalScope'), {
       data: [svc({ id: 'a', port: 5173, project: { rootPath: '/gh/LocalScope' } })],
