@@ -115,6 +115,14 @@ async function toggleAllProcesses(): Promise<void> {
  */
 function fromRaw(p: DevProcess): MachineProcess {
   return {
+    /*
+     * Always null, and correctly so: workspace identity is resolved on the
+     * server as part of the normalized endpoints, and this row came straight
+     * from the collector. There is no cheap client-side substitute — resolving
+     * a checkout means asking git — so an unattributed row is the honest
+     * outcome rather than a guess from its cwd string.
+     */
+    workspace: null,
     id: p.id,
     pid: p.pid,
     ppid: p.ppid,

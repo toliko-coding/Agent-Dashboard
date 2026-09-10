@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/lx-wnk/agent-dashboard/server/internal/identity"
 	"io"
 	"net"
 	"net/http"
@@ -71,6 +72,15 @@ type Handler struct {
 	lastProcessTotal lastReading[*int]
 	lastDevices      lastReading[[]Device]
 	lastConnected    lastReading[*int]
+	/*
+	 * Workspace identity for services and processes.
+	 *
+	 * One shared cached resolver, not one per request or per record: a single
+	 * process list carries dozens of observations and they repeat heavily —
+	 * measured live, 42 processes with a cwd across 9 distinct paths, one of
+	 * them 15 times. Per-record resolution would shell out to git for each.
+	 */
+	workspaces *identity.Resolver
 }
 
 // New builds a Handler for the collector at host:port (expected to be
@@ -82,7 +92,8 @@ func New(host string, port int) *Handler {
 		return nil
 	}
 	return &Handler{
-		baseURL: fmt.Sprintf("http://%s", net.JoinHostPort(host, fmt.Sprintf("%d", port))),
+		workspaces: identity.NewResolver(),
+		baseURL:    fmt.Sprintf("http://%s", net.JoinHostPort(host, fmt.Sprintf("%d", port))),
 		client: &http.Client{
 			Timeout: requestTimeout,
 			// No redirect following: the collector never redirects, and doing so

@@ -1,9 +1,13 @@
 package localscope
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/lx-wnk/agent-dashboard/sdk"
+	"github.com/lx-wnk/agent-dashboard/server/internal/identity"
 )
 
 /*
@@ -95,6 +99,11 @@ type Service struct {
 	// PID, which are observed rather than inferred.
 	Confidence string  `json:"confidence"`
 	StartedAt  *string `json:"startedAt"`
+	// Workspace is the checkout this service runs in, resolved from Cwd alone.
+	// Null when Cwd is absent or unresolvable — see workspaceFromCwd for why no
+	// other field is used as evidence. Correlation is id equality against an
+	// agent's workspace, so null here means the service stays unattributed.
+	Workspace *sdk.WorkspaceRef `json:"workspace"`
 }
 
 // Process is a development process LocalScope considered relevant.
@@ -119,6 +128,9 @@ type Process struct {
 	// DiscoveredProject is LocalScope's attribution. See the type's own note on
 	// why it is not a dashboard project.
 	DiscoveredProject *DiscoveredProject `json:"discoveredProject"`
+	// Workspace is the checkout this process runs in, resolved from Cwd alone.
+	// Same rule and same reasons as Service.Workspace.
+	Workspace *sdk.WorkspaceRef `json:"workspace"`
 }
 
 // ServicesResponse is GET /api/localscope/services.
@@ -230,11 +242,43 @@ func projectFrom(p *rawProjectRef) *DiscoveredProject {
 	return out
 }
 
-func servicesFrom(raw []rawService) []Service {
+/*
+ * workspaceFromCwd resolves an observation's workspace from its cwd, and from
+ * nothing else.
+ *
+ * cwd is the only evidence used, which was settled against the contract and the
+ * live collector rather than assumed:
+ *
+ *   - LocalScope derives DiscoveredProject FROM the cwd ("null when the cwd
+ *     resolved to no project"), so rootPath cannot rescue a missing cwd. On
+ *     this machine that holds exactly: of 8 services and 45 processes, zero had
+ *     a rootPath without a cwd. A rootPath fallback would never once have run.
+ *   - `Confidence` is a single joint qualifier over Kind, Label AND
+ *     DiscoveredProject, with no per-field granularity. A live service sits at
+ *     confidence 'low' — the port-only guess behind "Unidentified Service" —
+ *     while carrying a perfectly good observed cwd, so applying label-confidence
+ *     to path evidence would discard good evidence; trusting rootPath at that
+ *     same confidence would accept a guess. Neither is defensible.
+ *   - Process carries DiscoveredProject with NO Confidence field at all, so the
+ *     fallback would be strictly unqualifiable there. Services and processes
+ *     must share one rule.
+ *
+ * cwd is observed (lsof/ps), which is the same class of evidence as an agent's
+ * own cwd — the two sides of the correlation are therefore derived alike.
+ */
+func workspaceFromCwd(ctx context.Context, r *identity.Resolver, cwd *string) *sdk.WorkspaceRef {
+	if cwd == nil || *cwd == "" {
+		return nil
+	}
+	return r.RefFor(ctx, *cwd)
+}
+
+func servicesFrom(ctx context.Context, r *identity.Resolver, raw []rawService) []Service {
 	out := make([]Service, 0, len(raw))
 	for _, s := range raw {
 		out = append(out, Service{
-			ID: s.ID, PID: s.PID, Port: s.Port, Address: s.Address,
+			Workspace: workspaceFromCwd(ctx, r, s.Cwd),
+			ID:        s.ID, PID: s.PID, Port: s.Port, Address: s.Address,
 			Protocol: s.Protocol, BindScope: s.BindScope, IPVersion: s.IPVersion,
 			ProcessName: s.ProcessName, Command: s.Command, Cwd: s.Cwd,
 			Runtime: s.Runtime, Kind: s.Kind, Label: s.Label, URL: s.URL,
@@ -245,7 +289,7 @@ func servicesFrom(raw []rawService) []Service {
 	return out
 }
 
-func processesFrom(raw []rawProcess) []Process {
+func processesFrom(ctx context.Context, r *identity.Resolver, raw []rawProcess) []Process {
 	out := make([]Process, 0, len(raw))
 	for _, p := range raw {
 		ports := p.Ports
@@ -259,7 +303,8 @@ func processesFrom(raw []rawProcess) []Process {
 			reasons = []string{}
 		}
 		out = append(out, Process{
-			ID: p.ID, PID: p.PID, PPID: p.PPID, Name: p.Name,
+			Workspace: workspaceFromCwd(ctx, r, p.Cwd),
+			ID:        p.ID, PID: p.PID, PPID: p.PPID, Name: p.Name,
 			Command: p.Command, Cwd: p.Cwd, Runtime: p.Runtime,
 			CPUPercent: p.CPUPercent, MemoryBytes: p.MemoryBytes,
 			ElapsedSeconds: p.ElapsedSeconds, StartedAt: p.StartedAt,
@@ -280,7 +325,8 @@ func processesFrom(raw []rawProcess) []Process {
  */
 func (h *Handler) services(w http.ResponseWriter, r *http.Request) {
 	items, fresh := serveList[rawService, Service](
-		&h.lastServices, servicesFrom,
+		&h.lastServices,
+		func(raw []rawService) []Service { return servicesFrom(r.Context(), h.workspaces, raw) },
 		func() ([]byte, error) { return h.fetchUpstream(r.Context(), "/api/system/ports") },
 	)
 	writeNormalized(w, ServicesResponse{Freshness: fresh, Items: items})
@@ -318,7 +364,7 @@ func (h *Handler) processes(w http.ResponseWriter, r *http.Request) {
 		env.Degraded = []Degradation{}
 	}
 
-	items := processesFrom(env.Data.Processes)
+	items := processesFrom(r.Context(), h.workspaces, env.Data.Processes)
 	h.lastProcesses.store(items, env.Degraded, at, env.CollectedAt)
 	h.lastProcessTotal.store(env.Data.Total, env.Degraded, at, env.CollectedAt)
 

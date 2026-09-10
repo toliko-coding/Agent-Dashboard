@@ -1,3 +1,4 @@
+import type { WorkspaceRef } from '@/types'
 /*
  * The dashboard's own view of the local machine.
  *
@@ -155,6 +156,15 @@ export interface MachineService {
   /** Qualifies kind, label and discoveredProject — never port or pid. */
   confidence: string
   startedAt: string | null
+  /**
+   * The checkout this service runs in, resolved server-side from `cwd` alone.
+   *
+   * Null means identity could not be established, and an unattributed service
+   * is the correct outcome: correlation is workspace-id equality, so null here
+   * simply never matches. Do not substitute cwd, discoveredProject, the label
+   * or the port — guessing attaches one workspace's server to another's agent.
+   */
+  workspace: WorkspaceRef | null
 }
 
 /** A development process LocalScope considered relevant. */
@@ -174,6 +184,8 @@ export interface MachineProcess {
   ports: number[]
   relevanceReasons: string[]
   discoveredProject: DiscoveredProject | null
+  /** Same rule and same reasons as MachineService.workspace. */
+  workspace: WorkspaceRef | null
 }
 
 /**
