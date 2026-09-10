@@ -2,10 +2,8 @@ package merger
 
 import (
 	"context"
-	"path/filepath"
 
 	"github.com/lx-wnk/agent-dashboard/sdk"
-	"github.com/lx-wnk/agent-dashboard/server/internal/identity"
 )
 
 /*
@@ -30,39 +28,16 @@ supposed to add identity without adding path exposure.
 
 // workspaceRef resolves cwd and maps it onto the read-only wire type.
 //
-// Returns nil for every failure, and nil means "not known" — never "no
-// workspace". Nothing here falls back to a basename: a workspace synthesised
-// from a folder name would silently merge two unrelated checkouts that happen
-// to share one, which is the class of mistake this model exists to end.
+// The mapping itself lives in identity.Ref, shared with the LocalScope service
+// and process payloads. Correlation is workspace-id equality, so a second
+// mapping that built an id even slightly differently would stop agents matching
+// their own services — one builder is a correctness requirement, not tidiness.
+//
+// nil means "not known", never "no workspace". Nothing falls back to a
+// basename: that would merge two unrelated checkouts sharing a folder name.
 func (m *Merger) workspaceRef(ctx context.Context, cwd string) *sdk.WorkspaceRef {
-	if m == nil || m.workspaces == nil || cwd == "" {
+	if m == nil {
 		return nil
 	}
-	ws := m.workspaces.Get(ctx, cwd)
-	if ws == nil || ws.Key == "" {
-		return nil
-	}
-
-	ref := &sdk.WorkspaceRef{
-		ID:       identity.WorkspaceID(ws.Key),
-		Name:     filepath.Base(ws.Key),
-		Kind:     sdk.WorkspaceKind(ws.Kind),
-		Branch:   ws.Branch,
-		Detached: ws.Detached,
-	}
-
-	if ws.InRepository() {
-		repoName := ""
-		// Root is empty for a bare repository and for a submodule, whose object
-		// store has no working-tree parent. An empty name is honest there; a
-		// name derived from the .git path would describe git's internals.
-		if ws.Repo.Root != "" {
-			repoName = filepath.Base(ws.Repo.Root)
-		}
-		ref.Repository = &sdk.RepositoryRef{
-			ID:   identity.RepositoryID(ws.Repo.Key),
-			Name: repoName,
-		}
-	}
-	return ref
+	return m.workspaces.RefFor(ctx, cwd)
 }
