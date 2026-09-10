@@ -3,6 +3,7 @@ import type { Agent } from '@/types'
 import { computed, ref } from 'vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
 import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { toast } from '@/composables/useToast'
@@ -87,6 +88,17 @@ async function handleResolve(outcome: 'granted' | 'denied') {
       <span class="font-semibold text-sm text-fg shrink-0 w-[156px] overflow-hidden text-ellipsis whitespace-nowrap">
         {{ projectTitle }}
       </span>
+
+      <!--
+        The checkout, inline rather than on a second line: this list is a
+        fixed-height row grid, and two worktrees of one repository are otherwise
+        the same 156px of text. Capped so a long branch cannot push the row.
+      -->
+      <WorkspaceBadge
+        v-if="agent.workspace"
+        :workspace="agent.workspace"
+        class="font-mono text-[10px] shrink-0 max-w-[140px]"
+      />
 
       <!-- Model -->
       <span class="font-mono text-[11px] text-fg-faint shrink-0 w-16">{{ shortModel(agent.model ?? null) }}</span>

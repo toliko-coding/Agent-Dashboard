@@ -7,6 +7,7 @@ import ProviderBadge from '@/components/ProviderBadge.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppModal from '@/components/ui/AppModal.vue'
+import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
 import { useNow } from '@/composables/useNow'
 import { toast } from '@/composables/useToast'
 import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vue'
@@ -156,6 +157,19 @@ const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
         <span class="whitespace-nowrap" title="Tokens used">{{ formatTokens(totalTokens) }} tok</span>
         <span aria-hidden="true">·</span>
         <span class="whitespace-nowrap" title="Uptime">{{ formatUptime(agent.uptime) }}</span>
+        <!--
+          The checkout this agent runs in. Silent when identity is unknown.
+
+          min-w carries weight here: this row also holds cost, tokens, uptime
+          and the service chips, and the badge's own `truncate` will shrink a
+          long branch to nothing rather than to an ellipsis — leaving a bare ⑂
+          glyph with no text, which says less than showing nothing at all.
+          A floor plus a ceiling makes it degrade to "feat/local…" instead.
+        -->
+        <template v-if="agent.workspace">
+          <span aria-hidden="true">·</span>
+          <WorkspaceBadge :workspace="agent.workspace" class="min-w-[4.5rem] max-w-[11rem]" />
+        </template>
 
         <span class="ml-auto flex items-center gap-1.5 shrink-0">
           <!-- Runtime observed by LocalScope for this agent's project. Renders

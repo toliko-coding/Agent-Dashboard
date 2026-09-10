@@ -36,6 +36,7 @@ const baseAgent: Agent = {
   permissionsBypassed: false,
   convergenceAlert: false,
   meta: null,
+  workspace: null,
 }
 
 const activeSubagent: SubAgent = {
@@ -261,5 +262,56 @@ describe('agentCard terminal access', () => {
       global: { stubs: badgeStubs },
     })
     expect(w.find('[data-testid="agent-card-terminal"]').exists()).toBe(false)
+  })
+})
+
+describe('agentCard — workspace identity', () => {
+  const inWorkspace = (over: Record<string, unknown>): Agent => ({
+    ...baseAgent,
+    projectName: 'Agent-Dashboard',
+    workspace: {
+      id: 'ws_main',
+      name: 'Agent-Dashboard',
+      kind: 'git-main',
+      branch: 'feat/localscope-integration',
+      repository: { id: 'repo_shared', name: 'Agent-Dashboard' },
+      ...over,
+    },
+  } as Agent)
+
+  /*
+   * The point of the checkpoint, at the level a person actually sees. These two
+   * agents share a repository and a project name; before the workspace field
+   * their cards were identical text.
+   */
+  it('makes two agents in different worktrees visibly distinguishable', () => {
+    const main = mount(AgentCard, { props: { agent: inWorkspace({}) } })
+    const worktree = mount(AgentCard, {
+      props: { agent: inWorkspace({ id: 'ws_wt', kind: 'git-worktree', branch: 'feat/ui-redesign' }) },
+    })
+
+    expect(main.text()).toContain('feat/localscope-integration')
+    expect(worktree.text()).toContain('feat/ui-redesign')
+    expect(worktree.text()).toContain('worktree')
+    expect(main.text()).not.toContain('feat/ui-redesign')
+    // Same repository, so the project name alone still cannot separate them.
+    // (friendlyProjectName renders the folder name as "Agent Dashboard".)
+    expect(main.text()).toContain('Agent Dashboard')
+    expect(worktree.text()).toContain('Agent Dashboard')
+  })
+
+  it('shows no workspace hint when identity could not be resolved', () => {
+    const w = mount(AgentCard, { props: { agent: { ...baseAgent, workspace: null } } })
+    expect(w.find('[data-testid="workspace-branch"]').exists()).toBe(false)
+    expect(w.find('[data-testid="workspace-branch-worktree"]').exists()).toBe(false)
+    // Everything else about the card is unchanged — this is additive.
+    expect(w.find('[data-testid="agent-card-project"]').exists()).toBe(true)
+  })
+
+  it('exposes no filesystem path through the workspace badge', () => {
+    const w = mount(AgentCard, { props: { agent: inWorkspace({}) } })
+    const badge = w.get('[data-workspace-id]')
+    expect(badge.html()).not.toContain('.git')
+    expect(badge.html()).not.toContain('/home/user')
   })
 })
