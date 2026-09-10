@@ -173,3 +173,64 @@ describe('useAgentServices', () => {
     w.unmount()
   })
 })
+
+/*
+ * ===========================================================================
+ * KNOWN ARCHITECTURE HAZARD — pinned, not fixed. Scheduled for Phase 2D-D.
+ * ===========================================================================
+ *
+ * Correlation is bidirectional segment-safe path containment: a service belongs
+ * to an agent when either root contains the other. That was the best rule
+ * available before workspace identity existed, and it is correct for the case
+ * it was written for — an agent at a repo root, a dev server in a package below
+ * it.
+ *
+ * It has no concept of a workspace boundary, so it cannot see that a linked
+ * worktree is a DIFFERENT workspace. When worktrees live inside the repository
+ * — not the default ($HOME/dashboard-worktrees) but a supported layout, and one
+ * .gitignore already anticipates with `dashboard-worktrees/`, `.worktrees/` and
+ * `.claude/worktrees/` — a worktree's root sits under the main checkout's root
+ * and containment reports a match.
+ *
+ * The consequence is a cross-workspace false positive: an agent working in the
+ * main checkout is shown a dev server that belongs to a different branch's
+ * worktree. Both directions of the rule are affected.
+ *
+ * These tests assert the CURRENT behaviour on purpose. They document the defect
+ * rather than hiding it, and they will fail loudly when 2D-D moves correlation
+ * onto WorkspaceRef.id — which is the point: the fix must be deliberate, and it
+ * must come with this expectation being rewritten.
+ */
+describe('useAgentServices — cross-workspace hazard (pinned for 2D-D)', () => {
+  const MAIN = '/Users/x/Repo'
+  const NESTED_WORKTREE = '/Users/x/Repo/dashboard-worktrees/feat-y'
+
+  it('cURRENTLY correlates a nested worktree service to the main-checkout agent', async () => {
+    const { result, w } = await correlate(MAIN, {
+      data: [svc({ id: 'wt-server', cwd: NESTED_WORKTREE, discoveredProject: { rootPath: NESTED_WORKTREE } })],
+    })
+    // Wrong, and known to be wrong: that server belongs to another workspace,
+    // on another branch, with its own agents.
+    expect(result.services.value.map(s => s.id)).toEqual(['wt-server'])
+    w.unmount()
+  })
+
+  it('cURRENTLY correlates a main-checkout service to a nested-worktree agent', async () => {
+    const { result, w } = await correlate(NESTED_WORKTREE, {
+      data: [svc({ id: 'main-server', cwd: MAIN, discoveredProject: { rootPath: MAIN } })],
+    })
+    expect(result.services.value.map(s => s.id)).toEqual(['main-server'])
+    w.unmount()
+  })
+
+  it('is correct when worktrees sit outside the repository, which is the default', async () => {
+    // Same two workspaces, laid out the way DefaultRoot lays them out. Nothing
+    // contains anything, so containment happens to give the right answer —
+    // which is exactly why the defect above stayed invisible.
+    const { result, w } = await correlate('/Users/x/Repo', {
+      data: [svc({ id: 'wt-server', cwd: '/Users/x/dashboard-worktrees/feat-y', discoveredProject: { rootPath: '/Users/x/dashboard-worktrees/feat-y' } })],
+    })
+    expect(result.services.value).toEqual([])
+    w.unmount()
+  })
+})
