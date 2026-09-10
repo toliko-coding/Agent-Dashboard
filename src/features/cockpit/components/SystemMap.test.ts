@@ -67,7 +67,10 @@ describe('systemMap', () => {
     const w = await mountMap()
     expect(w.get('[data-testid="map-node-agents"]').attributes('data-available')).toBe('true')
     expect(w.get('[data-testid="map-node-projects"]').attributes('data-available')).toBe('true')
-    expect(w.text()).toContain('2 running')
+    // "total", not "running": the node shows every agent the scan found, and
+    // claiming they are all running contradicted the roster beside it.
+    expect(w.get('[data-testid="map-node-agents"]').text()).toContain('2 total')
+    expect(w.get('[data-testid="map-node-agents"]').text()).not.toContain('running')
     expect(w.text()).toContain('1 registered')
   })
 

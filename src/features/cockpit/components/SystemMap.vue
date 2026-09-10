@@ -64,7 +64,10 @@ const sources = computed<MapNode[]>(() => [
   {
     id: 'agents',
     label: 'Agents',
-    sub: `${agents.value.length} running`,
+    // agents.value.length is every agent the scan found, not the running
+    // subset — it read "4 running" beside a roster showing 1 running and 3
+    // idle. Copy fixed to match the number; the number is unchanged.
+    sub: `${agents.value.length} total`,
     available: true,
     x: 12,
     y: 22,
