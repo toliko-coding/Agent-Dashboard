@@ -176,7 +176,7 @@ describe('agentTriageBand all-clear state', () => {
   it('renders the all-clear line without a filled banner', () => {
     const w = mount(AgentTriageBand, { props: { agents: [], permissionItems: [] } })
     const line = w.get('[data-testid="triage-all-clear"]')
-    expect(line.text()).toContain('All clear')
+    expect(line.text()).toContain('No agents are blocked on you')
     expect(line.classes().join(' ')).not.toMatch(/bg-success-soft|border-success-line/)
   })
 

@@ -43,7 +43,12 @@ async function mountMetrics(opts: {
     // Pure helpers come from the real module: mocking them would test the
     // mock's idea of "stale · 3m ago" rather than the app's.
     const { EMPTY_SNAPSHOT, formatAge, freshnessNote } = await import('@/features/localscope/snapshot')
+    // The real indicator, not a stub: the whole point of the machine-scope line
+    // is WHAT it renders, so a stub would assert the mock's wording.
+    const DataFreshnessIndicator
+      = (await import('@/features/localscope/components/DataFreshnessIndicator.vue')).default
     return {
+      DataFreshnessIndicator,
       formatAge,
       freshnessNote,
       useLocalMachine: () => ({
@@ -91,26 +96,26 @@ describe('overviewMetrics', () => {
       agents: [{ status: 'active' }, { status: 'waiting' }],
       projects: [{ id: 'p' }],
     })
-    expect(state(w, 'metric-active-agents')).toBe('ready')
-    expect(w.get('[data-testid="metric-active-agents"]').text()).toContain('2')
-    expect(w.get('[data-testid="metric-active-agents"]').text()).toContain('1 running')
+    expect(state(w, 'metric-agents')).toBe('ready')
+    expect(w.get('[data-testid="metric-agents"]').text()).toContain('2')
+    expect(w.get('[data-testid="metric-agents"]').text()).toContain('1 running')
     expect(state(w, 'metric-projects')).toBe('ready')
   })
 
   it('uses empty — a real 0 — when the API returned nothing', async () => {
     const w = await mountMetrics({ agents: [], projects: [] })
-    expect(state(w, 'metric-active-agents')).toBe('empty')
+    expect(state(w, 'metric-agents')).toBe('empty')
     expect(state(w, 'metric-projects')).toBe('empty')
   })
 
   it('marks loading rather than showing 0 before the first response', async () => {
     const w = await mountMetrics({ agents: [], agentsLoading: true })
-    expect(state(w, 'metric-active-agents')).toBe('loading')
+    expect(state(w, 'metric-agents')).toBe('loading')
   })
 
   it('surfaces an API error as failed, not as empty', async () => {
     const w = await mountMetrics({ agents: [], agentsError: 'boom' })
-    expect(state(w, 'metric-active-agents')).toBe('failed')
+    expect(state(w, 'metric-agents')).toBe('failed')
   })
 
   // With the collector down, all three read as unavailable — never as zero.
@@ -214,19 +219,33 @@ describe('overviewMetrics — normalized machine snapshot', () => {
     expect(w.get('[data-testid="metric-local-services"]').text()).toContain('3m ago')
   })
 
-  it('shows a degraded reading with the source that failed, not as healthy', async () => {
+  /*
+   * LocalScope's degraded[] is scoped to the whole summary payload, and its
+   * source strings are an open vocabulary with no declared mapping to a count.
+   * An adb failure therefore says nothing about the services number, and the
+   * previous behaviour — pinning every degradation onto every card — made a
+   * device-adapter problem read as though the network count were partial.
+   */
+  it('states a degradation once at machine scope, not on each card', async () => {
     const w = await mountMetrics({
       snapshot: snap({
         source: 'degraded',
         degraded: [{ source: 'adb', reason: 'adb is not installed', kind: 'missing' }],
-        counts: { services: 4, devices: null },
+        counts: { services: 8, devices: null, network: 3 },
       }),
     })
-    expect(state(w, 'metric-local-services')).toBe('ready')
-    expect(w.get('[data-testid="metric-local-services"]').text()).toContain('partial')
-    expect(w.get('[data-testid="metric-local-services"]').text()).toContain('adb')
-    // The count that was not measured is still unknown, not zero.
-    expect(state(w, 'metric-devices')).toBe('notAsked')
+    const machine = w.get('[data-testid="machine-degradation"]')
+    expect(machine.text()).toContain('adb')
+    expect(machine.text()).toContain('reduced')
+
+    // The unrelated cards keep their own hints and make no partial claim.
+    expect(w.get('[data-testid="metric-local-services"]').text()).not.toContain('partial')
+    expect(w.get('[data-testid="metric-network"]').text()).not.toContain('partial')
+  })
+
+  it('does not claim a degradation when every collector succeeded', async () => {
+    const w = await mountMetrics({ snapshot: snap({ source: 'ok', counts: { services: 8 } }) })
+    expect(w.find('[data-testid="machine-degradation"]').exists()).toBe(false)
   })
 
   it('is loading, not zero, before the first response', async () => {

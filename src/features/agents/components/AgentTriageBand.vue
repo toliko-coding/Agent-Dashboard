@@ -580,15 +580,25 @@ watch(() => props.focusedSessionId, (id) => {
       {{ liveAnnouncement }}
     </div>
 
-    <!-- Empty state. Nothing to do is the normal case, so it stays a quiet line:
-         a filled banner here competed with the roster it sits above, and made
-         the band look equally loud whether or not anything needed attention. -->
+    <!--
+      Empty state. Nothing to do is the normal case, so it stays a quiet line:
+      a filled banner here competed with the roster it sits above, and made the
+      band look equally loud whether or not anything needed attention.
+
+      The wording says BLOCKED, not "waiting on you", because this band shows
+      only the kinds that stop an agent: question, permission, error, stalled.
+      An agent whose turn has finished carries a "Your turn" chip and is
+      deliberately excluded — it is ready for input, not blocked on it. The old
+      copy ("no agent is waiting on you") claimed something wider than the
+      filter delivers, so it appeared directly above three cards reading "Your
+      turn" and read as a straight contradiction.
+    -->
     <p
       v-if="isClear"
       data-testid="triage-all-clear"
       class="flex items-center gap-1.5 px-0.5 py-1 text-[11px] text-fg-faint"
     >
-      <span aria-hidden="true">✓</span>All clear — no agent is waiting on you.
+      <span aria-hidden="true">✓</span>No agents are blocked on you.
     </p>
 
     <template v-else>
