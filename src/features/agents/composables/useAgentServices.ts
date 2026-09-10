@@ -1,32 +1,47 @@
 import type { MachineService } from '@/features/localscope'
-import type { Agent } from '@/types'
+import type { Agent, WorkspaceRef } from '@/types'
 import { computed, toValue } from 'vue'
 import { useMachineServices } from '@/features/localscope'
-import { isPathUnder } from '@/utils/projectAgents'
 
 /*
  * The single correlation between a running agent and the local services
- * LocalScope observed, read through the dashboard's normalized model. The agent card and the workspace diagram both read it,
- * so there is exactly one rule rather than two that can drift apart.
+ * LocalScope observed, read through the dashboard's normalized model. The agent
+ * card and the workspace diagram both read it, so there is exactly one rule
+ * rather than two that can drift apart.
  *
- * The rule is segment-safe path containment, in both directions:
+ * The rule is workspace-identity equality:
  *
- *   - the service's project root sits inside the agent's cwd — the agent is
- *     working at a repo root and the server runs in a package below it;
- *   - or the agent's cwd sits inside the service's project root — the agent is
- *     working in a subdirectory of the project the server belongs to.
+ *   agent.workspace.id === service.workspace.id
  *
- * Deliberately NOT used, because each produces confident nonsense:
- *   - project-name matching. Agent.projectName is basename(cwd) and collides
- *     across unrelated checkouts, and the discovered project's name is a
- *     folder name too.
- *   - port heuristics (":5173 means Vite means this project").
- *   - process-name matching ("node" is not an identity).
+ * Both sides are resolved server-side from an observed cwd, through one shared
+ * cached resolver and one shared ref builder, so the two ids are constructed
+ * identically or the comparison would be meaningless.
  *
- * PID ownership is not available to correlate on: a LocalService.pid is the
- * listening process, and an agent's pid is the CLI process, which never owns
- * the socket. Nothing reports the parent/child link between them, so there is
- * no PID rule to apply rather than a rule being skipped.
+ * WHY NOT PATH CONTAINMENT, which this used to do. Bidirectional segment-safe
+ * containment has no concept of a workspace boundary. A linked worktree is the
+ * same repository but a DIFFERENT active workspace, with its own branch, its
+ * own dirty state and its own services; when worktrees live inside the
+ * repository, the worktree's root sits under the main checkout's root and
+ * containment reports a match in both directions. An agent on `main` was shown
+ * a dev server belonging to a feature branch. That was demonstrated, not
+ * suspected — the tests that pinned it are now the acceptance tests for this.
+ *
+ * WHY NOT REPOSITORY ID. Two worktrees share a repository. Matching on it would
+ * reintroduce exactly the defect above through a tidier-looking field.
+ *
+ * WHY NOTHING ELSE. Not project name (basename(cwd), collides across unrelated
+ * checkouts), not the discovered project, not the label, not the port
+ * (":5173 means Vite means this project"), not the process name ("node" is not
+ * an identity), not cwd containment in any form. PID ownership is unavailable:
+ * a service's pid is the listening process, an agent's is the CLI, and nothing
+ * reports the link between them.
+ *
+ * UNKNOWN STAYS UNKNOWN. If either side has no workspace, there is no match —
+ * including for a non-git directory, which still receives a real `plain`
+ * workspace identity and so participates in the same equality rule rather than
+ * a softer one. A false negative leaves a service off a card; a false positive
+ * puts another workspace's server on it, which is a claim about the machine
+ * that is simply untrue.
  */
 
 export interface AgentServiceCorrelation {
@@ -41,17 +56,11 @@ export interface AgentServiceCorrelation {
 }
 
 /** Pure correlation, exported so it can be tested without mounting anything. */
-export function servicesForAgent(services: MachineService[], agentCwd: string): MachineService[] {
-  if (!agentCwd)
+export function servicesForAgent(services: MachineService[], agentWorkspace: WorkspaceRef | null): MachineService[] {
+  const id = agentWorkspace?.id
+  if (!id)
     return []
-  return services.filter((s) => {
-    // Prefer the resolved project root; fall back to the process cwd. Both are
-    // absolute paths reported by LocalScope, never inferred here.
-    const root = s.discoveredProject?.rootPath ?? s.cwd
-    if (!root)
-      return false
-    return isPathUnder(root, agentCwd) || isPathUnder(agentCwd, root)
-  })
+  return services.filter(s => s.workspace?.id === id)
 }
 
 /**
@@ -86,7 +95,7 @@ export function useAgentServices(agent: (() => Agent) | Agent) {
   const available = computed(() => items.value !== null)
 
   const services = computed<MachineService[]>(() =>
-    items.value === null ? [] : servicesForAgent(items.value, toValue(agent).cwd))
+    items.value === null ? [] : servicesForAgent(items.value, toValue(agent).workspace))
 
   return { available, services }
 }

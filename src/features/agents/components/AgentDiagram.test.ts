@@ -27,6 +27,15 @@ async function mountDiagram(agent: Partial<Agent>, services: any[] = []) {
       agent: {
         projectName: 'LocalScope',
         cwd: '/gh/LocalScope',
+        // Correlation is workspace-id equality; cwd is kept on the fixture to
+        // show it no longer decides anything.
+        workspace: {
+          id: 'ws_localscope',
+          name: 'LocalScope',
+          kind: 'git-main',
+          branch: 'main',
+          repository: { id: 'repo_localscope', name: 'LocalScope' },
+        },
         model: 'claude-sonnet-5',
         tasks: [],
         subagents: [],
@@ -70,21 +79,35 @@ describe('agentDiagram', () => {
   })
 
   /*
-   * The cross-system join: a LocalScope service whose project root is inside
-   * this agent's working directory really is a server running in the project
-   * the agent is editing.
+   * The cross-system join: a LocalScope service that resolved to the SAME
+   * workspace as this agent really is a server running in the checkout the
+   * agent is editing.
    */
-  it('links a LocalScope service running in the agent\'s project', async () => {
+  it('links a LocalScope service in the agent\'s workspace', async () => {
     const w = await mountDiagram({}, [
-      { id: 's1', label: 'Vite Development Server', port: 5173, cwd: '/gh/LocalScope', discoveredProject: { rootPath: '/gh/LocalScope' } },
+      {
+        id: 's1',
+        label: 'Vite Development Server',
+        port: 5173,
+        cwd: '/gh/LocalScope',
+        discoveredProject: { rootPath: '/gh/LocalScope' },
+        workspace: { id: 'ws_localscope', name: 'LocalScope', kind: 'git-main', branch: 'main', repository: { id: 'repo_localscope', name: 'LocalScope' } },
+      },
     ])
     const leaf = w.get('[data-testid="diagram-leaf-svc-s1"]')
     expect(leaf.text()).toContain(':5173')
   })
 
-  it('does not link a service from an unrelated project', async () => {
+  it('does not link a service from another workspace', async () => {
     const w = await mountDiagram({}, [
-      { id: 's2', label: 'Other Server', port: 3000, cwd: '/gh/Something-Else', discoveredProject: { rootPath: '/gh/Something-Else' } },
+      {
+        id: 's2',
+        label: 'Other Server',
+        port: 3000,
+        cwd: '/gh/Something-Else',
+        discoveredProject: { rootPath: '/gh/Something-Else' },
+        workspace: { id: 'ws_other', name: 'Something-Else', kind: 'git-main', branch: 'main', repository: { id: 'repo_other', name: 'Something-Else' } },
+      },
     ])
     expect(w.find('[data-testid="diagram-leaf-svc-s2"]').exists()).toBe(false)
   })

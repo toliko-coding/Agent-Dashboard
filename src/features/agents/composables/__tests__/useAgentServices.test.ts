@@ -1,4 +1,4 @@
-import type { Agent } from '@/types'
+import type { Agent, WorkspaceRef } from '@/types'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
@@ -6,10 +6,10 @@ import { defineComponent } from 'vue'
 /*
  * Correlation between an agent and the services LocalScope observed.
  *
- * The rule under test is segment-safe path containment and nothing else — no
- * project-name matching, no port heuristics, no process-name matching — plus
- * the availability semantics that keep an absent collector from putting an
- * error or a zero on every card.
+ * The rule under test is workspace-identity equality and nothing else. These
+ * were the tests that pinned the old path-containment behaviour as a known
+ * defect; they are now the acceptance tests for the fix, so the scenarios that
+ * previously asserted a false match assert its absence.
  */
 
 let state: { reachable: boolean | null, error: string | null, data: any[] | null }
@@ -18,8 +18,6 @@ const resourceCalls = { count: 0 }
 vi.mock('@/features/localscope', () => ({
   useMachineServices: () => {
     resourceCalls.count++
-    // A list is known only when the collector actually reported one; the old
-    // reachable/error pair collapses into items being null.
     const known = state.reachable === true && state.error === null && state.data !== null
     return {
       data: {
@@ -37,15 +35,38 @@ vi.mock('@/features/localscope', () => ({
   },
 }))
 
+/** A workspace ref. `repo` defaults to a shared repository on purpose. */
+function ws(id: string, over: Partial<WorkspaceRef> = {}): WorkspaceRef {
+  return {
+    id,
+    name: 'Repo',
+    kind: 'git-main',
+    branch: 'main',
+    repository: { id: 'repo_shared', name: 'Repo' },
+    ...over,
+  } as WorkspaceRef
+}
+
 function svc(over: Record<string, unknown>) {
-  return { id: 's', port: 5173, label: 'Vite Development Server', cwd: null, discoveredProject: null, ...over }
+  return {
+    id: 's',
+    port: 5173,
+    label: 'Vite Development Server',
+    cwd: null,
+    discoveredProject: null,
+    workspace: null,
+    ...over,
+  }
 }
 
-function agentAt(cwd: string): Agent {
-  return { cwd, projectName: cwd.split('/').pop(), sessionId: cwd } as Agent
+function agentIn(workspace: WorkspaceRef | null, cwd = '/somewhere'): Agent {
+  return { cwd, projectName: 'Repo', sessionId: cwd, workspace } as Agent
 }
 
-async function correlate(agentCwd: string, opts: { reachable?: boolean | null, error?: string | null, data?: any[] | null } = {}) {
+async function correlate(
+  agent: Agent,
+  opts: { reachable?: boolean | null, error?: string | null, data?: any[] | null } = {},
+) {
   state = {
     reachable: opts.reachable === undefined ? true : opts.reachable,
     error: opts.error ?? null,
@@ -56,7 +77,7 @@ async function correlate(agentCwd: string, opts: { reachable?: boolean | null, e
   let result!: ReturnType<typeof useAgentServices>
   const C = defineComponent({
     setup() {
-      result = useAgentServices(() => agentAt(agentCwd))
+      result = useAgentServices(() => agent)
       return () => null
     },
   })
@@ -64,173 +85,170 @@ async function correlate(agentCwd: string, opts: { reachable?: boolean | null, e
   return { result, w }
 }
 
-describe('useAgentServices', () => {
-  it('correlates two services running in the agent project', async () => {
-    const { result, w } = await correlate('/gh/LocalScope', {
+describe('useAgentServices — workspace identity', () => {
+  // C. Same workspace on both sides is the only thing that correlates.
+  it('correlates services in the same workspace', async () => {
+    const { result, w } = await correlate(agentIn(ws('ws_a')), {
       data: [
-        svc({ id: 'a', port: 5173, discoveredProject: { rootPath: '/gh/LocalScope' } }),
-        svc({ id: 'b', port: 7317, discoveredProject: { rootPath: '/gh/LocalScope/packages/collector' } }),
+        svc({ id: 'a', port: 5173, workspace: ws('ws_a') }),
+        svc({ id: 'b', port: 7317, workspace: ws('ws_a') }),
+        svc({ id: 'other', port: 3000, workspace: ws('ws_z') }),
       ],
     })
     expect(result.available.value).toBe(true)
-    expect(result.services.value.map(s => s.port)).toEqual([5173, 7317])
+    expect(result.services.value.map(s => s.id)).toEqual(['a', 'b'])
     w.unmount()
   })
 
-  it('correlates nothing when the project runs no service', async () => {
-    const { result, w } = await correlate('/gh/Quiet', {
-      data: [svc({ id: 'a', discoveredProject: { rootPath: '/gh/Other' } })],
+  it('correlates nothing when the workspace runs no service', async () => {
+    const { result, w } = await correlate(agentIn(ws('ws_quiet')), {
+      data: [svc({ id: 'a', workspace: ws('ws_elsewhere') })],
     })
     expect(result.available.value).toBe(true)
     expect(result.services.value).toEqual([])
     w.unmount()
   })
 
-  // An absent collector must not become an error on every card.
-  it('reports unavailable — not an error, not zero — when LocalScope is down', async () => {
-    const { result, w } = await correlate('/gh/LocalScope', { reachable: false, data: null })
-    expect(result.available.value).toBe(false)
+  /*
+   * A. and B. — the defect this checkpoint exists to remove, in both
+   * directions. Same repository, nested on disk, different workspaces.
+   */
+  it('does not attach a nested worktree service to a main-checkout agent', async () => {
+    const main = ws('ws_main', { kind: 'git-main', branch: 'main' })
+    const worktree = ws('ws_wt', { kind: 'git-worktree', branch: 'feat/y' })
+    const { result, w } = await correlate(agentIn(main, '/Users/x/Repo'), {
+      data: [svc({
+        id: 'wt-server',
+        cwd: '/Users/x/Repo/dashboard-worktrees/feat-y',
+        workspace: worktree,
+      })],
+    })
     expect(result.services.value).toEqual([])
     w.unmount()
   })
 
-  it('reports unavailable while the collector is still loading', async () => {
-    const { result, w } = await correlate('/gh/LocalScope', { reachable: null, data: null })
-    expect(result.available.value).toBe(false)
-    w.unmount()
-  })
-
-  it('reports unavailable when the collector errored', async () => {
-    const { result, w } = await correlate('/gh/LocalScope', { error: 'LocalScope responded 500', data: [] })
-    expect(result.available.value).toBe(false)
-    w.unmount()
-  })
-
-  it('ignores a service from an unrelated project', async () => {
-    const { result, w } = await correlate('/gh/LocalScope', {
-      data: [svc({ id: 'x', port: 3000, discoveredProject: { rootPath: '/gh/WalletRadar_web' } })],
+  it('does not attach a main-checkout service to a nested worktree agent', async () => {
+    const main = ws('ws_main')
+    const worktree = ws('ws_wt', { kind: 'git-worktree', branch: 'feat/y' })
+    const { result, w } = await correlate(agentIn(worktree, '/Users/x/Repo/dashboard-worktrees/feat-y'), {
+      data: [svc({ id: 'main-server', cwd: '/Users/x/Repo', workspace: main })],
     })
     expect(result.services.value).toEqual([])
     w.unmount()
   })
 
   /*
-   * The false positive a plain startsWith would produce: /gh/LocalScope-docs
-   * shares a prefix with /gh/LocalScope but is a different project.
+   * D. and the §8 invariant, stated directly: a shared repository id is NOT
+   * evidence of a shared workspace, and must not attribute anything. This is
+   * the property Mission Control will rest on.
    */
-  it('does not correlate a sibling directory sharing a prefix', async () => {
-    const { result, w } = await correlate('/gh/LocalScope', {
-      data: [svc({ id: 'y', discoveredProject: { rootPath: '/gh/LocalScope-docs' } })],
+  it('never correlates on repository id — two worktrees of one repository stay apart', async () => {
+    const a = ws('ws_a', { kind: 'git-worktree', branch: 'feat/a' })
+    const b = ws('ws_b', { kind: 'git-worktree', branch: 'feat/b' })
+    expect(a.repository!.id).toBe(b.repository!.id) // precondition: same repo
+
+    const { result, w } = await correlate(agentIn(a), {
+      data: [svc({ id: 'b-server', workspace: b })],
     })
     expect(result.services.value).toEqual([])
     w.unmount()
   })
 
-  it('correlates upward too — agent in a subdirectory of the service project', async () => {
-    const { result, w } = await correlate('/gh/LocalScope/packages/web', {
-      data: [svc({ id: 'z', discoveredProject: { rootPath: '/gh/LocalScope' } })],
+  // E. and F. — a plain directory gets a real identity and the same rule.
+  it('correlates a plain non-git workspace with itself', async () => {
+    const plain = ws('ws_plain', { kind: 'plain', branch: '', repository: null })
+    const { result, w } = await correlate(agentIn(plain, '/Users/x/notes'), {
+      data: [svc({ id: 'p', workspace: { ...plain } })],
     })
-    expect(result.services.value.map(s => s.id)).toEqual(['z'])
+    expect(result.services.value.map(s => s.id)).toEqual(['p'])
     w.unmount()
   })
 
-  it('falls back to the service cwd when it has no resolved project', async () => {
-    const { result, w } = await correlate('/gh/LocalScope', {
-      data: [svc({ id: 'c', cwd: '/gh/LocalScope', project: null })],
-    })
-    expect(result.services.value.map(s => s.id)).toEqual(['c'])
+  it('keeps two different plain workspaces apart', async () => {
+    const a = ws('ws_plain_a', { kind: 'plain', branch: '', repository: null })
+    const b = ws('ws_plain_b', { kind: 'plain', branch: '', repository: null })
+    const { result, w } = await correlate(agentIn(a), { data: [svc({ id: 'b', workspace: b })] })
+    expect(result.services.value).toEqual([])
     w.unmount()
   })
 
-  it('gives two agents in the same project the same services', async () => {
-    state = {
-      reachable: true,
-      error: null,
-      data: [svc({ id: 'shared', discoveredProject: { rootPath: '/gh/LocalScope' } })],
-    }
-    vi.resetModules()
-    const { useAgentServices } = await import('../useAgentServices')
-    let a!: any, b!: any
-    const C = defineComponent({
-      setup() {
-        a = useAgentServices(() => agentAt('/gh/LocalScope'))
-        b = useAgentServices(() => agentAt('/gh/LocalScope/packages/collector'))
-        return () => null
-      },
+  // G. and H. — unknown stays unknown, on either side.
+  it('matches nothing when the agent has no resolved workspace', async () => {
+    const { result, w } = await correlate(agentIn(null, '/Users/x/Repo'), {
+      data: [svc({ id: 'a', cwd: '/Users/x/Repo', workspace: ws('ws_a') })],
     })
-    const w = mount(C)
-    expect(a.services.value.map((s: any) => s.id)).toEqual(['shared'])
-    expect(b.services.value.map((s: any) => s.id)).toEqual(['shared'])
+    // The cwd is identical — the old rule would have matched on it.
+    expect(result.services.value).toEqual([])
     w.unmount()
   })
 
-  it('never attributes a machine-wide service to an agent it does not belong to', async () => {
-    const { result, w } = await correlate('/gh/LocalScope', {
-      // A listener with no project and no cwd cannot be attributed to anyone.
-      data: [svc({ id: 'orphan', port: 631, project: null, cwd: null })],
+  it('matches nothing when the service has no resolved workspace', async () => {
+    const { result, w } = await correlate(agentIn(ws('ws_a'), '/Users/x/Repo'), {
+      data: [svc({ id: 'a', cwd: '/Users/x/Repo', workspace: null })],
+    })
+    expect(result.services.value).toEqual([])
+    w.unmount()
+  })
+
+  /*
+   * No containment fallback survives. A service whose cwd sits inside the
+   * agent's, and one that contains it, both fail without matching identity —
+   * the two shapes the old rule accepted.
+   */
+  it('has no path-containment fallback in either direction', async () => {
+    const { result, w } = await correlate(agentIn(ws('ws_a'), '/Users/x/Repo'), {
+      data: [
+        svc({ id: 'below', cwd: '/Users/x/Repo/packages/api', workspace: ws('ws_other') }),
+        svc({ id: 'above', cwd: '/Users/x', workspace: ws('ws_other2') }),
+        svc({ id: 'exact', cwd: '/Users/x/Repo', workspace: ws('ws_other3') }),
+      ],
+    })
+    expect(result.services.value).toEqual([])
+    w.unmount()
+  })
+
+  it('does not correlate on port, label or project name', async () => {
+    const { result, w } = await correlate(agentIn(ws('ws_a'), '/Users/x/Repo'), {
+      data: [svc({
+        id: 'decoy',
+        port: 5173,
+        label: 'Vite Development Server',
+        cwd: '/Users/x/Repo',
+        discoveredProject: { rootPath: '/Users/x/Repo', name: 'Repo' },
+        workspace: ws('ws_different'),
+      })],
     })
     expect(result.services.value).toEqual([])
     w.unmount()
   })
 })
 
-/*
- * ===========================================================================
- * KNOWN ARCHITECTURE HAZARD — pinned, not fixed. Scheduled for Phase 2D-D.
- * ===========================================================================
- *
- * Correlation is bidirectional segment-safe path containment: a service belongs
- * to an agent when either root contains the other. That was the best rule
- * available before workspace identity existed, and it is correct for the case
- * it was written for — an agent at a repo root, a dev server in a package below
- * it.
- *
- * It has no concept of a workspace boundary, so it cannot see that a linked
- * worktree is a DIFFERENT workspace. When worktrees live inside the repository
- * — not the default ($HOME/dashboard-worktrees) but a supported layout, and one
- * .gitignore already anticipates with `dashboard-worktrees/`, `.worktrees/` and
- * `.claude/worktrees/` — a worktree's root sits under the main checkout's root
- * and containment reports a match.
- *
- * The consequence is a cross-workspace false positive: an agent working in the
- * main checkout is shown a dev server that belongs to a different branch's
- * worktree. Both directions of the rule are affected.
- *
- * These tests assert the CURRENT behaviour on purpose. They document the defect
- * rather than hiding it, and they will fail loudly when 2D-D moves correlation
- * onto WorkspaceRef.id — which is the point: the fix must be deliberate, and it
- * must come with this expectation being rewritten.
- */
-describe('useAgentServices — cross-workspace hazard (pinned for 2D-D)', () => {
-  const MAIN = '/Users/x/Repo'
-  const NESTED_WORKTREE = '/Users/x/Repo/dashboard-worktrees/feat-y'
-
-  it('cURRENTLY correlates a nested worktree service to the main-checkout agent', async () => {
-    const { result, w } = await correlate(MAIN, {
-      data: [svc({ id: 'wt-server', cwd: NESTED_WORKTREE, discoveredProject: { rootPath: NESTED_WORKTREE } })],
-    })
-    // Wrong, and known to be wrong: that server belongs to another workspace,
-    // on another branch, with its own agents.
-    expect(result.services.value.map(s => s.id)).toEqual(['wt-server'])
-    w.unmount()
-  })
-
-  it('cURRENTLY correlates a main-checkout service to a nested-worktree agent', async () => {
-    const { result, w } = await correlate(NESTED_WORKTREE, {
-      data: [svc({ id: 'main-server', cwd: MAIN, discoveredProject: { rootPath: MAIN } })],
-    })
-    expect(result.services.value.map(s => s.id)).toEqual(['main-server'])
-    w.unmount()
-  })
-
-  it('is correct when worktrees sit outside the repository, which is the default', async () => {
-    // Same two workspaces, laid out the way DefaultRoot lays them out. Nothing
-    // contains anything, so containment happens to give the right answer —
-    // which is exactly why the defect above stayed invisible.
-    const { result, w } = await correlate('/Users/x/Repo', {
-      data: [svc({ id: 'wt-server', cwd: '/Users/x/dashboard-worktrees/feat-y', discoveredProject: { rootPath: '/Users/x/dashboard-worktrees/feat-y' } })],
-    })
+describe('useAgentServices — availability semantics (unchanged)', () => {
+  // An absent collector must not become an error on every card.
+  it('reports unavailable — not an error, not zero — when LocalScope is down', async () => {
+    const { result, w } = await correlate(agentIn(ws('ws_a')), { reachable: false, data: null })
+    expect(result.available.value).toBe(false)
     expect(result.services.value).toEqual([])
+    w.unmount()
+  })
+
+  it('reports unavailable while nothing has been collected yet', async () => {
+    const { result, w } = await correlate(agentIn(ws('ws_a')), { reachable: null, data: null })
+    expect(result.available.value).toBe(false)
+    w.unmount()
+  })
+
+  it('treats a malformed list as not known rather than as data', async () => {
+    const { result, w } = await correlate(agentIn(ws('ws_a')), { data: 'nonsense' as any })
+    expect(result.available.value).toBe(false)
+    expect(result.services.value).toEqual([])
+    w.unmount()
+  })
+
+  it('shares one resource across many cards rather than fetching per card', async () => {
+    resourceCalls.count = 0
+    const { w } = await correlate(agentIn(ws('ws_a')), { data: [] })
+    expect(resourceCalls.count).toBe(1)
     w.unmount()
   })
 })

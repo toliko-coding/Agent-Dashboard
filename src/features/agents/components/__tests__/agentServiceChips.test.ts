@@ -3,12 +3,34 @@ import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 
+/*
+ * Correlation is workspace-identity equality, so these fixtures give the agent
+ * and its services the same workspace id. The cwd values are kept as they were
+ * — they are still on the payload — precisely to show they no longer decide
+ * anything.
+ */
+const WS = {
+  id: 'ws_localscope',
+  name: 'LocalScope',
+  kind: 'git-main',
+  branch: 'main',
+  repository: { id: 'repo_localscope', name: 'LocalScope' },
+} as const
+
 function agentAt(cwd: string, id = cwd): Agent {
-  return { cwd, sessionId: id, projectName: cwd.split('/').pop() } as Agent
+  return { cwd, sessionId: id, projectName: cwd.split('/').pop(), workspace: { ...WS } } as unknown as Agent
 }
 
 function svc(over: Record<string, unknown>) {
-  return { id: 's', port: 5173, label: 'Vite Development Server', cwd: null, discoveredProject: null, ...over }
+  return {
+    id: 's',
+    port: 5173,
+    label: 'Vite Development Server',
+    cwd: null,
+    discoveredProject: null,
+    workspace: { ...WS },
+    ...over,
+  }
 }
 
 /*
@@ -57,9 +79,15 @@ describe('agentServiceChips', () => {
     expect(w.get('[data-testid="agent-service-overflow"]').text()).toBe('+2')
   })
 
-  it('renders nothing when the project has no service', async () => {
+  it('renders nothing when the workspace has no service', async () => {
     const w = await mountChips(agentAt('/gh/Quiet'), {
-      data: [svc({ id: 'a', discoveredProject: { rootPath: '/gh/Elsewhere' } })],
+      // A service in another workspace. Its rootPath is unrelated too, but the
+      // workspace id is what decides — the rootPath is now inert.
+      data: [svc({
+        id: 'a',
+        discoveredProject: { rootPath: '/gh/Elsewhere' },
+        workspace: { ...WS, id: 'ws_elsewhere', name: 'Elsewhere' },
+      })],
     })
     expect(w.find('[data-testid="agent-service-chips"]').exists()).toBe(false)
     // Specifically not a zero: nothing here can distinguish "collected and none

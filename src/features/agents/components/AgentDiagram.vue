@@ -10,10 +10,11 @@ import { useAgentServices } from '../composables/useAgentServices'
  * its data is absent — an agent with no subagents shows no subagent branch
  * rather than an empty box. Nothing here animates for decoration.
  *
- * The services branch is a genuine cross-system join: LocalScope reports
- * listening ports with the project directory they run in, so a port whose cwd
- * sits inside this agent's working directory really is "a server running in
- * the project this agent is editing".
+ * The services branch is a genuine cross-system join: a listening port and this
+ * agent resolve to the SAME workspace, so it really is "a server running in the
+ * checkout this agent is editing". Workspace, not path containment — a linked
+ * worktree shares a repository but is a different active workspace, and under
+ * the old rule its server appeared on the main checkout's agent.
  */
 const props = defineProps<{ agent: Agent }>()
 
@@ -56,8 +57,8 @@ const leaves = computed<Leaf[]>(() => {
     out.push({ id: 'terminal', label: 'Terminal', sub: 'attachable', kind: 'surface' })
   if (props.agent.pipelineTaskId)
     out.push({ id: 'pipeline', label: 'Pipeline', sub: 'linked task', kind: 'work' })
-  // Observed by LocalScope, not inferred here — a listening port whose project
-  // root is inside this agent's cwd really is a server in the project it edits.
+  // Observed by LocalScope, not inferred here — a listening port resolved to
+  // the same workspace as this agent really is a server in the checkout it edits.
   for (const s of relatedServices.value.slice(0, 2))
     out.push({ id: `svc-${s.id}`, label: s.label, sub: `:${s.port}`, kind: 'service' })
   return out
