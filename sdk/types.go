@@ -355,6 +355,67 @@ const (
 	SpawnerSourceEnv  = "env"
 )
 
+/*
+ * Repository and workspace identity, read-only.
+ *
+ * A Repository is one local git object store; a Workspace is one checkout of
+ * it. A linked worktree shares its main checkout's Repository and is a distinct
+ * Workspace — same history, its own branch, its own dirty state, its own
+ * agents and services. That distinction is the whole point of these types:
+ * before them, two worktrees of one repository were indistinguishable in the
+ * payload, because the only identity an agent carried was basename(cwd).
+ *
+ * Neither type carries a filesystem path. The repository key is a `.git`
+ * internal directory that nothing in the UI can act on, and the workspace root
+ * is an ancestor of the `cwd` an agent already reports, so publishing it would
+ * add exposure to buy nothing. What travels is an opaque id for comparison and
+ * a name for display.
+ */
+
+// RepositoryRef identifies one local git object store.
+type RepositoryRef struct {
+	// ID is opaque and stable: two workspaces share it exactly when they share
+	// a repository. Derived in server/internal/identity; see that package for
+	// what it is and, explicitly, what it is not.
+	ID string `json:"id"`
+	// Name is the primary working tree's directory name, for display only.
+	// Empty for a bare repository or a submodule, whose object store has no
+	// working-tree parent. Never an identity — two clones share this string.
+	Name string `json:"name"`
+}
+
+// WorkspaceKind is what a workspace is, which decides how it relates to others.
+type WorkspaceKind string
+
+const (
+	// WorkspaceKindGitMain is a repository's primary working tree.
+	WorkspaceKindGitMain WorkspaceKind = "git-main"
+	// WorkspaceKindGitWorktree is a linked worktree: same repository, different
+	// workspace.
+	WorkspaceKindGitWorktree WorkspaceKind = "git-worktree"
+	// WorkspaceKindPlain is a directory in no repository. Still a workspace —
+	// agents run in such directories — but it has no Repository, and two of
+	// them are never "the same project".
+	WorkspaceKindPlain WorkspaceKind = "plain"
+)
+
+// WorkspaceRef identifies one active checkout.
+type WorkspaceRef struct {
+	// ID is opaque and stable. Two worktrees of one repository have different
+	// IDs; the same checkout always has the same one.
+	ID string `json:"id"`
+	// Name is the workspace root's directory name, for display only.
+	Name string        `json:"name"`
+	Kind WorkspaceKind `json:"kind"`
+	// Branch is the checked-out branch, omitted when detached or unknown.
+	Branch string `json:"branch,omitempty"`
+	// Detached distinguishes a detached HEAD — normal for a worktree opened on
+	// a commit — from a branch that simply could not be read.
+	Detached bool `json:"detached,omitempty"`
+	// Repository is null exactly when Kind is plain.
+	Repository *RepositoryRef `json:"repository"`
+}
+
 // Agent is the unified view of a running Claude Code process.
 type Agent struct {
 	PID         int      `json:"pid"`
@@ -363,6 +424,15 @@ type Agent struct {
 	ProjectPath string   `json:"projectPath"`
 	ProjectName string   `json:"projectName"`
 	CWD         string   `json:"cwd"`
+	// Workspace is the checkout this agent is running in, resolved from CWD by
+	// server/internal/identity. Null when it could not be resolved — no cwd, a
+	// deleted directory, git unavailable, or the resolver budget expiring.
+	//
+	// Null means "not known" and never "no workspace": a caller must render it
+	// as unknown rather than fall back to ProjectName, which is basename(cwd)
+	// and collides across unrelated checkouts. Additive and read-only; it
+	// replaces no existing field in this phase.
+	Workspace *WorkspaceRef `json:"workspace"`
 	// ClaudeConfigDir is the value of CLAUDE_CONFIG_DIR detected in the running
 	// session's process env (empty when the session uses the default ~/.claude).
 	// Lets the dashboard resolve which config root a session's slash commands /

@@ -16,6 +16,7 @@ import (
 
 	"github.com/lx-wnk/agent-dashboard/sdk"
 	"github.com/lx-wnk/agent-dashboard/server/internal/channelconfig"
+	"github.com/lx-wnk/agent-dashboard/server/internal/identity"
 	"github.com/lx-wnk/agent-dashboard/server/internal/parser"
 	"github.com/lx-wnk/agent-dashboard/server/internal/provider"
 	"github.com/lx-wnk/agent-dashboard/server/internal/scanner"
@@ -259,6 +260,9 @@ type Merger struct {
 	tracker     *staleTracker
 	registry    *provider.Registry
 	screenProbe ScreenProbeFn
+	// workspaces resolves an agent's cwd to the checkout it runs in. Cached,
+	// because this rebuilds every agent on every SSE tick; see the resolver.
+	workspaces *identity.Resolver
 }
 
 // ScreenProbeFn resolves whichever AskUserQuestion screen is currently open on
@@ -288,12 +292,32 @@ func WithScreenProbe(fn ScreenProbeFn) Option {
 	return func(m *Merger) { m.screenProbe = fn }
 }
 
-// New builds a Merger. Defaults: the real scanner.ScanProcesses and a fresh
-// stale tracker.
+// WithWorkspaceResolver overrides workspace identity resolution. Tests inject a
+// stub so no test touches a real git repository; passing nil disables
+// enrichment entirely, which is also what a caller gets on any failure.
+func WithWorkspaceResolver(r *identity.Resolver) Option {
+	return func(m *Merger) { m.workspaces = r }
+}
+
+// New builds a Merger. Defaults: the real scanner.ScanProcesses, a fresh stale
+// tracker, and a caching workspace resolver.
 func New(opts ...Option) *Merger {
-	m := &Merger{scan: scanner.ScanProcesses, tracker: newStaleTracker()}
+	m := &Merger{scan: scanner.ScanProcesses, tracker: newStaleTracker(), workspaces: identity.NewResolver()}
 	for _, o := range opts {
 		o(m)
+	}
+	/*
+	 * Wired after options so an injected resolver is the one the finished-agent
+	 * path uses too. Both builders must populate every sdk.Agent field (stale.go
+	 * says so explicitly), and a live card and a finished card disagreeing about
+	 * which worktree they belong to would be worse than neither having one.
+	 *
+	 * Background context: buildStale runs off the scan's ctx, and a cancelled
+	 * request must not turn a cached workspace into "unknown" for a card that
+	 * is only being re-rendered.
+	 */
+	m.tracker.workspaceFn = func(cwd string) *sdk.WorkspaceRef {
+		return m.workspaceRef(context.Background(), cwd)
 	}
 	return m
 }
@@ -354,7 +378,7 @@ func (m *Merger) GetAgents(ctx context.Context, opts GetAgentsOpts) ([]sdk.Agent
 				if err != nil {
 					continue // no matching session; zero value left at agents[i]
 				}
-				agents[i] = m.buildAgent(proc, session, extra, opts.BaselinePerSessionCostUSD)
+				agents[i] = m.buildAgent(ctx, proc, session, extra, opts.BaselinePerSessionCostUSD)
 				sessionPaths[i] = session.Path
 			}
 		}()
@@ -434,7 +458,7 @@ func (m *Merger) resolveSession(proc scanner.ProcessInfo, claimed map[string]boo
 
 // buildAgent assembles an sdk.Agent from a scanned process and its resolved
 // session data.
-func (m *Merger) buildAgent(proc scanner.ProcessInfo, session *parser.SessionData, extra resolveExtra, baselineCost float64) sdk.Agent {
+func (m *Merger) buildAgent(ctx context.Context, proc scanner.ProcessInfo, session *parser.SessionData, extra resolveExtra, baselineCost float64) sdk.Agent {
 	prov := proc.Provider
 	if prov == "" {
 		prov = sdk.ProviderClaude
@@ -465,6 +489,7 @@ func (m *Merger) buildAgent(proc scanner.ProcessInfo, session *parser.SessionDat
 		ProjectPath:               proc.CWD,
 		ProjectName:               filepath.Base(proc.CWD),
 		CWD:                       proc.CWD,
+		Workspace:                 m.workspaceRef(ctx, proc.CWD),
 		ClaudeConfigDir:           proc.ClaudeConfigDir,
 		ClaudeConfigDirKnown:      proc.ClaudeConfigDirKnown,
 		Entrypoint:                session.Entrypoint,

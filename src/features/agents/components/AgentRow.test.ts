@@ -36,6 +36,7 @@ const baseAgent: Agent = {
   permissionsBypassed: false,
   convergenceAlert: false,
   meta: null,
+  workspace: null,
 }
 
 async function mountExpanded(agent: Agent) {

@@ -379,6 +379,70 @@ export const SpawnerSourceEnv = 'env'
  */
 export type SpawnerSource = typeof SpawnerSourceTask | typeof SpawnerSourceEnv
 /**
+ * RepositoryRef identifies one local git object store.
+ */
+export interface RepositoryRef {
+  /**
+   * ID is opaque and stable: two workspaces share it exactly when they share
+   * a repository. Derived in server/internal/identity; see that package for
+   * what it is and, explicitly, what it is not.
+   */
+  id: string
+  /**
+   * Name is the primary working tree's directory name, for display only.
+   * Empty for a bare repository or a submodule, whose object store has no
+   * working-tree parent. Never an identity — two clones share this string.
+   */
+  name: string
+}
+/**
+ * WorkspaceKind is what a workspace is, which decides how it relates to others.
+ */
+/**
+ * WorkspaceKindGitMain is a repository's primary working tree.
+ */
+export const WorkspaceKindGitMain = 'git-main'
+/**
+ * WorkspaceKindGitWorktree is a linked worktree: same repository, different
+ * workspace.
+ */
+export const WorkspaceKindGitWorktree = 'git-worktree'
+/**
+ * WorkspaceKindPlain is a directory in no repository. Still a workspace —
+ * agents run in such directories — but it has no Repository, and two of
+ * them are never "the same project".
+ */
+export const WorkspaceKindPlain = 'plain'
+export type WorkspaceKind = typeof WorkspaceKindGitMain | typeof WorkspaceKindGitWorktree | typeof WorkspaceKindPlain
+/**
+ * WorkspaceRef identifies one active checkout.
+ */
+export interface WorkspaceRef {
+  /**
+   * ID is opaque and stable. Two worktrees of one repository have different
+   * IDs; the same checkout always has the same one.
+   */
+  id: string
+  /**
+   * Name is the workspace root's directory name, for display only.
+   */
+  name: string
+  kind: WorkspaceKind
+  /**
+   * Branch is the checked-out branch, omitted when detached or unknown.
+   */
+  branch?: string
+  /**
+   * Detached distinguishes a detached HEAD — normal for a worktree opened on
+   * a commit — from a branch that simply could not be read.
+   */
+  detached?: boolean
+  /**
+   * Repository is null exactly when Kind is plain.
+   */
+  repository?: RepositoryRef
+}
+/**
  * Agent is the unified view of a running Claude Code process.
  */
 export interface Agent {
@@ -388,6 +452,16 @@ export interface Agent {
   projectPath: string
   projectName: string
   cwd: string
+  /**
+   * Workspace is the checkout this agent is running in, resolved from CWD by
+   * server/internal/identity. Null when it could not be resolved — no cwd, a
+   * deleted directory, git unavailable, or the resolver budget expiring.
+   * Null means "not known" and never "no workspace": a caller must render it
+   * as unknown rather than fall back to ProjectName, which is basename(cwd)
+   * and collides across unrelated checkouts. Additive and read-only; it
+   * replaces no existing field in this phase.
+   */
+  workspace?: WorkspaceRef
   /**
    * ClaudeConfigDir is the value of CLAUDE_CONFIG_DIR detected in the running
    * session's process env (empty when the session uses the default ~/.claude).

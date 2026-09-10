@@ -34,6 +34,7 @@ const baseAgent: Agent = {
   permissionsBypassed: false,
   convergenceAlert: false,
   meta: null,
+  workspace: null,
 }
 
 const stubs = {

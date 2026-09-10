@@ -34,6 +34,10 @@ type staleTracker struct {
 	mu      sync.Mutex
 	seen    map[int]liveSnapshot
 	parseFn func(path string) (*parser.SessionData, error)
+	// workspaceFn resolves a cwd to its workspace, injected by the Merger so
+	// the tracker itself stays independent of identity resolution. Nil is
+	// valid and yields no workspace, which is what every existing test gets.
+	workspaceFn func(string) *sdk.WorkspaceRef
 }
 
 func newStaleTracker() *staleTracker {
@@ -89,7 +93,7 @@ func (t *staleTracker) buildStale(livePIDs map[int]bool, baselineCost float64) [
 			// leak for this process-scoped registry; no age-out by design.
 			continue
 		}
-		out = append(out, buildFinishedAgent(pid, snap, session, baselineCost))
+		out = append(out, buildFinishedAgent(pid, snap, session, baselineCost, t.workspaceFn))
 	}
 	return out
 }
@@ -105,7 +109,21 @@ func (t *staleTracker) dismiss(pid int) {
 // card from a cached snapshot plus freshly parsed session data. Uptime is left
 // zero because the process is gone.
 // Keep sdk.Agent field population in parity with buildAgent in merger.go — a new sdk.Agent field must be added to both.
-func buildFinishedAgent(pid int, snap liveSnapshot, session *parser.SessionData, baselineCost float64) sdk.Agent {
+func buildFinishedAgent(pid int, snap liveSnapshot, session *parser.SessionData, baselineCost float64, workspaceFn func(string) *sdk.WorkspaceRef) sdk.Agent {
+	/*
+	 * A finished agent's process is gone, but the checkout it ran in normally
+	 * still exists, so its workspace is as resolvable as a live one's — and a
+	 * finished card that could not say which worktree it belonged to would be
+	 * exactly as ambiguous as the live cards this phase exists to disambiguate.
+	 *
+	 * Resolution still runs through the same cache, and still yields nil for a
+	 * directory that has since been deleted. nil is "not known", never a guess.
+	 */
+	var workspace *sdk.WorkspaceRef
+	if workspaceFn != nil {
+		workspace = workspaceFn(snap.projectPath)
+	}
+
 	provider := snap.provider
 	if provider == "" {
 		provider = sdk.ProviderClaude
@@ -120,6 +138,7 @@ func buildFinishedAgent(pid int, snap liveSnapshot, session *parser.SessionData,
 		ProjectPath:               snap.projectPath,
 		ProjectName:               filepath.Base(snap.projectPath),
 		CWD:                       snap.projectPath,
+		Workspace:                 workspace,
 		ClaudeConfigDir:           snap.configDir,
 		ClaudeConfigDirKnown:      snap.configDirKnown,
 		Entrypoint:                session.Entrypoint,

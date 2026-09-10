@@ -72,6 +72,7 @@ const baseAgent: Agent = {
   convergenceAlert: false,
   pipelineTaskId: 'task-1',
   meta: null,
+  workspace: null,
 }
 
 describe('taskCard', () => {

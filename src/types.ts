@@ -3,10 +3,13 @@ import type {
   SessionMeta as _SessionMetaBase,
   SubAgent as _SubAgentBase,
   TaskInfo as _TaskInfoBase,
+  WorkspaceRef as _WorkspaceRefBase,
   AgentStatus,
   HookEvent,
   PendingPermission,
+  RepositoryRef,
   TokenUsage,
+  WorkspaceKind,
 } from './sdk.generated'
 import type { MetricKey } from './utils/evalMetrics'
 // Types generated from sdk/types.go via tygo — do not edit these directly.
@@ -18,7 +21,7 @@ import {
   AgentStatusWaiting,
 } from './sdk.generated'
 
-export type { AgentStatus, HookEvent, PendingPermission, TokenUsage }
+export type { AgentStatus, HookEvent, PendingPermission, RepositoryRef, TokenUsage, WorkspaceKind }
 
 export interface SessionMeta extends Omit<_SessionMetaBase, 'firstPrompt'> {
   firstPrompt: string | null
@@ -33,13 +36,30 @@ export interface TaskInfo extends Omit<_TaskInfoBase, 'status'> {
   status: 'pending' | 'in_progress' | 'completed'
 }
 
+/*
+ * A Go pointer field serialises as `null`, but tygo emits it as optional
+ * (`repository?: RepositoryRef`), so the generated type says `undefined` where
+ * the wire says `null`. Narrowed here for the same reason SessionMeta.meta is —
+ * a check written against the generated type would be testing for a value that
+ * never arrives.
+ *
+ * null is meaningful in both places: no repository means this checkout is not
+ * in one, and no workspace means identity could not be resolved. Neither is a
+ * reason to fall back to projectName, which is basename(cwd) and collides
+ * across unrelated checkouts.
+ */
+export type WorkspaceRef = Omit<_WorkspaceRefBase, 'repository'> & {
+  repository: RepositoryRef | null
+}
+
 // Agent re-exported from sdk.generated with narrowed tasks/subagents/meta types.
 // The generated base has tasks: TaskInfo[] and subagents: SubAgent[] using the broad
 // generated types; here we override them with the narrower local types.
-export type Agent = Omit<_AgentBase, 'tasks' | 'subagents' | 'meta'> & {
+export type Agent = Omit<_AgentBase, 'tasks' | 'subagents' | 'meta' | 'workspace'> & {
   tasks: TaskInfo[]
   subagents: SubAgent[]
   meta: SessionMeta | null
+  workspace: WorkspaceRef | null
 }
 
 // Derived from sdk.generated consts — automatically stays in sync with sdk/types.go.
