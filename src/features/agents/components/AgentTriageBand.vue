@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PermissionItem } from '@/composables/usePendingPermissions'
+import type { AttentionItem, AttentionLevel, AttentionQueue } from '@/features/attention'
 import type { PendingCapabilityDecision } from '@/sdk.generated'
 import type { Agent, PendingPermission, PermissionRequest } from '@/types'
 import type { AnswerIntent } from '@/utils/answerKeys'
@@ -17,6 +18,13 @@ import { formatErrorState, formatRelativeActivity, secondsSince, shortModel } fr
 import { friendlyProjectName } from '@/utils/friendlyProjectName'
 
 const props = defineProps<{
+  /**
+   * The canonical attention queue App.vue derives. It alone decides what needs
+   * the user and how many things do; this band decides only how each item is
+   * presented and answered.
+   */
+  queue: AttentionQueue
+  /** Every agent, so an item's session resolves to the agent its card acts on. */
   agents: Agent[]
   permissionItems: PermissionItem[]
   capabilityDecisions?: PendingCapabilityDecision[]
@@ -24,6 +32,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   select: [agent: Agent]
+  openTask: [taskId: string]
   remembered: []
   approve: [taskId: string, ids: string[], remember: boolean]
   deny: [taskId: string, ids: string[]]
@@ -63,101 +72,152 @@ const toneLabelClass: Record<string, string> = {
   danger: 'text-danger-text',
 }
 
-// Agent cards: only render agents where task-driven permission items don't already cover them,
-// AND whose attention kind is error/stalled — or free agents with pendingToolUse.
-const orchestratedTaskIds = computed(() => new Set(props.permissionItems.map(i => i.taskId)))
-
-// "Allow AskUserQuestion" would write a meaningless standing allow-rule for a
-// tool nobody has to approve — and it is answered in the question card or the
+// "AskUserQuestion" would write a meaningless standing allow-rule for a tool
+// nobody has to approve — and it is answered in the question card or the
 // terminal, not here.
 const ASK_USER_QUESTION_TOOL = 'AskUserQuestion'
 
-// Per-agent attention/secs/grant-eligibility, computed once per agent per tick
-// and reused by visibleAgentCards, breakdown, blockedDetail and the template.
-// grantableToolUse folds in attention.ts's Attention.grantable — the single
-// source for which attention kinds are genuine prompt-on-screen evidence — so
-// the template never recomputes that decision per usage.
-const agentAttentionMap = computed(() => {
-  const map = new Map<string, { att: ReturnType<typeof attentionFor>, secs: number | null, grantableToolUse: boolean }>()
-  for (const agent of props.agents) {
-    const secs = secondsSince(agent.lastActivity, nowMs.value)
-    const att = attentionFor(agent, secs)
-    const grantableToolUse = !!att?.grantable && !!agent.pendingToolUse && agent.pendingToolUse.tool !== ASK_USER_QUESTION_TOOL
-    map.set(agent.sessionId, { att, secs, grantableToolUse })
+const LEVEL_ORDER: AttentionLevel[] = ['blocking', 'failed', 'stalled', 'ready']
+const LEVEL_LABELS: Record<AttentionLevel, string> = {
+  blocking: 'Blocking',
+  failed: 'Failed',
+  stalled: 'Stalled',
+  ready: 'Ready',
+}
+
+/*
+ * Every row below is a canonical attention item — nothing is added, dropped or
+ * reclassified here. An item is presented as the card that answers it:
+ *
+ *   agent item            the agent's card (question, held call, stored
+ *                         request, terminal prompt, failure)
+ *   agent item whose task has parked permission requests
+ *                         the task's permission card: the queue folds those
+ *                         requests into that agent, and the task's Approve
+ *                         records the decision against the task
+ *   task-permissions      the task's permission card
+ *   capability            the capability decision card
+ *   task-waiting (ready)  a compact row that opens the task, because it is
+ *                         answered there, not on an agent card
+ */
+const items = computed(() => props.queue.status === 'ready' ? props.queue.items : [])
+const agentsById = computed(() => new Map(props.agents.map(a => [a.sessionId, a])))
+const permissionItemsByTask = computed(() => new Map(props.permissionItems.map(i => [i.taskId, i])))
+const decisionsById = computed(() => new Map(capabilityDecisions.value.map(d => [d.id, d])))
+
+const itemBySession = computed(() => {
+  const map = new Map<string, AttentionItem>()
+  for (const item of items.value) {
+    if (item.subject.type === 'agent')
+      map.set(item.subject.sessionId, item)
   }
   return map
 })
 
-const visibleAgentCards = computed(() =>
-  props.agents.filter((agent) => {
-    const att = agentAttentionMap.value.get(agent.sessionId)?.att
-    if (!att)
-      return false
-    // A pending, answerable question always surfaces — regardless of orchestration.
-    if (att.kind === 'question')
-      return true
-    // Free agent with pendingToolUse — always show
-    if (!agent.pipelineTaskId && agent.pendingToolUse)
-      return true
-    // Orchestrated agent whose task is already represented in permissionItems — skip
-    if (agent.pipelineTaskId && orchestratedTaskIds.value.has(agent.pipelineTaskId) && att.kind === 'permission')
-      return false
-    return att.kind === 'error' || att.kind === 'stalled' || att.kind === 'permission'
-  }),
-)
+function foldedTaskItem(item: AttentionItem): PermissionItem | undefined {
+  if (item.subject.type !== 'agent' || (item.kind !== 'permission' && item.kind !== 'terminal-permission'))
+    return undefined
+  const taskId = agentsById.value.get(item.subject.sessionId)?.pipelineTaskId
+  return taskId ? permissionItemsByTask.value.get(taskId) : undefined
+}
+
+const taskPermissionCards = computed<PermissionItem[]>(() => {
+  const cards: PermissionItem[] = []
+  for (const item of items.value) {
+    const entry = item.kind === 'task-permissions' && item.subject.type === 'task'
+      ? permissionItemsByTask.value.get(item.subject.taskId)
+      : foldedTaskItem(item)
+    if (entry && !cards.includes(entry))
+      cards.push(entry)
+  }
+  return cards
+})
+
+const visibleAgentCards = computed<Agent[]>(() => {
+  const cards: Agent[] = []
+  for (const item of items.value) {
+    if (item.subject.type !== 'agent' || foldedTaskItem(item))
+      continue
+    const agent = agentsById.value.get(item.subject.sessionId)
+    if (agent)
+      cards.push(agent)
+  }
+  return cards
+})
+
+const capabilityCards = computed<PendingCapabilityDecision[]>(() => {
+  const cards: PendingCapabilityDecision[] = []
+  for (const item of items.value) {
+    const decision = item.subject.type === 'capability' ? decisionsById.value.get(item.subject.decisionId) : undefined
+    if (decision)
+      cards.push(decision)
+  }
+  return cards
+})
+
+const readyTaskItems = computed(() => items.value.filter(item => item.kind === 'task-waiting'))
+
+// Grant eligibility per agent card, computed once per update. grantableToolUse
+// folds in attention.ts's Attention.grantable — the single source for which
+// signals are genuine prompt-on-screen evidence.
+const agentAttentionMap = computed(() => {
+  const map = new Map<string, { grantableToolUse: boolean }>()
+  for (const agent of visibleAgentCards.value) {
+    const att = attentionFor(agent)
+    const grantableToolUse = !!att?.grantable && !!agent.pendingToolUse && agent.pendingToolUse.tool !== ASK_USER_QUESTION_TOOL
+    map.set(agent.sessionId, { grantableToolUse })
+  }
+  return map
+})
+
+function toneFor(agent: Agent): 'warning' | 'danger' {
+  return itemBySession.value.get(agent.sessionId)?.level === 'failed' ? 'danger' : 'warning'
+}
+
+function levelLabel(agent: Agent): string {
+  const level = itemBySession.value.get(agent.sessionId)?.level
+  return level ? LEVEL_LABELS[level] : ''
+}
+
+function openTask(item: AttentionItem): void {
+  if (item.subject.type === 'task')
+    emit('openTask', item.subject.taskId)
+}
 
 // Total permission requests across all task-driven permission items
 const totalRequestCount = computed(() => props.permissionItems.reduce((s, i) => s + i.requests.length, 0))
 
-// Breakdown string: "2 permissions · 1 failed run · 1 stalled"
+// "2 blocking · 1 failed · 1 ready" — counted from the queue, so it can never
+// disagree with the count beside it or with the Overview.
 const breakdown = computed(() => {
-  const counts: Record<string, number> = {}
-  // Count task-level permission requests
-  const permTotal = totalRequestCount.value
-  if (permTotal > 0)
-    counts.permission = permTotal
-  for (const agent of visibleAgentCards.value) {
-    const att = agentAttentionMap.value.get(agent.sessionId)?.att
-    if (att && att.kind !== 'permission')
-      counts[att.kind] = (counts[att.kind] ?? 0) + 1
-  }
-  if (capabilityDecisions.value.length > 0)
-    counts.capability = capabilityDecisions.value.length
-  const PARTS: [string, string, string][] = [
-    ['question', 'question', 'questions'],
-    ['permission', 'permission request', 'permission requests'],
-    ['capability', 'capability ask', 'capability asks'],
-    ['error', 'failed run', 'failed runs'],
-    ['stalled', 'stalled', 'stalled'],
-  ]
-  return PARTS
-    .filter(([k]) => counts[k])
-    .map(([k, s, p]) => `${counts[k]} ${counts[k] === 1 ? s : p}`)
+  const counts: Record<AttentionLevel, number> = { blocking: 0, failed: 0, stalled: 0, ready: 0 }
+  for (const item of items.value)
+    counts[item.level]++
+  return LEVEL_ORDER
+    .filter(level => counts[level] > 0)
+    .map(level => `${counts[level]} ${LEVEL_LABELS[level].toLowerCase()}`)
     .join(' · ')
 })
 
-const totalCount = computed(() => props.permissionItems.length + visibleAgentCards.value.length + capabilityDecisions.value.length)
+const totalCount = computed(() => items.value.length)
 
-const isClear = computed(() => totalCount.value === 0 && props.permissionItems.length === 0)
+const isChecking = computed(() => props.queue.status !== 'ready')
+const isClear = computed(() => props.queue.status === 'ready' && items.value.length === 0)
 
 function blockedDetail(agent: Agent): string {
   if (agent.pendingToolUse?.tool === ASK_USER_QUESTION_TOOL)
     return 'Waiting for your answer — open the terminal to reply'
-  const entry = agentAttentionMap.value.get(agent.sessionId)
-  const att = entry?.att
-  if (!att)
+  const item = itemBySession.value.get(agent.sessionId)
+  if (!item)
     return ''
-  // Switch on the kind rather than on which fields happen to be set: an agent
-  // can carry a leftover pendingToolUse in any state, so a fallthrough chain
-  // let whichever branch came first answer for a kind it was not about.
-  switch (att.kind) {
-    case 'stalled': {
-      const activity = formatRelativeActivity(entry.secs)
-      return agent.pendingToolUse ? `${agent.pendingToolUse.tool} — running but silent, last output ${activity}` : `Running but silent — last output ${activity}`
-    }
-    case 'error':
-      return agent.errorState ? formatErrorState(agent.errorState) : (agent.currentAction || 'Run failed')
-    case 'permission': {
+  // Switch on the item's kind rather than on which fields happen to be set: an
+  // agent can carry a leftover pendingToolUse in any state, so a fallthrough
+  // chain let whichever branch came first answer for a kind it was not about.
+  switch (item.kind) {
+    case 'api-error':
+      return agent.errorState ? formatErrorState(agent.errorState) : 'Run failed'
+    case 'permission':
+    case 'terminal-permission': {
       // The held call, not the transcript's pendingToolUse: with parallel tool
       // calls those describe different things, and the body must describe what
       // the buttons below it answer.
@@ -569,7 +629,7 @@ watch(() => props.focusedSessionId, (id) => {
 </script>
 
 <template>
-  <section :class="isClear ? 'mb-2' : 'mb-4'" aria-label="Needs your attention">
+  <section :class="isClear || isChecking ? 'mb-2' : 'mb-4'" aria-label="Needs your attention" data-testid="triage-band">
     <div
       role="status"
       aria-live="polite"
@@ -586,7 +646,7 @@ watch(() => props.focusedSessionId, (id) => {
       band look equally loud whether or not anything needed attention.
 
       The wording says BLOCKED, not "waiting on you", because this band shows
-      only the kinds that stop an agent: question, permission, error, stalled.
+      only canonical attention items (features/attention): blocking, failed, ready.
       An agent whose turn has finished carries a "Your turn" chip and is
       deliberately excluded — it is ready for input, not blocked on it. The old
       copy ("no agent is waiting on you") claimed something wider than the
@@ -594,11 +654,21 @@ watch(() => props.focusedSessionId, (id) => {
       turn" and read as a straight contradiction.
     -->
     <p
-      v-if="isClear"
+      v-if="isChecking"
+      data-testid="triage-checking"
+      class="flex items-center gap-1.5 px-0.5 py-1 text-[11px] text-fg-faint"
+    >
+      Checking what needs you…
+    </p>
+    <!-- No checkmark: nothing waiting on a decision is not a health report. -->
+    <p
+      v-else-if="isClear"
       data-testid="triage-all-clear"
       class="flex items-center gap-1.5 px-0.5 py-1 text-[11px] text-fg-faint"
     >
-      <span aria-hidden="true">✓</span>No agents are blocked on you.
+      {{ queue.stale
+        ? 'Nothing was waiting on your decision at the last update · agent updates reconnecting'
+        : 'Nothing is waiting on your decision.' }}
     </p>
 
     <template v-else>
@@ -611,7 +681,8 @@ watch(() => props.focusedSessionId, (id) => {
           class="text-[10px] font-bold font-mono bg-red-500 text-white rounded-full px-1.5 leading-[16px]"
           :aria-label="`${totalCount} items need attention`"
         >{{ totalCount }}</span>
-        <span v-if="breakdown" class="text-[11px] text-fg-faint">{{ breakdown }}</span>
+        <span v-if="breakdown" class="text-[11px] text-fg-faint" data-testid="triage-breakdown">{{ breakdown }}</span>
+        <span v-if="queue.stale" class="text-[11px] text-fg-mute" data-testid="triage-stale">Last known · agent updates reconnecting</span>
         <span class="ml-auto text-[10px] text-fg-faint font-mono select-none hidden sm:inline" aria-hidden="true">
           <kbd class="not-italic">n</kbd> next ·
           <kbd class="not-italic">a</kbd> approve ·
@@ -706,7 +777,7 @@ watch(() => props.focusedSessionId, (id) => {
           class="text-[10px] transition-transform duration-150"
           :class="cardsVisible ? 'rotate-90' : ''"
         >▸</span>
-        {{ cardsVisible ? 'Hide individual requests' : `Review individually (${permissionItems.length + visibleAgentCards.length})` }}
+        {{ cardsVisible ? 'Hide individual requests' : `Review individually (${taskPermissionCards.length + visibleAgentCards.length})` }}
       </button>
 
       <!-- Not gated behind v-if="cardsVisible": capability cards live outside the
@@ -717,8 +788,9 @@ watch(() => props.focusedSessionId, (id) => {
         <!-- Task permission cards -->
         <template v-if="cardsVisible">
           <div
-            v-for="item in permissionItems"
+            v-for="item in taskPermissionCards"
             :key="item.taskId"
+            data-testid="triage-task-permission-card"
             class="min-w-[280px] flex-1 basis-[280px] max-w-[420px] rounded-lg bg-card border border-l-[3px] border-warning-dot border-l-warning-dot p-3 flex flex-col gap-2"
           >
             <div class="flex items-center gap-2 min-w-0">
@@ -782,7 +854,7 @@ watch(() => props.focusedSessionId, (id) => {
              only Allow/Deny behind an extra click for the whole of that
              window is losing the decision by default, not deferring it. -->
         <div
-          v-for="decision in capabilityDecisions"
+          v-for="decision in capabilityCards"
           :key="decision.id"
           :ref="(el) => setCardRef(decision.id, el as HTMLElement | null)"
           data-testid="capability-decision-card"
@@ -836,16 +908,42 @@ watch(() => props.focusedSessionId, (id) => {
           </div>
         </div>
 
-        <!-- Agent attention cards (error, stalled, free-agent pendingToolUse) -->
+        <!-- Ready: a pipeline task handed back to you. Answered in its task,
+             not on an agent card, so the row only opens it. -->
+        <div
+          v-for="item in readyTaskItems"
+          :key="item.id"
+          data-testid="triage-ready-task"
+          class="min-w-[280px] flex-1 basis-[280px] max-w-[420px] rounded-lg bg-card border border-line p-3 flex items-center gap-2"
+        >
+          <span class="min-w-0 flex-1 flex flex-col gap-0.5">
+            <span class="font-semibold text-[13px] text-fg truncate">{{ item.title }}</span>
+            <span class="text-[11px] text-fg-mute">{{ item.reason }}<template v-if="item.detail"> · {{ item.detail }}</template></span>
+          </span>
+          <span class="text-[10px] font-bold uppercase tracking-wide shrink-0 text-neutral-text">Ready</span>
+          <AppButton
+            variant="outline"
+            size="sm"
+            class="shrink-0 whitespace-nowrap"
+            :aria-label="`Open task ${item.title}`"
+            data-testid="triage-open-task"
+            @click="openTask(item)"
+          >
+            Open ↗
+          </AppButton>
+        </div>
+
+        <!-- Agent cards: every canonical agent item not presented as its task's card -->
         <template v-if="cardsVisible">
           <div
             v-for="agent in visibleAgentCards"
             :key="agent.sessionId"
             :ref="(el) => setCardRef(agent.sessionId, el as HTMLElement | null)"
+            data-testid="triage-agent-card"
             class="min-w-[280px] flex-1 basis-[280px] max-w-[420px] rounded-lg bg-card border border-l-[3px] p-3 flex flex-col gap-2 transition-shadow"
             :class="[
-              toneBorderClass[agentAttentionMap.get(agent.sessionId)?.att?.tone ?? 'warning'],
-              toneLeftClass[agentAttentionMap.get(agent.sessionId)?.att?.tone ?? 'warning'],
+              toneBorderClass[toneFor(agent)],
+              toneLeftClass[toneFor(agent)],
               agent.sessionId === focusedSessionId ? 'ring-2 ring-accent shadow-md' : '',
             ]"
           >
@@ -855,9 +953,13 @@ watch(() => props.focusedSessionId, (id) => {
               <span class="font-mono text-[11px] text-fg-faint shrink-0">{{ shortModel(agent.model ?? null) }}</span>
               <span
                 class="ml-auto text-[10px] font-bold uppercase tracking-wide shrink-0"
-                :class="toneLabelClass[agentAttentionMap.get(agent.sessionId)?.att?.tone ?? 'warning']"
-              >{{ agentAttentionMap.get(agent.sessionId)?.att?.label }}</span>
+                :class="toneLabelClass[toneFor(agent)]"
+                data-testid="triage-level"
+              >{{ levelLabel(agent) }}</span>
             </div>
+            <p class="m-0 text-[11px] text-fg-mute" data-testid="triage-reason">
+              {{ itemBySession.get(agent.sessionId)?.reason }}
+            </p>
 
             <!-- Answerable question, detected directly in the session's terminal buffer -->
             <template v-if="agent.pendingQuestion">

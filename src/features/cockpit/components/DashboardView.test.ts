@@ -13,7 +13,6 @@ vi.mock('@/features/agents', async () => {
     useAgents: () => ({
       agents,
       filteredAgents: computed(() => agents.value),
-      attentionAgents: computed(() => []),
       pendingCapabilityDecisions: ref([]),
       searchQuery: ref(''),
       selectAgent: vi.fn(),
@@ -31,7 +30,7 @@ describe('dashboardView', () => {
   it('renders the toolbar, the triage band and the empty state when no agent is live', () => {
     const wrapper = mount(DashboardView, {
       attachTo: document.body,
-      props: { permissionItems: [], focusedSessionId: null },
+      props: { attention: { status: 'ready', stale: false, items: [] }, permissionItems: [], focusedSessionId: null },
       global: {
         stubs: {
           AutoApprovingStrip: { template: '<div data-testid="auto-approving-strip" />' },

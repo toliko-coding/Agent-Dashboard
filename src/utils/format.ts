@@ -13,8 +13,6 @@ export function formatErrorState(state: ErrorState): string {
   return ERROR_STATE_LABELS[state] ?? 'Run failed'
 }
 
-export const STALLED_THRESHOLD_SECONDS = 180
-
 export function secondsSince(iso: string | null, nowMs: number = Date.now()): number | null {
   if (!iso)
     return null
@@ -41,10 +39,6 @@ export function formatBurnRate(costUsd: number, uptimeSeconds: number): string {
     return '—'
   const rate = costUsd / Math.max(1, uptimeSeconds / 60)
   return `$${rate.toFixed(2)}/min`
-}
-
-export function isStalled(status: string, secondsSinceActivity: number | null): boolean {
-  return status === 'active' && secondsSinceActivity != null && secondsSinceActivity > STALLED_THRESHOLD_SECONDS
 }
 
 /**

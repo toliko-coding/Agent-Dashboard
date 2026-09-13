@@ -99,6 +99,11 @@ describe('attention model — blocking', () => {
     expect(item).toMatchObject({ level: 'blocking', kind: 'question', reason: 'Question waiting for your answer' })
   })
 
+  it('reports an unanswered AskUserQuestion as blocking, even where the screen cannot be read', () => {
+    const [item] = queue({ agents: [makeAgent({ pendingToolUse: { id: 'tu', tool: 'AskUserQuestion', pattern: '', patternDisplay: '' } })] })
+    expect(item).toMatchObject({ level: 'blocking', kind: 'question', reason: 'Question waiting in its terminal', since: null })
+  })
+
   it('reports the answers submit screen as blocking', () => {
     const [item] = queue({ agents: [makeAgent({ pendingConfirm: { question: 'Ready to submit your answers?', options: [] } })] })
     expect(item).toMatchObject({ level: 'blocking', kind: 'confirm' })
@@ -114,7 +119,7 @@ describe('attention model — failed', () => {
   // C
   it('reports a classified API error on a session that is not working', () => {
     const [item] = queue({ agents: [makeAgent({ errorState: 'rate_limited', working: false })] })
-    expect(item).toMatchObject({ level: 'failed', kind: 'api-error', reason: 'Rate limited' })
+    expect(item).toMatchObject({ level: 'failed', kind: 'api-error', reason: 'API error reported: Rate limited' })
   })
 
   it('does not report an error the session has already worked past', () => {

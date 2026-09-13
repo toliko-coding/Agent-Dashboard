@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PermissionItem } from '@/composables/usePendingPermissions'
+import type { AttentionQueue } from '@/features/attention'
 import { computed, ref } from 'vue'
 import AutoApprovingStrip from '@/components/AutoApprovingStrip.vue'
 import ChannelScriptCallout from '@/components/shell/ChannelScriptCallout.vue'
@@ -13,17 +14,20 @@ import { matchesStatusFilter, statusFilterCounts } from '@/utils/agentStatusFilt
 import { friendlyProjectName } from '@/utils/friendlyProjectName'
 
 defineProps<{
+  /** The canonical attention queue App.vue derives — the triage band's only source of what needs the user. */
+  attention: AttentionQueue
   permissionItems: PermissionItem[]
   focusedSessionId: string | null
 }>()
 const emit = defineEmits<{
   approve: [taskId: string, ids: string[], remember: boolean]
   deny: [taskId: string, ids: string[]]
+  openTask: [taskId: string]
 }>()
 
 // autoStart: false, exactly as App.vue calls it — useAgents holds module-level
 // state, so this is the same stream App.vue already started, not a second one.
-const { agents, filteredAgents, attentionAgents, pendingCapabilityDecisions, searchQuery, selectAgent, dismissAgent } = useAgents({ autoStart: false })
+const { agents, filteredAgents, pendingCapabilityDecisions, searchQuery, selectAgent, dismissAgent } = useAgents({ autoStart: false })
 const { dashboardLayout, dashboardSort, dashboardGroup, setDashboardGroup, dashboardProject, dashboardSpawner, dashboardStatus } = useViewState()
 const { spawners } = useSpawners()
 const { nowMs } = useNow()
@@ -71,11 +75,13 @@ defineExpose({ rosterAgents })
 
 <template>
   <AgentTriageBand
-    :agents="attentionAgents"
+    :queue="attention"
+    :agents="agents"
     :permission-items="permissionItems"
     :capability-decisions="pendingCapabilityDecisions"
     :focused-session-id="focusedSessionId"
     @select="selectAgent"
+    @open-task="(taskId) => emit('openTask', taskId)"
     @remembered="autoApprovingStrip?.load()"
     @approve="(taskId, ids, remember) => emit('approve', taskId, ids, remember)"
     @deny="(taskId, ids) => emit('deny', taskId, ids)"

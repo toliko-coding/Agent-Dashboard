@@ -1,9 +1,11 @@
 import type { PermissionItem } from '@/composables/usePendingPermissions'
+import type { AttentionQueue } from '@/features/attention'
 import type { PendingCapabilityDecision, PendingPermission, PendingToolUse } from '@/sdk.generated'
-import type { Agent } from '@/types'
+import type { Agent, PipelineTask } from '@/types'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { toast } from '@/composables/useToast'
+import { buildAttentionQueue } from '@/features/attention'
 import AgentTriageBand from './AgentTriageBand.vue'
 
 vi.mock('@/composables/useToast', () => ({
@@ -54,8 +56,46 @@ function toolUse(o: Partial<PendingToolUse> & Pick<PendingToolUse, 'tool'>): Pen
   return { id: 'tu_1', pattern: '', patternDisplay: o.pattern ?? '', ...o }
 }
 
+interface BandSources {
+  agents: Agent[]
+  permissionItems: PermissionItem[]
+  capabilityDecisions?: PendingCapabilityDecision[]
+  tasks?: PipelineTask[]
+  focusedSessionId?: string | null
+}
+
+function queueFor(sources: BandSources): AttentionQueue {
+  return {
+    status: 'ready',
+    stale: false,
+    items: buildAttentionQueue({
+      agents: sources.agents,
+      permissionItems: sources.permissionItems,
+      capabilityDecisions: sources.capabilityDecisions ?? [],
+      tasks: sources.tasks ?? [],
+    }),
+  }
+}
+
+/*
+ * The band renders the queue App.vue derives, so a test supplies it the same
+ * way: derived from the same sources. setProps re-derives it, as the app does
+ * on every update, so a test that changes an agent sees the queue follow.
+ */
+function mountTriage(options: { props: BandSources & { queue?: AttentionQueue }, attachTo?: HTMLElement }) {
+  const { tasks: _tasks, queue, ...bandProps } = options.props
+  let sources: BandSources = { ...options.props }
+  const wrapper = mount(AgentTriageBand, { ...options, props: { ...bandProps, queue: queue ?? queueFor(sources) } })
+  const setProps = wrapper.setProps.bind(wrapper)
+  wrapper.setProps = ((next: Partial<BandSources>) => {
+    sources = { ...sources, ...next }
+    return setProps({ ...next, queue: queueFor(sources) })
+  }) as typeof wrapper.setProps
+  return wrapper
+}
+
 function mountBand(agent: Agent) {
-  return mount(AgentTriageBand, { props: { agents: [agent], permissionItems: [] } })
+  return mountTriage({ props: { agents: [agent], permissionItems: [] } })
 }
 
 describe('agentTriageBand pending tool use', () => {
@@ -71,17 +111,15 @@ describe('agentTriageBand pending tool use', () => {
     expect(wrapper.text()).toContain('Waiting for your answer')
   })
 
-  // A bare pendingToolUse on an otherwise finished agent is a "your turn" card,
-  // not a blocked one: nothing is waiting for a grant. The exclusion form this
-  // replaced only ruled out 'stalled', so it offered the button here too.
-  it('offers no grant for a leftover tool use on a finished turn', () => {
+  // A bare pendingToolUse on an agent whose turn has finished is not attention:
+  // nothing is waiting for a grant, and "your turn" is the resting state of a
+  // session, not a request. There is no card, so there is no grant to offer.
+  it('shows no card, and so no grant, for a leftover tool use on a finished turn', () => {
     const wrapper = mountBand(makeAgent({
       pendingToolUse: toolUse({ id: 'tu_b', tool: 'Bash', pattern: 'npm publish' }),
     }))
     expect(wrapper.text()).not.toContain('Allow Bash')
-    // Positive anchor: without it the assertion above also passes when the card
-    // stops rendering altogether.
-    expect(wrapper.text()).toContain('Bash')
+    expect(wrapper.find('[data-testid="triage-all-clear"]').exists()).toBe(true)
   })
 
   // A question is answered, not granted: the prompt on screen is about something
@@ -135,18 +173,17 @@ describe('agentTriageBand pending tool use', () => {
   })
 })
 
-describe('agentTriageBand stalled card', () => {
-  // A tool_use left unresolved for a long time is reclassified 'stalled' (nobody
-  // asked for approval, the run is just quiet) — the card must not imply an
-  // approval is pending or print the full command that was never submitted for review.
-  it('renders no approve control for a stalled agent', () => {
+describe('agentTriageBand failed and retired stall cards', () => {
+  // E: the retired stall heuristic. A tool call left unresolved for a long time
+  // is also a long build, so it produces no card — and never a command.
+  it('shows no stalled card for a long-silent unresolved tool call', () => {
     const wrapper = mountBand(makeAgent({
       pendingToolUse: toolUse({ id: 'tu_s', tool: 'Bash', pattern: 'rm -rf /tmp/build-cache && npm publish --access public' }),
-      lastActivity: new Date(Date.now() - 300_000).toISOString(),
+      lastActivity: new Date(Date.now() - 30 * 60_000).toISOString(),
     }))
-    expect(wrapper.text()).not.toContain('Allow Bash')
     expect(wrapper.text()).not.toContain('rm -rf /tmp/build-cache')
-    expect(wrapper.text()).toContain('Bash — running but silent, last output')
+    expect(wrapper.text()).not.toMatch(/stalled|no activity|running but silent/i)
+    expect(wrapper.find('[data-testid="triage-all-clear"]').exists()).toBe(true)
   })
 
   // errorState and pendingToolUse arrive together whenever an API error
@@ -174,14 +211,14 @@ describe('agentTriageBand all-clear state', () => {
   // "Nothing needs you" is the normal case, so it must not read as loudly as a
   // band full of blocked agents.
   it('renders the all-clear line without a filled banner', () => {
-    const w = mount(AgentTriageBand, { props: { agents: [], permissionItems: [] } })
+    const w = mountTriage({ props: { agents: [], permissionItems: [] } })
     const line = w.get('[data-testid="triage-all-clear"]')
-    expect(line.text()).toContain('No agents are blocked on you')
+    expect(line.text()).toBe('Nothing is waiting on your decision.')
     expect(line.classes().join(' ')).not.toMatch(/bg-success-soft|border-success-line/)
   })
 
   it('drops the all-clear line as soon as an agent needs attention', () => {
-    const w = mountBand(makeAgent({ pendingToolUse: toolUse({ tool: 'Bash', pattern: 'ls', id: 'tu_1' }) }))
+    const w = mountBand(makeAgent({ heldPermissions: [{ id: 'held-1', tool: 'Bash', pattern: 'ls', requestedAt: new Date().toISOString() }] }))
     expect(w.find('[data-testid="triage-all-clear"]').exists()).toBe(false)
   })
 })
@@ -371,7 +408,7 @@ describe('agentTriageBand permission bridge', () => {
   // separate v-if branches on the same card. A hold lapsing between SSE ticks
   // must not dump a focused user on <body> mid-decision.
   it('keeps focus inside the card when a held request lapses to terminal fallback', async () => {
-    const wrapper = mount(AgentTriageBand, {
+    const wrapper = mountTriage({
       props: { agents: [makeAgent({ heldPermissions: [perm()] })], permissionItems: [] },
       attachTo: document.body,
     })
@@ -448,7 +485,7 @@ describe('agentTriageBand capability decisions', () => {
   }
 
   function mountWithDecisions(decisions: PendingCapabilityDecision[]) {
-    return mount(AgentTriageBand, {
+    return mountTriage({
       props: { agents: [], permissionItems: [], capabilityDecisions: decisions },
     })
   }
@@ -528,7 +565,7 @@ describe('agentTriageBand capability decisions', () => {
         outcome: null,
       }],
     }
-    const wrapper = mount(AgentTriageBand, {
+    const wrapper = mountTriage({
       props: { agents: [], permissionItems: [item], capabilityDecisions: [] },
     })
     expect(wrapper.find('[data-testid="capability-decision-card"]').exists()).toBe(false)
@@ -570,7 +607,7 @@ describe('agentTriageBand capability decision resolve outcomes', () => {
   }
 
   function mountWithDecisions(decisions: PendingCapabilityDecision[]) {
-    return mount(AgentTriageBand, {
+    return mountTriage({
       props: { agents: [], permissionItems: [], capabilityDecisions: decisions },
     })
   }
@@ -649,7 +686,7 @@ describe('agentTriageBand capability cards vs. the bulk collapse', () => {
         { id: 'req-2', stageRunId: 'run-1', tool: 'Read', pattern: '/etc/passwd', reason: null, requestedAt: new Date().toISOString(), resolvedAt: null, outcome: null },
       ],
     }
-    const wrapper = mount(AgentTriageBand, {
+    const wrapper = mountTriage({
       props: { agents: [], permissionItems: [item], capabilityDecisions: [capabilityDecision({ id: 'cap-reachable' })] },
     })
 
@@ -679,7 +716,7 @@ describe('agentTriageBand capability card focus and announcement', () => {
   // "same card" left to look inside. Focus must land somewhere sane, never
   // on <body>.
   it('moves focus off <body> when a focused capability card disappears', async () => {
-    const wrapper = mount(AgentTriageBand, {
+    const wrapper = mountTriage({
       props: {
         agents: [],
         permissionItems: [],
@@ -707,7 +744,7 @@ describe('agentTriageBand capability card focus and announcement', () => {
   // F-3: a new capability ask gets 25 seconds and, without this, no notice
   // for a screen-reader user away from the card.
   it('announces a newly appearing capability ask', async () => {
-    const wrapper = mount(AgentTriageBand, {
+    const wrapper = mountTriage({
       props: { agents: [], permissionItems: [], capabilityDecisions: [] },
     })
     const live = wrapper.get('[data-testid="triage-live-announcement"]')
@@ -719,5 +756,112 @@ describe('agentTriageBand capability card focus and announcement', () => {
 
     expect(live.text()).toContain('network.egress')
     expect(live.text()).toContain('api.stripe.com')
+  })
+})
+
+describe('agentTriageBand — canonical attention (3D)', () => {
+  const held = (id = 'held-1') => ({ id, tool: 'Bash', pattern: 'npm publish', requestedAt: new Date().toISOString() })
+  const countOf = (w: ReturnType<typeof mountBand>) => w.get('[aria-label$="need attention"]').text()
+  const readyTask = { id: 't-review', title: 'Refactor billing', currentStage: 'implementation', needsUser: true } as PipelineTask
+
+  // C
+  it('does not show an idle agent merely because it is idle', () => {
+    const w = mountBand(makeAgent({ status: 'idle', working: false }))
+    expect(w.find('[data-testid="triage-all-clear"]').exists()).toBe(true)
+    expect(w.findAll('[data-testid="triage-agent-card"]')).toHaveLength(0)
+  })
+
+  // D
+  it('does not show a working agent merely because it is working', () => {
+    const w = mountBand(makeAgent({ working: true, pendingToolUse: toolUse({ tool: 'Bash', pattern: 'npm test' }) }))
+    expect(w.find('[data-testid="triage-all-clear"]').exists()).toBe(true)
+  })
+
+  // F
+  it('shows a blocking item with its canonical level, reason and count', () => {
+    const w = mountBand(makeAgent({ heldPermissions: [held()] }))
+    expect(w.get('[data-testid="triage-level"]').text()).toBe('Blocking')
+    expect(w.get('[data-testid="triage-reason"]').text()).toBe('Permission request waiting')
+    expect(countOf(w)).toBe('1')
+    expect(w.get('[data-testid="triage-breakdown"]').text()).toBe('1 blocking')
+  })
+
+  // G
+  it('shows a failed item as reported, and none once the session is working again', () => {
+    const failed = mountBand(makeAgent({ errorState: 'rate_limited', working: false }))
+    expect(failed.get('[data-testid="triage-level"]').text()).toBe('Failed')
+    expect(failed.get('[data-testid="triage-reason"]').text()).toBe('API error reported: Rate limited')
+    const recovered = mountBand(makeAgent({ errorState: 'rate_limited', working: true }))
+    expect(recovered.find('[data-testid="triage-all-clear"]').exists()).toBe(true)
+  })
+
+  // H
+  it('shows a ready task as a row that opens the task, not as an agent card', async () => {
+    const w = mountTriage({ props: { agents: [], permissionItems: [], tasks: [readyTask] } })
+    expect(w.findAll('[data-testid="triage-agent-card"]')).toHaveLength(0)
+    const row = w.get('[data-testid="triage-ready-task"]')
+    expect(row.text()).toContain('Refactor billing')
+    expect(row.text()).toContain('Pipeline task waiting for you')
+    expect(countOf(w)).toBe('1')
+    await row.get('[data-testid="triage-open-task"]').trigger('click')
+    expect(w.emitted('openTask')).toEqual([['t-review']])
+  })
+
+  // B: every item is presented exactly once, and the count is the queue's.
+  it('presents each canonical item exactly once, with the queue\'s count', () => {
+    const permissionItem: PermissionItem = {
+      taskId: 't-perm',
+      projectName: 'demo',
+      title: 'Ship it',
+      requests: [{ id: 'req-1', stageRunId: 'run-1', tool: 'Bash', pattern: 'npm publish', reason: null, requestedAt: new Date().toISOString(), resolvedAt: null, outcome: null }],
+    }
+    const sources = {
+      agents: [
+        makeAgent({ sessionId: 'held', heldPermissions: [held()] }),
+        makeAgent({ sessionId: 'failed', errorState: 'quota_exhausted' }),
+        makeAgent({ sessionId: 'folded', pipelineTaskId: 't-perm', pendingPermissions: [held('p-1')] }),
+        makeAgent({ sessionId: 'idle', status: 'idle' }),
+        makeAgent({ sessionId: 'busy', working: true }),
+      ],
+      permissionItems: [permissionItem],
+      capabilityDecisions: [{ id: 'cap-1', capability: 'mail.send', value: 'x', context: 'global', reason: '', requestedAt: new Date().toISOString() }],
+      tasks: [readyTask],
+    }
+    const queue = queueFor(sources)
+    const w = mountTriage({ props: { ...sources, queue } })
+    const presented = w.findAll('[data-testid="triage-agent-card"]').length
+      + w.findAll('[data-testid="triage-task-permission-card"]').length
+      + w.findAll('[data-testid="capability-decision-card"]').length
+      + w.findAll('[data-testid="triage-ready-task"]').length
+    expect(queue.items).toHaveLength(5)
+    expect(presented).toBe(queue.items.length)
+    expect(countOf(w)).toBe(String(queue.items.length))
+    expect(w.get('[data-testid="triage-breakdown"]').text()).toBe('3 blocking · 1 failed · 1 ready')
+  })
+
+  // I
+  it('keeps last-known items, adds no failure, and says so while agent updates reconnect', () => {
+    const agents = [makeAgent({ heldPermissions: [held()] })]
+    const live = queueFor({ agents, permissionItems: [] })
+    const w = mountTriage({ props: { agents, permissionItems: [], queue: { ...live, stale: true } } })
+    expect(w.findAll('[data-testid="triage-agent-card"]')).toHaveLength(1)
+    expect(w.find('[data-testid="triage-stale"]').exists()).toBe(true)
+    expect(w.text()).not.toContain('Failed')
+  })
+
+  it('claims nothing, clear or otherwise, before the queue is known', () => {
+    const w = mountTriage({ props: { agents: [makeAgent({ heldPermissions: [held()] })], permissionItems: [], queue: { status: 'loading', stale: false, items: [] } } })
+    expect(w.find('[data-testid="triage-checking"]').exists()).toBe(true)
+    expect(w.find('[data-testid="triage-all-clear"]').exists()).toBe(false)
+    expect(w.find('[aria-label$="need attention"]').exists()).toBe(false)
+  })
+
+  // M: the canonical summary carries no path or payload. The decision rows keep
+  // the exact call being approved — approving an unseen command is not safe.
+  it('puts no path in the band and no command in the canonical level, reason or breakdown', () => {
+    const w = mountBand(makeAgent({ cwd: '/Users/someone/secret-client/repo', projectPath: '/Users/someone/secret-client/repo', heldPermissions: [held()] }))
+    expect(w.html()).not.toContain('/Users/someone')
+    for (const id of ['triage-level', 'triage-reason', 'triage-breakdown'])
+      expect(w.get(`[data-testid="${id}"]`).text()).not.toContain('npm publish')
   })
 })

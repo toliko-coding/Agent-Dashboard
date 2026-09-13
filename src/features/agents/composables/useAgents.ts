@@ -1,12 +1,10 @@
 import type { PendingCapabilityDecision } from '@/sdk.generated'
 import type { Agent } from '@/types'
 import { computed, onUnmounted, ref, shallowRef, watch } from 'vue'
-import { startNowTicking } from '@/composables/useNow'
 import { drainPendingMessages } from '@/composables/usePendingMessages'
 import { createSseResource } from '@/composables/useSseResource'
-import { needsAttention, sortByTriage } from '@/utils/attention'
 import { errorMessage } from '@/utils/errorMessage'
-import { secondsSince, totalTokenCount } from '@/utils/format'
+import { totalTokenCount } from '@/utils/format'
 import { AGENTS_POLL_MS } from '@/utils/sse'
 
 export interface TrendPoint {
@@ -135,18 +133,6 @@ const filteredAgents = computed(() => {
   )
 })
 
-const { nowMs } = startNowTicking()
-
-const attentionAgents = computed(() => {
-  const secsOf = (a: Agent) => secondsSince(a.lastActivity, nowMs.value)
-  return sortByTriage(
-    agents.value.filter(a => needsAttention(a, secsOf(a))),
-    secsOf,
-  )
-})
-
-const attentionCount = computed(() => attentionAgents.value.length)
-
 // Debounce search query
 watch(searchQuery, (q) => {
   if (debounceTimer)
@@ -216,8 +202,6 @@ export function useAgents(options?: { autoStart?: boolean }) {
     pendingCapabilityDecisions,
     costTrend,
     filteredAgents,
-    attentionAgents,
-    attentionCount,
     selectedAgent,
     isLoading,
     error,

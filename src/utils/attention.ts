@@ -1,11 +1,20 @@
 import type { Agent } from '../types'
-import { isAwaitingInput, isStalled, STALLED_THRESHOLD_SECONDS } from './format'
 
+/*
+ * Per-agent attention evidence: which of an agent's own signals says the user
+ * has to act, and whether that prompt may be answered with a standing grant.
+ *
+ * This is the classifier underneath the canonical attention queue
+ * (features/attention/queue.ts), and nothing outside that queue decides whether
+ * an agent needs the user. It has no clock and no notion of "your turn" or
+ * "stalled", on purpose: a finished turn is the resting state of every
+ * interactive session, and silence with an unresolved tool call is also a long
+ * build. Both used to live here and made idle and busy agents read as requests.
+ */
 export interface Attention {
-  kind: 'question' | 'permission' | 'error' | 'stalled' | 'yourTurn'
+  kind: 'question' | 'permission' | 'error'
   label: string
-  tone: 'warning' | 'danger' | 'neutral'
-  weight: number
+  tone: 'warning' | 'danger'
   // Whether this kind is evidence that a PERMISSION prompt is on screen — the
   // only basis on which the triage band may offer a standing grant for the
   // agent's pending tool call. A question is answered, never granted: its
@@ -15,28 +24,30 @@ export interface Attention {
   grantable: boolean
 }
 
-export function attentionFor(agent: Agent, secondsSinceActivity: number | null): Attention | null {
+const ASK_USER_QUESTION_TOOL = 'AskUserQuestion'
+
+export function attentionFor(agent: Agent): Attention | null {
   // A finished agent's process is gone: its reconstructed errorState/pendingToolUse
-  // are historical and not actionable from the triage band (dismiss lives on the card).
+  // are historical and not actionable (dismiss lives on the card).
   if (agent.status === 'finished')
     return null
   // A real, answerable AskUserQuestion outranks a generic permission prompt.
   if (agent.pendingQuestion)
-    return { kind: 'question', label: 'Question', tone: 'warning', weight: -1, grantable: false }
+    return { kind: 'question', label: 'Question', tone: 'warning', grantable: false }
   // The review/submit screen is equally answerable and equally blocking: the
   // session sits there until someone presses a key.
   if (agent.pendingConfirm)
-    return { kind: 'question', label: 'Confirm answers', tone: 'warning', weight: -1, grantable: false }
+    return { kind: 'question', label: 'Confirm answers', tone: 'warning', grantable: false }
   // A PreToolUse hook call the bridge is holding open: the session is blocked
   // right now and one click releases or refuses it. Ranked above a pipeline
   // request because it expires — nobody answering means the run falls back to
   // its terminal, where the dashboard can no longer help.
   if (agent.heldPermissions && agent.heldPermissions.length > 0)
-    return { kind: 'permission', label: 'Awaiting your decision', tone: 'warning', weight: 0, grantable: true }
+    return { kind: 'permission', label: 'Awaiting your decision', tone: 'warning', grantable: true }
   // A pipeline stage run's stored request: answered through the task's approve
   // control, which also records the decision against the task.
   if (agent.pendingPermissions && agent.pendingPermissions.length > 0)
-    return { kind: 'permission', label: 'Needs permission', tone: 'warning', weight: 0, grantable: true }
+    return { kind: 'permission', label: 'Needs permission', tone: 'warning', grantable: true }
   // The session is showing its own prompt: the bridge lapsed before anyone
   // decided, or is not installed for it. Not answerable from here — but it is
   // the one signal that positively means a permission prompt is on screen.
@@ -51,58 +62,18 @@ export function attentionFor(agent: Agent, secondsSinceActivity: number | null):
   if (agent.awaitingTerminalPermission) {
     const named = Boolean(agent.terminalPermissionToolUseId)
       && agent.terminalPermissionToolUseId === agent.pendingToolUse?.id
-    return { kind: 'permission', label: 'Answer in terminal', tone: 'warning', weight: 0, grantable: named }
+    return { kind: 'permission', label: 'Answer in terminal', tone: 'warning', grantable: named }
   }
-  if (agent.errorState)
-    return { kind: 'error', label: 'Run failed', tone: 'danger', weight: 1, grantable: false }
-  // An unresolved tool_use is the only signal a plain JSONL gives for "blocked on
-  // a permission prompt" — but a session that never prompts produces the same
-  // shape while a tool is simply still running, and permissionsBypassed only
-  // catches the two flags that skip prompting outright: an allow-listed tool or
-  // a partial permission mode silences the real prompt just as completely, and
-  // neither reaches this payload. Naming the tool as if a prompt were on screen
-  // was the bug the report described. Past the same dwell used for a stalled
-  // session, the honest claim is just that nothing has happened in a while — not
-  // which tool, and not that anyone is waiting on it.
-  const toolUseStalled = Boolean(agent.pendingToolUse) && !agent.permissionsBypassed
-    && secondsSinceActivity != null && secondsSinceActivity > STALLED_THRESHOLD_SECONDS
-  if (isStalled(agent.status, secondsSinceActivity) || toolUseStalled)
-    return { kind: 'stalled', label: 'No activity', tone: 'warning', weight: 2, grantable: false }
-  // Turn finished, process alive: ready for the next instruction rather than
-  // blocked on one, so it ranks below every other attention kind.
-  if (isAwaitingInput(agent))
-    return { kind: 'yourTurn', label: 'Your turn', tone: 'neutral', weight: 3, grantable: false }
+  // An unanswered AskUserQuestion in a session whose screen cannot be read.
+  // Unlike any other unresolved tool call this one cannot be a long-running
+  // tool: it completes only when a person answers. It used to surface only
+  // after three minutes of silence, through the retired stall heuristic.
+  if (agent.pendingToolUse?.tool === ASK_USER_QUESTION_TOOL)
+    return { kind: 'question', label: 'Question in terminal', tone: 'warning', grantable: false }
+  // A classified API error, on a session that is not working. The parser never
+  // clears errorState when a later request succeeds, so a working session's
+  // error is history, not a failure to report.
+  if (agent.errorState && !agent.working)
+    return { kind: 'error', label: 'Run failed', tone: 'danger', grantable: false }
   return null
-}
-
-export function needsAttention(agent: Agent, secondsSinceActivity: number | null): boolean {
-  return attentionFor(agent, secondsSinceActivity) !== null
-}
-
-// Sorts attention-needing agents first (by ascending weight), then by longer-waiting first.
-// Non-attention agents are appended in their original order.
-export function sortByTriage(agents: Agent[], secsOf: (a: Agent) => number | null): Agent[] {
-  const attention: Agent[] = []
-  const rest: Agent[] = []
-
-  for (const agent of agents) {
-    const secs = secsOf(agent)
-    if (needsAttention(agent, secs))
-      attention.push(agent)
-    else
-      rest.push(agent)
-  }
-
-  attention.sort((a, b) => {
-    const attA = attentionFor(a, secsOf(a))!
-    const attB = attentionFor(b, secsOf(b))!
-    if (attA.weight !== attB.weight)
-      return attA.weight - attB.weight
-    // Longer-waiting first: higher secondsSince = more urgent
-    const secsA = secsOf(a) ?? 0
-    const secsB = secsOf(b) ?? 0
-    return secsB - secsA
-  })
-
-  return [...attention, ...rest]
 }

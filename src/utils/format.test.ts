@@ -1,6 +1,6 @@
 import type { TokenUsage } from '../types'
 import { describe, expect, it } from 'vitest'
-import { formatBurnRate, formatCost, formatDateTime, formatRelativeActivity, formatRelativeThenDate, formatScope, formatTokens, formatUptime, isAwaitingInput, isStalled, maskToken, secondsSince, shortModel, STALLED_THRESHOLD_SECONDS, totalTokenCount } from './format'
+import { formatBurnRate, formatCost, formatDateTime, formatRelativeActivity, formatRelativeThenDate, formatScope, formatTokens, formatUptime, isAwaitingInput, maskToken, secondsSince, shortModel, totalTokenCount } from './format'
 
 describe('totalTokenCount', () => {
   it('sums all four token fields', () => {
@@ -294,32 +294,6 @@ describe('formatBurnRate', () => {
   it('formats to two decimal places', () => {
     // $1 over 120s = $1 / 2 = $0.50/min
     expect(formatBurnRate(1, 120)).toBe('$0.50/min')
-  })
-})
-
-describe('isStalled', () => {
-  it('returns false when status is not active', () => {
-    expect(isStalled('waiting', 300)).toBe(false)
-    expect(isStalled('idle', 300)).toBe(false)
-    expect(isStalled('error', 300)).toBe(false)
-  })
-
-  it('returns false when secondsSinceActivity is null', () => {
-    expect(isStalled('active', null)).toBe(false)
-  })
-
-  it('returns false when seconds are at or below threshold', () => {
-    expect(isStalled('active', STALLED_THRESHOLD_SECONDS)).toBe(false)
-    expect(isStalled('active', STALLED_THRESHOLD_SECONDS - 1)).toBe(false)
-  })
-
-  it('returns true when active and seconds exceed threshold', () => {
-    expect(isStalled('active', STALLED_THRESHOLD_SECONDS + 1)).toBe(true)
-    expect(isStalled('active', 500)).toBe(true)
-  })
-
-  it('sTALLED_THRESHOLD_SECONDS is 180', () => {
-    expect(STALLED_THRESHOLD_SECONDS).toBe(180)
   })
 })
 

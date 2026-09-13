@@ -8,12 +8,11 @@ import AppBadge from '@/components/ui/AppBadge.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
-import { useNow } from '@/composables/useNow'
 import { toast } from '@/composables/useToast'
 import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vue'
 import MetricsPopover from '@/features/agents/components/MetricsPopover.vue'
 import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
-import { formatCost, formatDuration, formatTokens, formatUptime, isAwaitingInput, isStalled, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
+import { formatCost, formatDuration, formatTokens, formatUptime, isAwaitingInput, shortModel, totalTokenCount } from '@/utils/format'
 import { friendlyProjectName } from '@/utils/friendlyProjectName'
 import { agentDisplayStatus } from '@/utils/statusColors'
 
@@ -42,7 +41,6 @@ async function dismiss() {
 }
 
 const { getIdentity } = useAgentIdentity()
-const { nowMs } = useNow()
 
 const totalTokens = computed(() => totalTokenCount(props.agent.tokenUsage))
 const projectLabel = computed(() => friendlyProjectName(props.agent.projectName))
@@ -58,8 +56,6 @@ const healthChipClass = computed(() => {
   return 'bg-danger-soft text-danger-text'
 })
 
-const secSince = computed(() => secondsSince(props.agent.lastActivity, nowMs.value))
-const stalled = computed(() => isStalled(props.agent.status, secSince.value))
 const awaitingInput = computed(() => isAwaitingInput(props.agent))
 
 const activeSubagents = computed(() => props.agent.subagents.filter(s => s.status === 'active'))
@@ -124,12 +120,7 @@ const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
           data-testid="agent-card-internal-badge"
         />
         <span
-          v-if="stalled"
-          class="text-[10px] font-medium px-1 py-0.5 rounded bg-warning-soft text-warning-text whitespace-nowrap"
-          title="Agent is active but has produced no output for 3+ minutes"
-        >stalled</span>
-        <span
-          v-else-if="awaitingInput"
+          v-if="awaitingInput"
           data-testid="agent-awaiting-input"
           class="text-[10px] font-medium px-1 py-0.5 rounded bg-neutral-soft text-neutral-text whitespace-nowrap"
           title="The agent finished its turn — it will not do anything else until you send it something"

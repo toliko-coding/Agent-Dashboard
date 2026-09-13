@@ -122,7 +122,7 @@ onMounted(() => {
   void loadServerConfig()
 })
 
-const { agents, costTrend, filteredAgents, attentionAgents, selectedAgent, isLoading, error, live, selectAgent, selectAgentWhenAvailable, startStream: startAgents } = useAgents({ autoStart: false })
+const { agents, costTrend, filteredAgents, selectedAgent, isLoading, error, live, selectAgent, selectAgentWhenAvailable, startStream: startAgents } = useAgents({ autoStart: false })
 const { tasks, selectedTask, selectTask, startStream: startTasks } = useTasks({ autoStart: false })
 const { items: permissionItems, approve: approvePermission, deny: denyPermission } = usePendingPermissions(tasks)
 // The canonical attention queue, derived once here where the permission items
@@ -130,6 +130,16 @@ const { items: permissionItems, approve: approvePermission, deny: denyPermission
 // same things. It replaced a count that included every idle "your turn" agent.
 const attention = useAttentionQueue(permissionItems)
 const needsYouCount = computed(() => attention.value.items.length)
+// The agents behind the queue's agent items, in queue order: what the triage
+// shortcuts (n / a / d / ⇧A) step through and act on. Derived from the queue,
+// never re-decided, so a key can only reach an item the band is showing.
+const attentionAgents = computed(() => attention.value.items.flatMap((item) => {
+  if (item.subject.type !== 'agent')
+    return []
+  const sessionId = item.subject.sessionId
+  const agent = agents.value.find(a => a.sessionId === sessionId)
+  return agent ? [agent] : []
+}))
 // Today's persisted spend — reuses the shared cost-summary logic so the footer
 // and Cost view agree. Distinct from totalCost (cost of agents running now).
 const { todayUsd, start: startTodayCost } = useTodayCost()
@@ -192,7 +202,7 @@ function onCreateTaskAndRefine(task: PipelineTask) {
   showRefinementChat.value = true
 }
 
-// Keyboard focus for the triage band: `n` cycles attention agents (wrapping).
+// Keyboard focus for the triage band: `n` cycles the queue's agent items (wrapping).
 const focusedSessionId = ref<string | null>(null)
 // Guards the keyboard resolve shortcuts (a/d/⇧A) against rapid double-fire.
 const kbResolving = ref(false)
@@ -363,8 +373,10 @@ onMounted(() => usageComposable.start())
 
         <DashboardView
           v-else-if="activeView === 'dashboard'"
+          :attention="attention"
           :permission-items="permissionItems"
           :focused-session-id="focusedSessionId"
+          @open-task="(taskId) => navigateTo({ taskId })"
           @approve="(taskId, ids, remember) => approvePermission(taskId, ids, remember)"
           @deny="(taskId, ids) => denyPermission(taskId, ids)"
         />

@@ -9,7 +9,7 @@ import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { toast } from '@/composables/useToast'
 import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
 import { attentionFor } from '@/utils/attention'
-import { formatBurnRate, formatCost, formatRelativeActivity, isAwaitingInput, isStalled, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
+import { formatBurnRate, formatCost, formatRelativeActivity, isAwaitingInput, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
 import { friendlyProjectName } from '@/utils/friendlyProjectName'
 import { agentDisplayStatus } from '@/utils/statusColors'
 
@@ -25,8 +25,7 @@ const { resolving, resolveAgent } = usePermissionResolve()
 const expanded = ref(false)
 
 const secSince = computed(() => secondsSince(props.agent.lastActivity, nowMs.value))
-const att = computed(() => attentionFor(props.agent, secSince.value))
-const stalled = computed(() => isStalled(props.agent.status, secSince.value))
+const att = computed(() => attentionFor(props.agent))
 const awaitingInput = computed(() => isAwaitingInput(props.agent))
 const relActivity = computed(() => formatRelativeActivity(secSince.value))
 const burnRate = computed(() => formatBurnRate(props.agent.costEstimate, props.agent.uptime))
@@ -134,8 +133,7 @@ async function handleResolve(outcome: 'granted' | 'denied') {
 
       <!-- Liveness (right rail) — always shown so every row carries a timestamp -->
       <span
-        class="font-mono text-[11px] shrink-0 w-[76px] text-right"
-        :class="stalled ? 'text-warning-text' : 'text-fg-faint'"
+        class="font-mono text-[11px] shrink-0 w-[76px] text-right text-fg-faint"
       >{{ relActivity }}</span>
 
       <!-- Cost -->
@@ -171,12 +169,7 @@ async function handleResolve(outcome: 'granted' | 'denied') {
           data-testid="agent-row-internal-badge"
         />
         <span
-          v-if="stalled"
-          class="text-[10px] font-medium px-1 py-0.5 rounded bg-warning-soft text-warning-text"
-          title="Agent is active but has produced no output for 3+ minutes"
-        >stalled</span>
-        <span
-          v-else-if="awaitingInput"
+          v-if="awaitingInput"
           data-testid="agent-awaiting-input"
           class="text-[10px] font-medium px-1 py-0.5 rounded bg-neutral-soft text-neutral-text"
           title="The agent finished its turn — it will not do anything else until you send it something"

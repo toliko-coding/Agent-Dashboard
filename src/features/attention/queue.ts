@@ -22,18 +22,25 @@ import { STAGE_LABELS } from '@/utils/stageLabels'
  *             modal or its submit screen on the live terminal; a permission
  *             call the bridge is holding; a pipeline stage run's stored
  *             permission requests; the session's own permission prompt
- *             (typed Notification hook); a capability decision waiting at a
- *             server enforcement point; a task parked on lingering requests.
+ *             (typed Notification hook); an unanswered AskUserQuestion in a
+ *             session whose screen cannot be read (it completes only when a
+ *             person answers); a capability decision waiting at a server
+ *             enforcement point; a task parked on lingering requests.
  *   failed    an explicit failure: an API error the parser classified
  *             (rate limited, quota exhausted, authentication failed) on a
  *             session that is not working. errorState is never cleared by a
  *             later success, so a session that is working again is not
- *             reported — its error is history.
- *   stalled   no producer. The two stall signals in utils/attention.ts cannot
- *             tell a stuck session from normal work: an unresolved tool_use
- *             past 3 minutes is also a long build, and "active but silent"
- *             compares the server's status bucket with the browser's clock,
- *             which reads every agent as stalled once the stream drops.
+ *             reported — its error is history. That is the only guard the
+ *             payload allows: an idle session that recovered and then finished
+ *             its turn still carries the old error while it stays in the
+ *             transcript tail, so the item is worded as what the log reported
+ *             ("API error reported: …"), never as the session's current state.
+ *   stalled   no producer. The two client stall heuristics could not tell a
+ *             stuck session from normal work: an unresolved tool_use past 3
+ *             minutes is also a long build, and "active but silent" compared
+ *             the server's status bucket with the browser's clock, which read
+ *             every agent as stalled once the stream dropped. Both are retired;
+ *             the level stays for evidence the server may one day supply.
  *   ready     the workflow has handed a turn to the user: a pipeline task
  *             whose latest stage run is awaiting_user (plan or artifact
  *             approval, an escalation) and that no other item already covers.
@@ -138,9 +145,8 @@ function permissionDetail(requests: PendingPermission[]): string {
 }
 
 function agentItem(agent: Agent): AttentionItem | null {
-  // Null seconds on purpose: without a clock, attentionFor cannot report the
-  // stall heuristics, so stale data can never manufacture attention.
-  const att = attentionFor(agent, null)
+  // attentionFor has no clock, so stale data can never manufacture attention.
+  const att = attentionFor(agent)
   if (!att)
     return null
 
@@ -157,9 +163,11 @@ function agentItem(agent: Agent): AttentionItem | null {
   switch (att.kind) {
     case 'question':
       // attentionFor ranks a question above its submit screen; the TUI shows one or the other.
-      return agent.pendingQuestion
-        ? { ...base, level: 'blocking', kind: 'question', reason: 'Question waiting for your answer', since: null }
-        : { ...base, level: 'blocking', kind: 'confirm', reason: 'Answers waiting to be submitted', since: null }
+      if (agent.pendingQuestion)
+        return { ...base, level: 'blocking', kind: 'question', reason: 'Question waiting for your answer', since: null }
+      if (agent.pendingConfirm)
+        return { ...base, level: 'blocking', kind: 'confirm', reason: 'Answers waiting to be submitted', since: null }
+      return { ...base, level: 'blocking', kind: 'question', reason: 'Question waiting in its terminal', since: null }
     case 'permission': {
       // Same precedence as attentionFor: held call, stored requests, terminal prompt.
       const held = agent.heldPermissions ?? []
@@ -173,9 +181,8 @@ function agentItem(agent: Agent): AttentionItem | null {
     case 'error':
       if (agent.working || !agent.errorState)
         return null
-      return { ...base, level: 'failed', kind: 'api-error', reason: formatErrorState(agent.errorState), detail: 'API error reported by the session', since: null }
+      return { ...base, level: 'failed', kind: 'api-error', reason: `API error reported: ${formatErrorState(agent.errorState)}`, detail: 'in the session\'s recent log', since: null }
     default:
-      // 'stalled' and 'yourTurn' are not attention in this model — see the header.
       return null
   }
 }
