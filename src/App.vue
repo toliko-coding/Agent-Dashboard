@@ -369,7 +369,7 @@ onMounted(() => usageComposable.start())
           Error: {{ error }}
         </p>
 
-        <CockpitView v-else-if="activeView === 'cockpit'" :attention="attention" @new-agent="showSpawnDialog = true" @open-task="(taskId) => navigateTo({ taskId })" />
+        <CockpitView v-else-if="activeView === 'cockpit'" :attention="attention" @open-task="(taskId) => navigateTo({ taskId })" />
 
         <DashboardView
           v-else-if="activeView === 'dashboard'"

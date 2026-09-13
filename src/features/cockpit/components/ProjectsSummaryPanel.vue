@@ -47,7 +47,7 @@ const state = computed<PanelState>(() => {
       <button
         type="button"
         data-testid="projects-open-all"
-        class="text-[11px] text-accent hover:underline rounded px-1 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+        class="text-ui-sm text-accent hover:underline rounded px-1 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
         @click="emit('navigate')"
       >
         Open →
@@ -58,7 +58,7 @@ const state = computed<PanelState>(() => {
       <li
         v-for="{ project, counts } in rows.slice(0, 6)"
         :key="project.id"
-        class="flex items-center gap-2 text-[12px] min-w-0"
+        class="flex items-center gap-2 text-ui-sm min-w-0"
         :data-testid="`project-row-${project.id}`"
       >
         <span
@@ -72,13 +72,13 @@ const state = computed<PanelState>(() => {
              attributed to it. It is not a zero. -->
         <span
           v-if="counts.total === null"
-          class="ml-auto shrink-0 text-[10px] text-fg-faint"
+          class="ml-auto shrink-0 text-label text-fg-faint"
           :data-testid="`project-agents-unknown-${project.id}`"
           title="No folder registered, so agents cannot be associated"
         >— agents</span>
         <span
           v-else
-          class="ml-auto shrink-0 text-[10px] font-mono text-fg-mute"
+          class="ml-auto shrink-0 text-label font-mono text-fg-mute"
           :data-testid="`project-agents-${project.id}`"
         >
           {{ counts.active }}/{{ counts.total }} active

@@ -54,7 +54,7 @@ function plural(n: number, one: string, many: string): string {
 <template>
   <div class="flex flex-col gap-2 min-w-0" data-testid="runtime-topology-tree">
     <!-- Source honesty first: an unreported list is unknown, not empty. -->
-    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fg-mute">
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-sm text-fg-mute">
       <p v-if="serviceItems === null" data-testid="topology-services-unavailable">
         Services not reported by LocalScope — service attribution unknown.
       </p>
@@ -65,7 +65,7 @@ function plural(n: number, one: string, many: string): string {
       <DataFreshnessIndicator :reading="processes.data.value" testid="topology-processes-freshness" />
     </div>
 
-    <p v-if="isEmpty" class="text-[11px] text-fg-mute" data-testid="topology-empty">
+    <p v-if="isEmpty" class="text-ui-sm text-fg-mute" data-testid="topology-empty">
       Nothing observed yet.
     </p>
 
@@ -79,12 +79,12 @@ function plural(n: number, one: string, many: string): string {
         :data-repository-id="repo.id"
       >
         <p class="flex items-baseline gap-2 min-w-0">
-          <span class="text-[10px] uppercase tracking-wider text-fg-faint shrink-0">Repository</span>
-          <span class="font-mono text-[12px] font-semibold text-fg truncate">{{ repo.label }}</span>
+          <span class="text-label uppercase tracking-wider text-fg-faint shrink-0">Repository</span>
+          <span class="font-mono text-ui font-semibold text-fg truncate">{{ repo.label }}</span>
           <!-- Stated from two upward; "1 workspace" on every repository is noise. -->
           <span
             v-if="repo.workspaces.length >= 2"
-            class="text-[11px] text-fg-faint shrink-0"
+            class="text-ui-sm text-fg-faint shrink-0"
             data-testid="topology-workspace-count"
           >{{ repo.workspaces.length }} workspaces</span>
         </p>
@@ -105,8 +105,8 @@ function plural(n: number, one: string, many: string): string {
         data-testid="topology-local"
       >
         <p class="flex flex-wrap items-baseline gap-2 min-w-0">
-          <span class="text-[10px] uppercase tracking-wider text-fg-faint">Local workspaces</span>
-          <span class="text-[11px] text-fg-faint">not in a Git repository</span>
+          <span class="text-label uppercase tracking-wider text-fg-faint">Local workspaces</span>
+          <span class="text-ui-sm text-fg-faint">not in a Git repository</span>
         </p>
         <ul class="flex flex-col gap-2 mt-1.5 min-w-0" aria-label="Local workspaces, not in a Git repository">
           <li v-for="node in topology.local" :key="node.key">
@@ -128,17 +128,17 @@ function plural(n: number, one: string, many: string): string {
         class="rounded-lg border border-dashed border-line p-2 min-w-0"
         data-testid="topology-unresolved"
       >
-        <p class="text-[10px] uppercase tracking-wider text-fg-faint">
+        <p class="text-label uppercase tracking-wider text-fg-faint">
           Workspace unknown
         </p>
-        <ul class="flex flex-col gap-0.5 mt-1 text-[11px] min-w-0" aria-label="Observations with no workspace identity">
+        <ul class="flex flex-col gap-0.5 mt-1 text-ui-sm min-w-0" aria-label="Observations with no workspace identity">
           <li
             v-for="a in unresolved.agents"
             :key="`${a.sessionId}-${a.pid}`"
             class="flex items-baseline gap-2 min-w-0"
             data-testid="topology-unresolved-agent"
           >
-            <span class="text-[10px] uppercase tracking-wider text-fg-faint w-16 shrink-0">Agent</span>
+            <span class="text-label uppercase tracking-wider text-fg-faint w-16 shrink-0">Agent</span>
             <span class="text-fg truncate">{{ friendlyProjectName(a.projectName) }} · {{ statusLabel(agentDisplayStatus(a)) }}</span>
           </li>
           <li v-if="unresolved.processes" class="text-fg-mute" data-testid="topology-unresolved-processes">

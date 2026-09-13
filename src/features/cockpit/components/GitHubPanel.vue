@@ -54,7 +54,7 @@ const message = computed(() => {
     <p
       v-if="repoFailures.length > 0"
       data-testid="cockpit-github-partial-failure"
-      class="text-[12px] rounded-md px-3 py-2 mb-2 bg-warning-soft text-warning-text"
+      class="text-ui-sm rounded-md px-3 py-2 mb-2 bg-warning-soft text-warning-text"
       role="alert"
     >
       {{ repoFailures.join('; ') }}
@@ -63,7 +63,7 @@ const message = computed(() => {
       <li
         v-for="pr in pullRequests.slice(0, 8)"
         :key="`${pr.repo}#${pr.number}`"
-        class="flex items-center justify-between gap-2 text-[12px] min-w-0"
+        class="flex items-center justify-between gap-2 text-ui-sm min-w-0"
         :data-testid="`cockpit-github-pr-${pr.number}`"
       >
         <a :href="pr.url" target="_blank" rel="noopener noreferrer" class="truncate text-fg hover:text-accent">

@@ -41,26 +41,28 @@ function clockTime(raw: string): string {
 <template>
   <CockpitPanel
     id="activity"
-    title="Activity"
+    title="Recent activity"
     :state="state"
     :message="error ?? 'No recorded activity yet.'"
   >
+    <!--
+      Time, severity and what happened. The audit target (task:<id>, pid:<n>) is
+      an internal identifier, not something Command shows; the event's own
+      surface carries it.
+    -->
     <ul class="flex flex-col gap-1.5" data-testid="activity-feed">
       <li
         v-for="e in shown"
         :key="e.id"
-        class="flex items-baseline gap-2 text-[12px] min-w-0"
+        class="flex items-baseline gap-2 text-ui-sm min-w-0"
         :data-testid="`activity-${e.action}`"
       >
         <time
-          class="font-mono text-[10px] text-fg-faint tabular-nums shrink-0"
+          class="font-mono text-label text-fg-faint tabular-nums shrink-0"
           :datetime="e.timestampRaw"
         >{{ clockTime(e.timestampRaw) }}</time>
         <span class="size-1.5 rounded-full shrink-0 translate-y-[-1px]" :class="DOT[e.severity]" aria-hidden="true" />
         <span class="text-fg truncate">{{ e.title }}</span>
-        <span v-if="e.detail" class="ml-auto font-mono text-[10px] text-fg-faint truncate shrink-0" :title="e.detail">
-          {{ e.detail }}
-        </span>
       </li>
     </ul>
   </CockpitPanel>

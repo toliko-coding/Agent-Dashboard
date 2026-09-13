@@ -57,38 +57,38 @@ const listLabel = computed(() => isPlain.value
     :data-workspace-id="node.workspace.id"
     :data-workspace-kind="node.workspace.kind"
   >
-    <p class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0 text-[11px]">
-      <span class="text-[10px] uppercase tracking-wider text-fg-faint">{{ isPlain ? 'Local workspace' : 'Workspace' }}</span>
+    <p class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0 text-ui-sm">
+      <span class="text-label uppercase tracking-wider text-fg-faint">{{ isPlain ? 'Local workspace' : 'Workspace' }}</span>
       <span v-if="!isPlain" class="text-fg-faint" aria-hidden="true">⑂</span>
       <span class="font-mono text-fg-soft break-all">{{ display.title }}</span>
       <span class="text-fg-mute">{{ display.kind }}</span>
       <span v-if="showName" class="font-mono text-fg-faint break-all">{{ node.workspace.name }}</span>
     </p>
 
-    <ul class="flex flex-col gap-0.5 text-[11px] min-w-0" :aria-label="listLabel">
+    <ul class="flex flex-col gap-0.5 text-ui-sm min-w-0" :aria-label="listLabel">
       <li
         v-for="a in node.agents"
         :key="`${a.sessionId}-${a.pid}`"
         class="flex items-baseline gap-2 min-w-0"
         data-testid="topology-agent"
       >
-        <span class="text-[10px] uppercase tracking-wider text-fg-faint w-16 shrink-0">Agent</span>
+        <span class="text-label uppercase tracking-wider text-fg-faint w-16 shrink-0">Agent</span>
         <span class="text-fg truncate">{{ agentLabel(a) }}</span>
       </li>
       <li v-if="node.agents.length === 0" class="flex items-baseline gap-2" data-testid="topology-no-agents">
-        <span class="text-[10px] uppercase tracking-wider text-fg-faint w-16 shrink-0">Agents</span>
+        <span class="text-label uppercase tracking-wider text-fg-faint w-16 shrink-0">Agents</span>
         <span class="text-fg-faint">none observed</span>
       </li>
 
       <!-- Omitted entirely when the list was not reported; stated once above the tree. -->
       <li v-if="processesKnown" class="flex items-baseline gap-2 min-w-0" data-testid="topology-processes">
-        <span class="text-[10px] uppercase tracking-wider text-fg-faint w-16 shrink-0">Processes</span>
+        <span class="text-label uppercase tracking-wider text-fg-faint w-16 shrink-0">Processes</span>
         <span v-if="node.processes.length > 0" class="text-fg-mute truncate">{{ node.processes.length }} — {{ processNames }}</span>
         <span v-else class="text-fg-faint">none observed</span>
       </li>
 
       <li v-if="servicesKnown" class="flex items-baseline gap-2 min-w-0" data-testid="topology-services">
-        <span class="text-[10px] uppercase tracking-wider text-fg-faint w-16 shrink-0">Services</span>
+        <span class="text-label uppercase tracking-wider text-fg-faint w-16 shrink-0">Services</span>
         <span v-if="node.services.length > 0" class="font-mono text-success-text break-all">{{ ports }}</span>
         <span v-else class="text-fg-faint">none observed</span>
       </li>

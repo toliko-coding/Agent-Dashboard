@@ -60,9 +60,7 @@ describe('folder terminology — copy', () => {
 
   /* The persisted Dashboard Project is a real entity and keeps its name. */
   it('still calls the persisted Dashboard Project "Projects" everywhere it appears', () => {
-    expect(src('src/features/cockpit/components/QuickActionsPanel.vue')).toContain(`label: 'Projects'`)
     expect(src('src/features/cockpit/components/ProjectsSummaryPanel.vue')).toContain('title="Projects"')
-    expect(src('src/features/cockpit/components/SystemMap.vue')).toContain(`label: 'Projects'`)
     expect(src('src/features/settings/components/ApiKeySettings.vue')).toContain(`label: 'Projects'`)
     expect(src('src/features/projects/components/ProjectsView.vue')).toContain('Settings → Projects')
   })

@@ -31,7 +31,7 @@ const state = computed<PanelState>(() => {
     :message="denied ?? error ?? 'No memory space is defined in this scope.'"
   >
     <ul class="flex flex-col gap-1.5">
-      <li v-for="r in resources.slice(0, 6)" :key="r.id" class="flex items-center justify-between gap-2 text-[12px] min-w-0" :data-testid="`cockpit-memoryspace-${r.id}`">
+      <li v-for="r in resources.slice(0, 6)" :key="r.id" class="flex items-center justify-between gap-2 text-ui-sm min-w-0" :data-testid="`cockpit-memoryspace-${r.id}`">
         <span class="truncate text-fg">{{ r.name }}</span>
         <span class="shrink-0 text-fg-mute">{{ r.state }}</span>
       </li>

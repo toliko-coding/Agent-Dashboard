@@ -55,7 +55,7 @@ watch(expanded, (value) => {
 <template>
   <section class="flex flex-col gap-2 border-t border-line pt-3 min-w-0" data-testid="runtime-topology">
     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-      <h3 class="text-[12px] font-semibold text-fg">
+      <h3 class="text-ui font-semibold text-fg">
         <button
           type="button"
           class="inline-flex items-center gap-1.5 rounded focus-visible:outline-2 focus-visible:outline-ring"
@@ -64,11 +64,11 @@ watch(expanded, (value) => {
           data-testid="runtime-topology-toggle"
           @click="expanded = !expanded"
         >
-          <span class="text-fg-soft text-[10px] w-3 inline-block" aria-hidden="true">{{ expanded ? '▼' : '▶' }}</span>
+          <span class="text-fg-soft text-label w-3 inline-block" aria-hidden="true">{{ expanded ? '▼' : '▶' }}</span>
           Runtime topology
         </button>
       </h3>
-      <span class="text-[11px] text-fg-faint">Repository → workspace → agents, processes and services</span>
+      <span class="text-ui-sm text-fg-faint">Repository → workspace → agents, processes and services</span>
     </div>
     <RuntimeTopologyTree v-if="expanded" id="runtime-topology-tree" :agents="agents" />
   </section>

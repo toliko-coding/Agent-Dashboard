@@ -31,7 +31,7 @@ const state = computed<PanelState>(() => {
 <template>
   <CockpitPanel id="pipeline" title="Pipeline" :state="state" :message="error ?? 'No task is in the pipeline.'">
     <ul class="flex flex-col gap-1.5">
-      <li v-for="[stage, count] in byStage" :key="stage" class="flex items-center justify-between gap-2 text-[12px]" :data-testid="`cockpit-stage-${stage}`">
+      <li v-for="[stage, count] in byStage" :key="stage" class="flex items-center justify-between gap-2 text-ui-sm" :data-testid="`cockpit-stage-${stage}`">
         <span class="truncate text-fg">{{ STAGE_LABELS[stage] ?? stage }}</span>
         <span class="shrink-0 text-fg-mute">{{ count }}</span>
       </li>
