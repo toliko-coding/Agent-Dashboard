@@ -222,10 +222,39 @@ describe('runtimeTopology — the collapsible section', () => {
     expect(localStorage.getItem('system-map-topology-expanded')).toBe('true')
   })
 
-  it('is expanded by default and labels its toggle as a heading', () => {
+  it('is collapsed on first use, mounts no list consumer, and labels its toggle as a heading', () => {
     scenario()
     const w = mount(RuntimeTopology, { props: { agents: [] } })
-    expect(w.get('[data-testid="runtime-topology-toggle"]').attributes('aria-expanded')).toBe('true')
+    expect(w.get('[data-testid="runtime-topology-toggle"]').attributes('aria-expanded')).toBe('false')
+    expect(w.find('[data-testid="runtime-topology-tree"]').exists()).toBe(false)
+    expect(servicesCalls).toBe(0)
     expect(w.get('h3').text()).toContain('Runtime topology')
+    // Reading the preference never writes one.
+    expect(localStorage.getItem('system-map-topology-expanded')).toBeNull()
+  })
+
+  /*
+   * Membership is unchanged by the default: once expanded, the map still shows
+   * the whole observed machine — including repositories with no agent at all,
+   * plain workspaces and unresolved observations.
+   */
+  it('opens from a stored expanded preference with every observed workspace present', () => {
+    localStorage.setItem('system-map-topology-expanded', 'true')
+    const agents = scenario()
+    const orphanWs = ws('ws_orphan', { name: 'NOBI', branch: 'main', repository: { id: 'repo_orphan', name: 'NOBI' } })
+    servicesState = list([...servicesState.items, svc(orphanWs, 5183)])
+
+    const w = mount(RuntimeTopology, { props: { agents } })
+    expect(w.get('[data-testid="runtime-topology-toggle"]').attributes('aria-expanded')).toBe('true')
+
+    const orphan = w.findAll('[data-testid="topology-repository"]')
+      .find(r => r.attributes('data-repository-id') === 'repo_orphan')
+    expect(orphan).toBeTruthy()
+    expect(orphan!.find('[data-testid="topology-no-agents"]').exists()).toBe(true)
+    expect(orphan!.text()).toContain(':5183')
+    expect(w.find('[data-testid="topology-local"]').exists()).toBe(true)
+    expect(w.find('[data-testid="topology-unresolved"]').exists()).toBe(true)
+    // The stored choice is read, not rewritten.
+    expect(localStorage.getItem('system-map-topology-expanded')).toBe('true')
   })
 })

@@ -22,12 +22,24 @@ defineProps<{ agents: Agent[] }>()
 
 const STORAGE_KEY = 'system-map-topology-expanded'
 
+/*
+ * Collapsed unless the user has explicitly expanded it.
+ *
+ * Expanding mounts the tree, and the tree is what starts the normalized service
+ * and process list pollers. Those lists were deliberately kept off always-open
+ * surfaces, and the Overview is the landing page — so a first visit must not
+ * start them. Only a stored "true" opens the section; a missing or unreadable
+ * preference leaves it closed.
+ *
+ * Nothing is written on startup. The preference is persisted only when the user
+ * toggles, so reading a stored choice can never overwrite it.
+ */
 function readExpanded(): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) !== 'false'
+    return localStorage.getItem(STORAGE_KEY) === 'true'
   }
   catch {
-    return true
+    return false
   }
 }
 
