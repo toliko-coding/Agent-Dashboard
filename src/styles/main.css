@@ -1,32 +1,50 @@
 @import "tailwindcss";
 
+/*
+ * Fira Code, self-hosted (Phase 3B).
+ *
+ * These four weights are Fira Code 6.2.0, byte-identical to what was loaded from
+ * jsDelivr until now, vendored under src/assets/fonts/fira-code with their SIL
+ * Open Font License (OFL.txt). Vite fingerprints them into dist/assets, so the
+ * embedded server serves them from its own origin.
+ *
+ * Self-hosting fixes two things at once. It removes a third-party request on
+ * every visit — an IP disclosure and an offline failure for a tool that reads a
+ * developer's local session data. And the production Content-Security-Policy is
+ * `font-src 'self' data:`, which was already blocking the CDN files: the
+ * embedded build silently fell back to SF Mono or Menlo. Only development, with
+ * no CSP, ever actually rendered Fira Code.
+ *
+ * Fira Code is for technical information only — branch, PID, port, model id,
+ * command, ids, costs. The interface itself stays in the system font.
+ */
 @font-face {
   font-family: 'Fira Code';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('https://cdn.jsdelivr.net/npm/firacode@6.2.0/distr/woff2/FiraCode-Regular.woff2') format('woff2');
+  src: url('../assets/fonts/fira-code/FiraCode-Regular.woff2') format('woff2');
 }
 @font-face {
   font-family: 'Fira Code';
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('https://cdn.jsdelivr.net/npm/firacode@6.2.0/distr/woff2/FiraCode-Medium.woff2') format('woff2');
+  src: url('../assets/fonts/fira-code/FiraCode-Medium.woff2') format('woff2');
 }
 @font-face {
   font-family: 'Fira Code';
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('https://cdn.jsdelivr.net/npm/firacode@6.2.0/distr/woff2/FiraCode-SemiBold.woff2') format('woff2');
+  src: url('../assets/fonts/fira-code/FiraCode-SemiBold.woff2') format('woff2');
 }
 @font-face {
   font-family: 'Fira Code';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url('https://cdn.jsdelivr.net/npm/firacode@6.2.0/distr/woff2/FiraCode-Bold.woff2') format('woff2');
+  src: url('../assets/fonts/fira-code/FiraCode-Bold.woff2') format('woff2');
 }
 
 /* Dark mode activated by class="dark" on <html> */
