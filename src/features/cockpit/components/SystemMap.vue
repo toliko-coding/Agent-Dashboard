@@ -5,6 +5,7 @@ import { useSystemResources } from '@/composables/useSystemResources'
 import { useAgents } from '@/features/agents'
 import { useLocalMachine } from '@/features/localscope'
 import CockpitPanel from './CockpitPanel.vue'
+import RuntimeTopology from './RuntimeTopology.vue'
 
 /*
  * A fixed topology diagram, drawn as plain inline SVG.
@@ -17,6 +18,11 @@ import CockpitPanel from './CockpitPanel.vue'
  * Counts come from the shared singletons already streaming; the three
  * right-hand nodes have no collector and are drawn as unavailable rather than
  * as empty, so the map shows the shape of what is NOT wired up yet.
+ *
+ * Beneath it sits the runtime identity graph (RuntimeTopology): repositories,
+ * their workspaces, and the agents, processes and services in each. That is a
+ * separate, variable-sized structure drawn as nested lists, added beside this
+ * fixed diagram rather than forced into it — see RuntimeTopology for why.
  */
 const emit = defineEmits<{ navigate: [view: 'dashboard' | 'projects' | 'localscope'] }>()
 
@@ -211,5 +217,7 @@ function curveFromHub(to: { x: number, y: number }): string {
     <p class="text-[10px] text-fg-faint mt-1">
       Dashed outline = no collector yet
     </p>
+
+    <RuntimeTopology :agents="agents" />
   </CockpitPanel>
 </template>

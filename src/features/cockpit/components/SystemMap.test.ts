@@ -54,7 +54,9 @@ function mockLocalScope(next: { reachable: boolean | null, data?: any, source?: 
   }
 }
 
-const stubs = { CockpitPanel: { template: '<div><slot /></div>' } }
+// RuntimeTopology is stubbed here and tested in its own suites; this file keeps
+// covering the machine overview diagram it sits beneath.
+const stubs = { CockpitPanel: { template: '<div><slot /></div>' }, RuntimeTopology: true }
 
 async function mountMap() {
   const SystemMap = (await import('./SystemMap.vue')).default
@@ -180,5 +182,22 @@ describe('systemMap — normalized snapshot', () => {
     expect(w.text()).toContain('Not connected')
     expect(w.text()).not.toContain('0 listening')
     expect(w.text()).not.toContain('0 connected')
+  })
+})
+
+describe('systemMap — runtime topology', () => {
+  it('carries the runtime topology beneath the machine overview', async () => {
+    mockLocalScope({ reachable: false })
+    const w = await mountMap()
+    expect(w.find('runtime-topology-stub').exists()).toBe(true)
+    // The overview diagram is still there, unchanged.
+    expect(w.find('[data-testid="map-node-agents"]').exists()).toBe(true)
+  })
+
+  // "Projects" on the map is the persisted Dashboard Project and keeps its name.
+  it('still names the persisted Dashboard Project node Projects', async () => {
+    mockLocalScope({ reachable: false })
+    const w = await mountMap()
+    expect(w.get('[data-testid="map-node-projects"]').text()).toContain('Projects')
   })
 })
