@@ -125,19 +125,26 @@ watch(() => props.agent?.sessionId, (sessionId) => {
     :open="!!agent"
     :z-index="1000"
     size="auto"
+    placement="end"
     :labelled-by="agent ? `agent-modal-title-${agent.pid}` : undefined"
     @close="emit('close')"
   >
     <!--
-      A workspace, not a drawer. The 560px side panel forced the conversation —
-      the thing you actually came to read and reply to — into a column narrower
-      than a phone. This is a large surface where the conversation is primary
-      and the intelligence column sits beside it rather than behind a tab.
+      The agent's details, as a panel against the right edge: the page it was
+      opened from stays in view beside it, which a centred dialog covered.
+
+      Wide on purpose. A 560px drawer once forced the conversation into a
+      column narrower than a phone, so the panel is ~1180px from 1440px up and
+      ~960px from 1024px — the conversation stays primary, with the
+      intelligence column beside it — and below 1024px it is a full-height,
+      full-width sheet with the conversation alone. AppModal's end placement
+      supplies the focus trap, Escape, scroll lock, focus return and the slide.
     -->
     <div
       v-if="agent"
       data-testid="agent-workspace"
-      class="w-[min(1500px,96vw)] h-[min(920px,92vh)] bg-card border border-line rounded-xl shadow-modal flex flex-col overflow-hidden"
+      data-layout="side-panel"
+      class="h-full w-screen min-[1024px]:w-[min(960px,92vw)] min-[1440px]:w-[min(1180px,78vw)] bg-card border-l border-line shadow-modal flex flex-col overflow-hidden"
     >
       <!-- Header spans the full width -->
       <header class="bg-raised px-4 py-2.5 flex flex-col gap-2 flex-shrink-0 border-b border-line">

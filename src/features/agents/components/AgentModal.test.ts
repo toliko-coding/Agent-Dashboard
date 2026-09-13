@@ -1,6 +1,7 @@
 import type { Agent } from '@/types'
 import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 
 import AgentModal from './AgentModal.vue'
 
@@ -146,11 +147,17 @@ describe('agentModal — workspace', () => {
     })
   }
 
-  it('renders a large workspace rather than a narrow drawer', () => {
+  it('renders a wide right-side panel, never the old narrow drawer', () => {
     const w = workspace()
     const box = w.get('[data-testid="agent-workspace"]')
-    // Sized from the viewport, and explicitly not the old 560px panel.
-    expect(box.classes().join(' ')).toContain('w-[min(1500px,96vw)]')
+    const classes = box.classes().join(' ')
+    expect(box.attributes('data-layout')).toBe('side-panel')
+    // A full-height sheet below 1024px, then wide panels — explicitly not 560px.
+    expect(classes).toContain('h-full')
+    expect(classes).toContain('w-screen')
+    expect(classes).toContain('min-[1024px]:w-[min(960px,92vw)]')
+    expect(classes).toContain('min-[1440px]:w-[min(1180px,78vw)]')
+    expect(classes).not.toContain('560px')
     expect(w.find('[data-testid="agent-details-panel"]').exists()).toBe(false)
   })
 
@@ -204,5 +211,49 @@ describe('agentModal — workspace', () => {
     expect(w.text()).toContain('Started')
     expect(w.text().toLowerCase()).not.toContain('est.')
     expect(w.text().toLowerCase()).not.toContain('remaining')
+  })
+})
+
+describe('agentModal — right-side detail panel (3H)', () => {
+  // The real AppModal this time: focus handling is its job and the point of the check.
+  const { AppModal: _stubbedModal, ...childStubs } = stubs
+  // PromptInput exposes focus(); the panel calls it once open, so the stub must too.
+  const panelStubs = { ...childStubs, AgentIntelligencePanel: true, PromptInput: { template: '<div />', methods: { focus() {} } } }
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('opens against the right edge through AppModal\'s end placement', async () => {
+    const w = mount(AgentModal, { props: { agent: baseAgent }, global: { stubs: panelStubs }, attachTo: document.body })
+    await nextTick()
+    const dialog = document.querySelector('[role="dialog"]')!
+    expect(dialog.getAttribute('aria-modal')).toBe('true')
+    expect(dialog.className).toContain('justify-end')
+    expect(dialog.className).toContain('items-stretch')
+    expect(dialog.getAttribute('aria-labelledby')).toBe(`agent-modal-title-${baseAgent.pid}`)
+    w.unmount()
+  })
+
+  it('moves focus into the panel, closes on Escape, and returns focus to what opened it', async () => {
+    const trigger = document.createElement('button')
+    trigger.textContent = 'open'
+    document.body.appendChild(trigger)
+    trigger.focus()
+
+    const w = mount(AgentModal, { props: { agent: null }, global: { stubs: panelStubs }, attachTo: document.body })
+    await w.setProps({ agent: baseAgent })
+    await nextTick()
+    await nextTick()
+    const panel = document.querySelector('.base-modal-box')!
+    expect(panel.contains(document.activeElement)).toBe(true)
+
+    document.querySelector('[role="dialog"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(w.emitted('close')).toHaveLength(1)
+
+    await w.setProps({ agent: null })
+    await nextTick()
+    expect(document.activeElement).toBe(trigger)
+    w.unmount()
   })
 })
