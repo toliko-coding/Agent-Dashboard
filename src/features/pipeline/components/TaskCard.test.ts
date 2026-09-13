@@ -177,6 +177,25 @@ describe('taskCard — agent chip', () => {
   })
 })
 
+describe('taskCard — agent state', () => {
+  function badgeState(agent: Agent) {
+    return mount(TaskCard, { props: { task: baseTask, workingAgent: agent }, global: { stubs } })
+      .get('[data-testid="task-agent-chip"] [data-state]')
+      .attributes('data-state')
+  }
+
+  // D: status is a 30s bucket, so a working agent arrives as 'active'. The
+  // working signal has to win, or work in progress reads as a resting success.
+  it('shows a working agent as working, not as active', () => {
+    expect(badgeState({ ...baseAgent, status: 'active', working: true })).toBe('working')
+  })
+
+  it('shows an agent with no open turn by its status', () => {
+    expect(badgeState({ ...baseAgent, status: 'active', working: false })).toBe('active')
+    expect(badgeState({ ...baseAgent, status: 'waiting', working: false })).toBe('waiting')
+  })
+})
+
 describe('taskCard — active child block', () => {
   it('hides the block when childCount is 0', () => {
     const task = { ...baseTask, childCount: 0, activeChildCount: 0, activeChild }

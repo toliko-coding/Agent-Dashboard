@@ -79,13 +79,20 @@ function selectView(view: ActiveView): void {
         <div class="w-7 h-7 rounded-lg bg-accent shrink-0" aria-hidden="true" />
         <div v-if="expanded" class="min-w-0 flex flex-col">
           <span class="text-[13px] font-semibold text-fg truncate leading-tight">Agent Dashboard</span>
-          <span class="flex items-center gap-1 text-[10px] text-fg-faint" role="status">
+          <!--
+            Says only what `live` measures. App.vue derives it from the agents
+            feed (useAgents: the last SSE frame or GET /api/agents succeeded),
+            so it can vouch for agent updates arriving and nothing else — not
+            agent, service or machine health, and not LocalScope, which has its
+            own freshness indicators. It used to read "all systems normal".
+          -->
+          <span class="flex items-center gap-1 text-[10px] text-fg-faint" role="status" data-testid="sidebar-live-status">
             <span
               class="w-1.5 h-1.5 rounded-full shrink-0"
               :class="live ? 'bg-live-dot' : 'bg-warning'"
               aria-hidden="true"
             />
-            {{ live ? 'Live · all systems normal' : 'Reconnecting…' }}
+            {{ live ? 'Agent updates live' : 'Reconnecting…' }}
           </span>
         </div>
         <button

@@ -13,7 +13,7 @@ import { PluginSlot } from '@/features/plugins'
 import { formatCost, formatDuration } from '@/utils/format'
 import { secondsUntil } from '@/utils/retryCountdown'
 import { STAGE_LABELS } from '@/utils/stageLabels'
-import { agentStatusTone, runStatusLabel, runStatusTone, stageTone } from '@/utils/statusColors'
+import { agentDisplayStatus, runStatusLabel, runStatusTone, stageTone } from '@/utils/statusColors'
 
 const props = withDefaults(defineProps<{
   task: PipelineTask
@@ -42,14 +42,9 @@ const agentIdentity = computed(() =>
   props.workingAgent ? getIdentity(props.workingAgent.projectPath) : null,
 )
 
-const agentBadgeVariant = computed(() => {
-  const tone = agentStatusTone(props.workingAgent?.status ?? '')
-  if (tone === 'success')
-    return 'active'
-  if (tone === 'warning')
-    return 'waiting'
-  return 'idle'
-})
+// agentDisplayStatus, not agent.status: status is a 30s time bucket, so a
+// working agent arrives as 'active' and was shown as a resting green "Active".
+const agentBadgeVariant = computed(() => props.workingAgent ? agentDisplayStatus(props.workingAgent) : 'idle')
 
 const { copy: copyId, copied: idCopied } = useCopyId(props.task.id)
 

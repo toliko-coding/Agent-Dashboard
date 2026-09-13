@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SSE_FALLBACK_POLL_MS, SSE_RETRY_DELAY_MS } from '../../utils/sse'
 import { createSseResource } from '../useSseResource'
@@ -7,6 +9,7 @@ class MockEventSource {
   static CONNECTING = 0
   static OPEN = 1
   static CLOSED = 2
+  onopen: (() => void) | null = null
   onmessage: ((e: MessageEvent) => void) | null = null
   onerror: ((e: Event) => void) | null = null
   readyState = 0
@@ -169,5 +172,40 @@ describe('createSseResource', () => {
     res.stopStream()
     hiddenSpy.mockRestore()
     void docProto
+  })
+
+  describe('onConnectionChange', () => {
+    it('reports open when the stream opens and when a frame arrives', () => {
+      const onConnectionChange = vi.fn()
+      const res = createSseResource({ streamUrl: '/s', fetchInitial: vi.fn(), onMessage: vi.fn(), onConnectionChange })
+      res.startStream()
+      lastSource().onopen?.()
+      expect(onConnectionChange).toHaveBeenLastCalledWith(true)
+      onConnectionChange.mockClear()
+      lastSource().emit('{}')
+      expect(onConnectionChange).toHaveBeenLastCalledWith(true)
+    })
+
+    // A transient error is retried by EventSource itself and never reaches
+    // fetchInitial — the case a caller's own error state cannot see.
+    it('reports closed on a transient error, not only on a permanent one', () => {
+      const onConnectionChange = vi.fn()
+      const fetchInitial = vi.fn()
+      const res = createSseResource({ streamUrl: '/s', fetchInitial, onMessage: vi.fn(), onConnectionChange })
+      res.startStream()
+      fetchInitial.mockClear()
+      lastSource().fail(MockEventSource.CONNECTING)
+      expect(onConnectionChange).toHaveBeenLastCalledWith(false)
+      expect(fetchInitial).not.toHaveBeenCalled()
+      lastSource().fail(MockEventSource.CLOSED)
+      expect(onConnectionChange).toHaveBeenLastCalledWith(false)
+    })
+
+    // E: connection state is reported from events the stream already has.
+    it('adds no timer of its own', () => {
+      const source = readFileSync(resolve(process.cwd(), 'src/composables/useSseResource.ts'), 'utf8')
+      expect(source.match(/setInterval\(/g)).toHaveLength(1)
+      expect(source.match(/setTimeout\(/g)).toHaveLength(1)
+    })
   })
 })

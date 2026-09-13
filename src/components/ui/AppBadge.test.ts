@@ -86,4 +86,26 @@ describe('appBadge semantic state', () => {
     // statusColors.ts, not this component.
     expect(mount(AppBadge, { props: { variant: 'waiting' } }).get('.sr-only').text()).toBe('Quiet')
   })
+
+  /*
+   * C: live and success stay distinct. Live belongs to connection indicators;
+   * no agent state may borrow it, and success must not borrow live.
+   */
+  it('never draws an agent state in the live colour', () => {
+    for (const variant of ALL) {
+      const badge = mount(AppBadge, { props: { variant } })
+      expect(badge.html(), `${variant}`).not.toMatch(/\b(bg|text)-(state-)?live/)
+    }
+    expect(dot('active').classes()).toContain('bg-state-success')
+  })
+
+  // D: active is a resting healthy state; working is its own state.
+  it('keeps active and working apart', () => {
+    const active = dot('active').classes()
+    const working = dot('working').classes()
+    expect(working).toContain('bg-state-working')
+    expect(working).not.toContain('bg-state-success')
+    expect(active).not.toContain('bg-state-working')
+    expect(active.some(c => c.startsWith('motion-'))).toBe(false)
+  })
 })

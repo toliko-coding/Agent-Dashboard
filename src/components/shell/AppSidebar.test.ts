@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -93,7 +95,7 @@ describe('appSidebar', () => {
     const { AppSidebar, useSidebar } = await load()
     useSidebar().togglePinned()
     const w = mount(AppSidebar, { props })
-    expect(w.text()).toContain('Live · all systems normal')
+    expect(w.text()).toContain('Agent updates live')
   })
 
   it('shows a reconnecting state when not live', async () => {
@@ -238,5 +240,44 @@ describe('appSidebar — 3B', () => {
     const dot = w.get('[role="status"] span')
     expect(dot.classes().join(' ')).not.toMatch(/animate-|motion-/)
     expect(dot.classes()).toContain('bg-live-dot')
+  })
+})
+
+describe('appSidebar — 3B.1 status truth', () => {
+  // Comments stripped: the status line's own comment names useAgents to say
+  // where the prop comes from, which is not the sidebar calling it.
+  const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/shell/AppSidebar.vue'), 'utf8')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+  const appSource = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf8')
+
+  // A: nothing measures global health, so nothing may claim it.
+  it('makes no global health claim, connected or not', async () => {
+    const { AppSidebar, useSidebar } = await load()
+    useSidebar().togglePinned()
+    for (const live of [true, false]) {
+      const text = mount(AppSidebar, { props: { ...props, live } }).get('[data-testid="sidebar-live-status"]').text()
+      expect(text).not.toMatch(/all systems|normal|healthy|no (failures|errors)/i)
+    }
+  })
+
+  // B: the wording names the one thing the signal measures.
+  it('words the status after its only source, the agents feed', async () => {
+    // The prop is the agents feed's own live flag (proven in useAgents.test.ts),
+    // not a flag App.vue assembles from other state.
+    expect(appSource).toMatch(/const\s*\{[^}]*\blive\b[^}]*\}\s*=\s*useAgents\(/)
+    expect(appSource).not.toMatch(/const live\s*=/)
+    const { AppSidebar, useSidebar } = await load()
+    useSidebar().togglePinned()
+    const status = mount(AppSidebar, { props }).get('[data-testid="sidebar-live-status"]')
+    expect(status.text()).toBe('Agent updates live')
+    expect(status.text()).not.toMatch(/runtime|system|machine|localscope/i)
+    expect(status.get('span').classes()).toContain('bg-live-dot')
+  })
+
+  // E: the line is a pure function of a prop — no request or timer of its own.
+  it('opens no request and starts no timer for the status line', () => {
+    expect(sidebarSource).not.toMatch(/setInterval|useIntervalFn|useTimeoutPoll|fetch\(|EventSource|useLocalMachine|useAgents/)
   })
 })

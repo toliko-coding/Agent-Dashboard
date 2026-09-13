@@ -121,7 +121,7 @@ onMounted(() => {
   void loadServerConfig()
 })
 
-const { agents, costTrend, filteredAgents, attentionAgents, attentionCount, pendingCapabilityDecisions, selectedAgent, isLoading, error, selectAgent, selectAgentWhenAvailable, startStream: startAgents } = useAgents({ autoStart: false })
+const { agents, costTrend, filteredAgents, attentionAgents, attentionCount, pendingCapabilityDecisions, selectedAgent, isLoading, error, live, selectAgent, selectAgentWhenAvailable, startStream: startAgents } = useAgents({ autoStart: false })
 const { tasks, selectedTask, selectTask, startStream: startTasks } = useTasks({ autoStart: false })
 const { items: permissionItems, approve: approvePermission, deny: denyPermission } = usePendingPermissions(tasks)
 const combinedAttentionCount = computed(() => attentionCount.value + permissionItems.value.length + pendingCapabilityDecisions.value.length)
@@ -148,8 +148,6 @@ watch(loaded, (isLoaded) => {
 watch(activeView, () => {
   nextTick(() => document.getElementById('main-content')?.focus())
 })
-
-const live = computed(() => !error.value)
 
 // Live burn-rate over the last 5 minutes, computed time-based from the
 // client-side cost-trend ring buffer (see useAgents). Falls back to null until

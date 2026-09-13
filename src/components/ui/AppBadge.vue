@@ -21,8 +21,24 @@ const props = defineProps<{ variant: Variant, label?: string }>()
  * the state.
  */
 const PRESENTATION: Record<Variant, { dot: string, label: string, motion: string }> = {
-  // Success, not live: an active agent is healthy and recently working. Live is
-  // reserved for data observation and flow, and no longer aliases success.
+  /*
+   * The semantic state rule:
+   *   LIVE      data or observation is connected and arriving (connection dots;
+   *             never a badge variant)
+   *   WORKING   an agent is doing work right now — the open-turn / recent-output
+   *             signal, which agentDisplayStatus turns into `working` BEFORE a
+   *             badge sees the agent
+   *   SUCCESS   an explicit healthy or completed state
+   *   ATTENTION the user has to act
+   *   ERROR     an explicit failure
+   *
+   * `active` is the server's time bucket: activity within activeThreshold
+   * (30s, merger.CalculateStatus) with no open turn — an agent that just
+   * answered, or a subagent whose log was written in the last 30s. That is the
+   * healthy resting state, so it takes the success colour and no motion. It is
+   * not a synonym for working: a caller that has the working signal must pass
+   * agentDisplayStatus(agent), never agent.status.
+   */
   active: { dot: 'bg-state-success', label: 'text-success-text', motion: '' },
   working: { dot: 'bg-state-working', label: 'text-state-working', motion: 'motion-working' },
   waiting: { dot: 'bg-state-waiting', label: 'text-state-waiting', motion: '' },

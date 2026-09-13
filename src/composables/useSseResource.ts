@@ -15,6 +15,13 @@ export interface CreateSseResourceOptions {
   pollLeading?: boolean
   /** Fires once per (re)connect, on the first frame — e.g. drain queued messages. */
   onConnected?: () => void
+  /**
+   * Whether the stream is open: true when it opens or delivers a frame, false
+   * on every error, including the transient ones EventSource retries by itself.
+   * Those retries never reach `fetchInitial`, so without this a caller's own
+   * error state cannot see that updates have stopped arriving.
+   */
+  onConnectionChange?: (open: boolean) => void
 }
 
 export interface SseResource {
@@ -37,6 +44,7 @@ export function createSseResource(opts: CreateSseResourceOptions): SseResource {
     pauseWhenHidden = false,
     pollLeading = false,
     onConnected,
+    onConnectionChange,
   } = opts
 
   let eventSource: EventSource | null = null
@@ -55,15 +63,18 @@ export function createSseResource(opts: CreateSseResourceOptions): SseResource {
     eventSource = new EventSource(streamUrl)
 
     let connected = false
+    eventSource.onopen = () => onConnectionChange?.(true)
     eventSource.onmessage = (e) => {
       onMessage(e.data)
       // First frame after (re)connect — drain hook for offline-queued work.
       if (!connected) {
         connected = true
+        onConnectionChange?.(true)
         onConnected?.()
       }
     }
     eventSource.onerror = () => {
+      onConnectionChange?.(false)
       if (eventSource?.readyState === EventSource.CLOSED) {
         // Permanent failure — fall back to polling, retry SSE after a delay.
         stopSSE()

@@ -5,6 +5,7 @@ import { defineComponent, nextTick } from 'vue'
 // Minimal EventSource stub to prevent actual network calls.
 class MockEventSource {
   static instances: MockEventSource[] = []
+  onopen: (() => void) | null = null
   onmessage: ((e: MessageEvent) => void) | null = null
   onerror: ((e: Event) => void) | null = null
   readyState = 0
@@ -143,6 +144,53 @@ describe('useAgents pendingCapabilityDecisions', () => {
     es.onmessage?.({ data: JSON.stringify({ agents: [], trend: [] }) } as MessageEvent)
 
     expect(result.pendingCapabilityDecisions.value).toEqual([])
+    wrapper.unmount()
+  })
+})
+
+/*
+ * B: `live` is what the shell's status line claims, so it has to follow the
+ * feed itself. Before 3B.1 it was `!error`, and `error` is only set by a failed
+ * request — a stream that dropped and was retrying by itself stayed "live"
+ * indefinitely (seen in the running app: 45s offline, still live).
+ */
+describe('useAgents live', () => {
+  const lastSource = () => MockEventSource.instances.at(-1)!
+  const frame = { data: JSON.stringify({ agents: [], trend: [] }) } as MessageEvent
+
+  it('is live once agent data has arrived', async () => {
+    const { result, wrapper } = withSetup(() => useAgents.useAgents({ autoStart: true }))
+    await flushPromises()
+    expect(result.live.value).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('stops being live when the stream errors, even while it retries by itself', async () => {
+    const { result, wrapper } = withSetup(() => useAgents.useAgents({ autoStart: true }))
+    await flushPromises()
+    lastSource().onerror?.({} as Event)
+    expect(result.live.value).toBe(false)
+    // A retrying stream is not a failed request to show the user.
+    expect(result.error.value).toBeNull()
+    lastSource().onmessage?.(frame)
+    expect(result.live.value).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('is live again as soon as the stream reopens', async () => {
+    const { result, wrapper } = withSetup(() => useAgents.useAgents({ autoStart: true }))
+    await flushPromises()
+    lastSource().onerror?.({} as Event)
+    lastSource().onopen?.()
+    expect(result.live.value).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('is not live when the agents request fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    const { result, wrapper } = withSetup(() => useAgents.useAgents({ autoStart: true }))
+    await flushPromises()
+    expect(result.live.value).toBe(false)
     wrapper.unmount()
   })
 })

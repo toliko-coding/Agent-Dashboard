@@ -25,6 +25,16 @@ const costTrend = ref<TrendPoint[]>([])
 const selectedAgent = ref<Agent | null>(null)
 const isLoading = ref(true)
 const error = ref<string | null>(null)
+// The stream reported an error and has not delivered or reopened since. Kept
+// apart from `error`, which is a failed request shown to the user; a stream
+// that is retrying is not an error to display, but it is not live either.
+const streamDown = ref(false)
+/**
+ * Agent updates are arriving: the stream is open (or a poll succeeded) and the
+ * last request did not fail. The only thing the shell's live indicators may
+ * claim — it says nothing about agent, service or machine health.
+ */
+const live = computed(() => !error.value && !streamDown.value)
 const searchQuery = ref('')
 const debouncedQuery = ref('')
 
@@ -58,6 +68,7 @@ function handleAgentData(data: Agent[], _trend: TrendPoint[] | undefined, decisi
   costTrend.value = [...costTrend.value.filter(p => p.t >= cutoff), { t: now, cost, tokens }]
 
   error.value = null
+  streamDown.value = false
   isLoading.value = false
 
   if (selectedAgent.value) {
@@ -101,6 +112,7 @@ const sse = createSseResource({
   pauseWhenHidden: true,
   pollLeading: true,
   onConnected: () => void drainPendingMessages(),
+  onConnectionChange: (open) => { streamDown.value = !open },
 })
 
 const filteredAgents = computed(() => {
@@ -204,6 +216,7 @@ export function useAgents(options?: { autoStart?: boolean }) {
     selectedAgent,
     isLoading,
     error,
+    live,
     searchQuery,
     selectAgent,
     dismissAgent,
