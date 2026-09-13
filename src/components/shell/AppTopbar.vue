@@ -7,7 +7,7 @@ import OfflineBadge from '../OfflineBadge.vue'
 
 const props = withDefaults(defineProps<{
   activeView: ActiveView
-  /** SSE connection state. Undefined = unknown, rendered as neutral rather than "online". */
+  /** Whether agent updates are arriving (useAgents' live). Undefined = unknown, rendered as neutral. */
   live?: boolean
   /** Short user label for the avatar chip. Omitted when auth is disabled. */
   userLabel?: string
@@ -26,10 +26,16 @@ const { nowMs } = useNow()
 const clock = computed(() =>
   new Date(nowMs.value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
 
+/*
+ * Only what `live` measures: whether agent updates are arriving (the agents
+ * stream open, or a fallback poll succeeding — useAgents). It said "System
+ * Online", a claim about the whole system that nothing measures. The sidebar
+ * reads the same flag and says the same thing.
+ */
 const statusLabel = computed(() => {
   if (props.live === undefined)
-    return 'Connecting'
-  return props.live ? 'System Online' : 'Reconnecting'
+    return 'Connecting…'
+  return props.live ? 'Agent updates live' : 'Reconnecting…'
 })
 
 /*

@@ -37,7 +37,7 @@ describe('appTopbar — 3B truth fixes', () => {
     expect(dot.classes().join(' ')).not.toMatch(/animate-|motion-/)
     expect(dot.classes()).toContain('bg-live-dot')
     // The state is still a word, never colour alone.
-    expect(w.get('[role="status"]').text()).toContain('System Online')
+    expect(w.get('[role="status"]').text()).toBe('Agent updates live')
   })
 
   it('shows a static warning dot while reconnecting', () => {
@@ -64,5 +64,35 @@ describe('appTopbar — 3B truth fixes', () => {
     const { resolve } = await import('node:path')
     const palette = readFileSync(resolve(process.cwd(), 'src/components/SpotlightSearch.vue'), 'utf8')
     expect(palette).toContain('placeholder="Search tasks and agents…"')
+  })
+})
+
+describe('appTopbar — 3D status truth', () => {
+  // K
+  it('never claims the system is online, whatever the connection state', () => {
+    for (const live of [true, false, undefined]) {
+      const text = mount(AppTopbar, { props: { activeView: 'cockpit', live } }).get('[role="status"]').text()
+      expect(text).not.toMatch(/system|online|healthy|operational|all systems|normal/i)
+    }
+  })
+
+  it('names what it measures: agent updates live, reconnecting, or connecting', () => {
+    const label = (live?: boolean) => mount(AppTopbar, { props: { activeView: 'cockpit', live } }).get('[role="status"]').text()
+    expect(label(true)).toBe('Agent updates live')
+    expect(label(false)).toBe('Reconnecting…')
+    expect(label(undefined)).toBe('Connecting…')
+  })
+
+  // L: one connection flag, from the agents stream, feeds both status lines.
+  it('reads the same live flag as the sidebar, straight from useAgents', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const app = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf8')
+    expect(app).toMatch(/const\s*\{[^}]*\blive\b[^}]*\}\s*=\s*useAgents\(/)
+    expect(app).not.toMatch(/const live\s*=/)
+    expect(app).toMatch(/<AppSidebar[\s\S]*?:live="live"[\s\S]*?\/>/)
+    expect(app).toMatch(/<AppTopbar[\s\S]*?:live="live"/)
+    const sidebar = readFileSync(resolve(process.cwd(), 'src/components/shell/AppSidebar.vue'), 'utf8')
+    expect(sidebar).toContain('live ? \'Agent updates live\' : \'Reconnecting…\'')
   })
 })

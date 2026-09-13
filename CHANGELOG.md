@@ -13,6 +13,7 @@ from [Conventional Commits](https://www.conventionalcommits.org/) by GoReleaser.
 Preparing the first public release.
 
 ### Changed
+- **The topbar says "Agent updates live", not "System Online".** It reads the same connection flag as the sidebar; nothing measures whether the system is online.
 - **The sidebar's Agents badge counts the Needs you queue.** It counted every agent whose turn had ended, so an idle roster read as a list of requests.
 - **Fira Code is self-hosted.** The four weights (Fira Code 6.2.0, byte-identical to the CDN files) are bundled with the app under the SIL Open Font License, so the dashboard makes no third-party request to load fonts. The production Content-Security-Policy (`font-src 'self' data:`) was already blocking the jsDelivr files, which meant the embedded build had silently fallen back to the system monospace font; it now renders Fira Code as intended. The interface font is unchanged — the native system font.
 - **Connection indicators no longer pulse.** The sidebar, topbar and live-indicator dots pulsed permanently while connected, which is decoration rather than activity. They are now static and drawn in the live colour; continuous motion stays reserved for real ongoing work such as an agent working or a tool running.
