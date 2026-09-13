@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AttentionItem } from '@/features/attention'
 import type { Agent } from '@/types'
 import type { AgentGroup, AgentGrouping } from '@/utils/agentGroup'
 import { computed, ref, watch } from 'vue'
@@ -11,9 +12,20 @@ const props = defineProps<{
   agents: Agent[]
   groups?: AgentGrouping[]
   groupBy?: AgentGroup
+  /** The canonical attention queue's items; each card shows only its own. */
+  attentionItems?: AttentionItem[]
 }>()
 
 defineEmits<{ select: [agent: Agent], dismiss: [pid: number] }>()
+
+const attentionBySession = computed(() => {
+  const map = new Map<string, AttentionItem>()
+  for (const item of props.attentionItems ?? []) {
+    if (item.subject.type === 'agent')
+      map.set(item.subject.sessionId, item)
+  }
+  return map
+})
 
 // Use grouped rendering when groups are provided and at least one has a label.
 const useGroups = computed(() =>
@@ -128,6 +140,7 @@ watch(() => props.groups, (groups) => {
                 v-for="agent in child.agents"
                 :key="agent.pid"
                 :agent="agent"
+                :attention="attentionBySession.get(agent.sessionId) ?? null"
                 @select="$emit('select', agent)"
                 @dismiss="$emit('dismiss', $event)"
               />
@@ -144,6 +157,7 @@ watch(() => props.groups, (groups) => {
             v-for="agent in group.agents"
             :key="agent.pid"
             :agent="agent"
+            :attention="attentionBySession.get(agent.sessionId) ?? null"
             @select="$emit('select', agent)"
             @dismiss="$emit('dismiss', $event)"
           />
@@ -157,6 +171,7 @@ watch(() => props.groups, (groups) => {
         v-for="agent in agents"
         :key="agent.pid"
         :agent="agent"
+        :attention="attentionBySession.get(agent.sessionId) ?? null"
         @select="$emit('select', agent)"
         @dismiss="$emit('dismiss', $event)"
       />

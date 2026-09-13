@@ -2,7 +2,7 @@
 import type { Agent } from '@/types'
 import { computed } from 'vue'
 import { useNow } from '@/composables/useNow'
-import { formatBurnRate, formatCost, formatRelativeActivity, formatUptime, secondsSince } from '@/utils/format'
+import { formatBurnRate, formatCost, formatRelativeActivity, formatTokens, formatUptime, secondsSince, totalTokenCount } from '@/utils/format'
 
 const props = defineProps<{ agent: Agent }>()
 const { nowMs } = useNow()
@@ -23,6 +23,13 @@ const hasCache = computed(() => props.agent.cacheCreationCostEstimate > 0 || pro
     </div>
     <div class="flex justify-between gap-3">
       <span class="text-fg-mute">Last activity</span><span class="text-fg">{{ lastActivity }}</span>
+    </div>
+    <!-- Moved here from the card face in 3G: diagnostic, not operational. -->
+    <div v-if="agent.tokenUsage" class="flex justify-between gap-3" data-testid="metrics-tokens">
+      <span class="text-fg-mute">Tokens</span><span class="text-fg">{{ formatTokens(totalTokenCount(agent.tokenUsage)) }}</span>
+    </div>
+    <div class="flex justify-between gap-3" data-testid="metrics-health">
+      <span class="text-fg-mute">Health</span><span class="text-fg">{{ agent.healthScore }}/100</span>
     </div>
     <div v-if="burn !== '—'" class="flex justify-between gap-3">
       <span class="text-fg-mute">Burn rate</span><span class="text-fg">{{ burn }}</span>

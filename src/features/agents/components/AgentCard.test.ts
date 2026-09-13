@@ -1,7 +1,8 @@
+import type { AttentionItem } from '@/features/attention'
 import type { Agent, SubAgent } from '@/types'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
+import { axe } from '@/utils/testA11y'
 import AgentCard from './AgentCard.vue'
 
 vi.mock('@/features/agents/composables/useAgentIdentity', () => ({
@@ -11,21 +12,21 @@ vi.mock('@/features/agents/composables/useAgentIdentity', () => ({
 }))
 
 const baseAgent: Agent = {
-  pid: 1234,
-  sessionId: 'sess-1',
+  pid: 918273,
+  sessionId: '3f2a1b9c-0000-4000-8000-000000000000',
   provider: 'claude',
-  projectPath: '/home/user/my-project',
+  projectPath: '/home/user/secret-client/my-project',
   projectName: 'my-project',
-  cwd: '/home/user/my-project',
+  cwd: '/home/user/secret-client/my-project',
   entrypoint: 'cli',
   status: 'active',
   uptime: 60,
-  lastActivity: '2026-01-01T00:00:00Z',
+  lastActivity: new Date().toISOString(),
   lastTools: [],
   tasks: [],
   subagents: [],
-  tokenUsage: { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 },
-  costEstimate: 0,
+  tokenUsage: { inputTokens: 1200, outputTokens: 300, cacheCreationTokens: 0, cacheReadTokens: 0 },
+  costEstimate: 1.25,
   cacheCreationCostEstimate: 0,
   cacheReadCostEstimate: 0,
   healthScore: 80,
@@ -37,7 +38,8 @@ const baseAgent: Agent = {
   convergenceAlert: false,
   meta: null,
   workspace: null,
-}
+  lastOutput: 'TRANSCRIPT: the deploy key is abc123',
+} as Agent
 
 const activeSubagent: SubAgent = {
   id: 'sa-1',
@@ -47,120 +49,112 @@ const activeSubagent: SubAgent = {
   sessionFile: '/tmp/sa-1.jsonl',
   tokensUsed: 5000,
   durationSeconds: 90,
-  latestOutput: 'Analyzing the codebase for relevant patterns',
+  latestOutput: 'SUBAGENT OUTPUT: analysing the codebase',
 }
 
-const stubs = {
-  MachineBadge: true,
-  ProviderBadge: true,
-  AppBadge: true,
-  PromptInput: true,
+const stubs = { MachineBadge: true, ProviderBadge: true, PromptInput: true }
+function render(agent: Partial<Agent> = {}, attention: AttentionItem | null = null) {
+  return mount(AgentCard, { props: { agent: { ...baseAgent, ...agent } as Agent, attention }, global: { stubs } })
 }
 
-describe('agentCard', () => {
-  it('renders a real button with data-testid="agent-card-open"', () => {
-    const wrapper = mount(AgentCard, {
-      props: { agent: baseAgent },
-      global: { stubs },
-    })
-    expect(wrapper.find('button[data-testid="agent-card-open"]').exists()).toBe(true)
-  })
+function item(level: AttentionItem['level'], reason: string): AttentionItem {
+  return { id: `agent:${baseAgent.sessionId}`, level, kind: level === 'failed' ? 'api-error' : 'permission', subject: { type: 'agent', sessionId: baseAgent.sessionId }, agentSessionId: baseAgent.sessionId, workspace: null, repository: null, title: '', reason, since: null, lastActivity: null }
+}
 
-  it('aria-label on the open button contains the friendly project name', () => {
-    const wrapper = mount(AgentCard, {
-      props: { agent: baseAgent },
-      global: { stubs },
-    })
-    const btn = wrapper.find('button[data-testid="agent-card-open"]')
-    expect(btn.attributes('aria-label')).toContain('My Project')
+describe('agentCard — opening', () => {
+  it('renders a real button with data-testid="agent-card-open" named after the agent', () => {
+    const btn = render().get('button[data-testid="agent-card-open"]')
+    expect(btn.attributes('aria-label')).toBe('Open details for Claude session 3f2a1b9c')
   })
 
   it('clicking the open button emits select with the agent', async () => {
-    const wrapper = mount(AgentCard, {
-      props: { agent: baseAgent },
-      global: { stubs },
-    })
-    await wrapper.find('button[data-testid="agent-card-open"]').trigger('click')
-    expect(wrapper.emitted('select')).toBeTruthy()
-    expect(wrapper.emitted('select')![0]).toEqual([baseAgent])
+    const w = render()
+    await w.get('button[data-testid="agent-card-open"]').trigger('click')
+    expect(w.emitted('select')![0][0]).toMatchObject({ sessionId: baseAgent.sessionId })
+  })
+
+  it('names the agent by its pipeline task when it has one', () => {
+    expect(render({ pipelineTaskTitle: 'Fix login redirect' }).get('[data-testid="agent-card-title"]').text()).toBe('Fix login redirect')
   })
 })
 
-describe('agentCard — active subagents block', () => {
-  it('hides the block when there are no active subagents', () => {
-    const agent = { ...baseAgent, subagents: [{ ...activeSubagent, status: 'completed' as const }] }
-    const wrapper = mount(AgentCard, {
-      props: { agent },
-      global: { stubs },
-    })
-    expect(wrapper.find('[data-testid="active-subagents-block"]').exists()).toBe(false)
+describe('agentCard — compact worker (3G)', () => {
+  it('shows no transcript, subagent output, PID or path', () => {
+    const html = render({ subagents: [activeSubagent] }).html()
+    for (const hidden of ['TRANSCRIPT', 'SUBAGENT OUTPUT', String(baseAgent.pid), '/home/user', 'secret-client'])
+      expect(html).not.toContain(hidden)
   })
 
-  it('hides the block when subagents is empty', () => {
-    const wrapper = mount(AgentCard, {
-      props: { agent: baseAgent },
-      global: { stubs },
-    })
-    expect(wrapper.find('[data-testid="active-subagents-block"]').exists()).toBe(false)
+  it('has no fixed height, so nothing it shows is clipped', () => {
+    const card = render().get('[data-testid="agent-card"]')
+    expect(card.classes().join(' ')).not.toMatch(/\bh-\[\d+px\]/)
   })
 
-  it('shows the block with type, token count, and output snippet for active subagents', () => {
-    const agent = { ...baseAgent, subagents: [activeSubagent] }
-    const wrapper = mount(AgentCard, {
-      props: { agent },
-      global: { stubs },
-    })
-    const block = wrapper.find('[data-testid="active-subagents-block"]')
-    expect(block.exists()).toBe(true)
-    expect(block.text()).toContain('researcher')
-    expect(block.text()).toContain('5k tok')
-    expect(wrapper.find('[data-testid="subagent-latest-output"]').text()).toContain('Analyzing the codebase')
+  it('counts active subagents instead of listing them', () => {
+    const w = render({ subagents: [activeSubagent, { ...activeSubagent, id: 'sa-2' }, { ...activeSubagent, id: 'sa-3', status: 'completed' }] })
+    expect(w.get('[data-testid="agent-card-facts"]').text()).toContain('2 subagents')
+    expect(w.find('[data-testid="active-subagents-block"]').exists()).toBe(false)
   })
 
-  it('shows the expand toggle when latestOutput is non-empty', () => {
-    const agent = { ...baseAgent, subagents: [activeSubagent] }
-    const wrapper = mount(AgentCard, {
-      props: { agent },
-      global: { stubs },
-    })
-    expect(wrapper.find('[data-testid="subagent-expand-toggle"]').exists()).toBe(true)
+  it('names an open tool call by tool only while working', () => {
+    const w = render({ working: true, pendingToolUse: { id: 't', tool: 'Bash', pattern: 'rm -rf /tmp/cache', patternDisplay: 'rm -rf /tmp/cache' } })
+    expect(w.get('[data-testid="agent-card-activity"]').text()).toBe('Using Bash')
+    expect(w.html()).not.toContain('rm -rf')
   })
 
-  it('does not show expand toggle when latestOutput is empty', () => {
-    const agent = { ...baseAgent, subagents: [{ ...activeSubagent, latestOutput: '' }] }
-    const wrapper = mount(AgentCard, {
-      props: { agent },
-      global: { stubs },
-    })
-    expect(wrapper.find('[data-testid="subagent-expand-toggle"]').exists()).toBe(false)
+  it('says what the agent last used when it is not working', () => {
+    expect(render({ currentAction: 'Read' }).get('[data-testid="agent-card-activity"]').text()).toBe('Last tool Read')
+    expect(render({ currentAction: undefined, lastTools: [] }).get('[data-testid="agent-card-activity"]').text()).toBe('No tool used yet')
   })
 
-  it('expand toggle reveals full latestOutput on click', async () => {
-    const agent = { ...baseAgent, subagents: [activeSubagent] }
-    const wrapper = mount(AgentCard, {
-      props: { agent },
-      global: { stubs },
-    })
-    const output = wrapper.find('[data-testid="subagent-latest-output"]')
-    expect(output.classes()).toContain('truncate')
+  it('shows role, last activity and cost as facts', () => {
+    const w = render({ spawnerName: 'Reviewer' })
+    expect(w.get('[data-testid="agent-card-facts"]').text()).toMatch(/Reviewer · \d+s ago/)
+    expect(w.get('[data-testid="agent-card-cost"]').text()).toBe('$1.25')
+  })
 
-    await wrapper.find('[data-testid="subagent-expand-toggle"]').trigger('click')
-    expect(output.classes()).not.toContain('truncate')
-    expect(output.classes()).toContain('whitespace-pre-wrap')
+  it('moves tokens and health into the metrics popover', async () => {
+    const w = render()
+    expect(w.text()).not.toContain('tok')
+    await w.get('[data-testid="agent-card-info"]').trigger('click')
+    expect(w.get('[data-testid="metrics-tokens"]').text()).toContain('1.5k')
+    expect(w.get('[data-testid="metrics-health"]').text()).toContain('80/100')
+  })
+})
+
+describe('agentCard — attention (canonical, passed in)', () => {
+  it('shows nothing without an attention item', () => {
+    expect(render().find('[data-testid="agent-card-attention"]').exists()).toBe(false)
+  })
+
+  it('marks a blocked agent quietly, in amber, with the reason for assistive tech', () => {
+    const chip = render({}, item('blocking', 'Permission request waiting')).get('[data-testid="agent-card-attention"]')
+    expect(chip.text()).toContain('Needs you')
+    expect(chip.classes()).toContain('text-warning-text')
+    expect(chip.get('.sr-only').text()).toContain('Permission request waiting')
+  })
+
+  it('marks a failed agent in red', () => {
+    const chip = render({}, item('failed', 'API error reported: Rate limited')).get('[data-testid="agent-card-attention"]')
+    expect(chip.text()).toContain('Failed')
+    expect(chip.classes()).toContain('text-danger-text')
+  })
+
+  it('never moves the whole card', () => {
+    const card = render({ working: true }, item('blocking', 'Question waiting for your answer')).get('[data-testid="agent-card"]')
+    expect(card.classes().join(' ')).not.toMatch(/motion-|animate-/)
   })
 })
 
 describe('agentCard working badge', () => {
-  const badgeStubs = { MachineBadge: true, ProviderBadge: true, PromptInput: true }
-
   it('shows Working badge when agent.working, overriding status', () => {
-    const w = mount(AgentCard, { props: { agent: { ...baseAgent, status: 'waiting', working: true } }, global: { stubs: badgeStubs } })
+    const w = mount(AgentCard, { props: { agent: { ...baseAgent, status: 'waiting', working: true } }, global: { stubs } })
     expect(w.text()).toContain('Working')
     expect(w.text()).not.toContain('Waiting')
   })
 
   it('shows the "Quiet" label (not the ambiguous "Waiting") when not working', () => {
-    const w = mount(AgentCard, { props: { agent: { ...baseAgent, status: 'waiting', working: false } }, global: { stubs: badgeStubs } })
+    const w = mount(AgentCard, { props: { agent: { ...baseAgent, status: 'waiting', working: false } }, global: { stubs } })
     expect(w.text()).toContain('Quiet')
     expect(w.text()).not.toContain('Waiting')
   })
@@ -176,98 +170,69 @@ describe('agentCard finished state', () => {
   })
 
   it('shows no dismiss button for a live agent', () => {
-    const wrapper = mount(AgentCard, {
-      props: { agent: { ...baseAgent, status: 'active' } },
-      global: { stubs },
-    })
-    expect(wrapper.find('[data-testid="agent-card-dismiss"]').exists()).toBe(false)
+    expect(render({ status: 'active' }).find('[data-testid="agent-card-dismiss"]').exists()).toBe(false)
   })
 
   it('shows a dismiss button for a finished agent', () => {
-    const wrapper = mount(AgentCard, {
-      props: { agent: { ...baseAgent, status: 'finished' } },
-      global: { stubs },
-    })
-    expect(wrapper.find('[data-testid="agent-card-dismiss"]').exists()).toBe(true)
+    const w = render({ status: 'finished' })
+    expect(w.find('[data-testid="agent-card-dismiss"]').exists()).toBe(true)
+    expect(w.get('[data-testid="agent-card-activity"]').text()).toBe('Finished')
   })
 
   it('calls the DELETE endpoint and emits dismiss on click', async () => {
-    const wrapper = mount(AgentCard, {
-      props: { agent: { ...baseAgent, pid: 4242, status: 'finished' } },
-      global: { stubs },
-    })
-    await wrapper.find('[data-testid="agent-card-dismiss"]').trigger('click')
+    const w = render({ pid: 4242, status: 'finished' })
+    await w.get('[data-testid="agent-card-dismiss"]').trigger('click')
     expect(fetch).toHaveBeenCalledWith('/api/agents/4242/channel', expect.objectContaining({ method: 'DELETE' }))
-    expect(wrapper.emitted('dismiss')?.[0]).toEqual([4242])
+    expect(w.emitted('dismiss')?.[0]).toEqual([4242])
   })
 })
 
 describe('agentCard your-turn marker', () => {
-  const badgeStubs = { MachineBadge: true, ProviderBadge: true, PromptInput: true }
-
   it('marks a live agent that stopped on its own', () => {
-    const w = mount(AgentCard, { props: { agent: { ...baseAgent, status: 'idle', working: false } }, global: { stubs: badgeStubs } })
-    expect(w.get('[data-testid="agent-awaiting-input"]').text()).toBe('your turn')
+    expect(render({ status: 'idle', working: false }).get('[data-testid="agent-awaiting-input"]').text()).toBe('your turn')
   })
 
   it('shows nothing while the agent is working', () => {
-    const w = mount(AgentCard, { props: { agent: { ...baseAgent, status: 'active', working: true } }, global: { stubs: badgeStubs } })
-    expect(w.find('[data-testid="agent-awaiting-input"]').exists()).toBe(false)
+    expect(render({ status: 'active', working: true }).find('[data-testid="agent-awaiting-input"]').exists()).toBe(false)
   })
 
   it('shows nothing for a finished agent — there is nothing to continue', () => {
-    const w = mount(AgentCard, { props: { agent: { ...baseAgent, status: 'finished', working: false } }, global: { stubs: badgeStubs } })
-    expect(w.find('[data-testid="agent-awaiting-input"]').exists()).toBe(false)
+    expect(render({ status: 'finished', working: false }).find('[data-testid="agent-awaiting-input"]').exists()).toBe(false)
   })
 })
 
 describe('agentCard internal process badge', () => {
-  const badgeStubs = { MachineBadge: true, ProviderBadge: true, PromptInput: true }
-
   it('shows the internal-process badge when agent.internalProcess is true', () => {
-    const w = mount(AgentCard, { props: { agent: { ...baseAgent, internalProcess: true } }, global: { stubs: badgeStubs } })
-    expect(w.find('[data-testid="agent-card-internal-badge"]').exists()).toBe(true)
+    expect(render({ internalProcess: true }).find('[data-testid="agent-card-internal-badge"]').exists()).toBe(true)
   })
 
   it('hides the internal-process badge for a normal session', () => {
-    const w = mount(AgentCard, { props: { agent: { ...baseAgent, internalProcess: false } }, global: { stubs: badgeStubs } })
-    expect(w.find('[data-testid="agent-card-internal-badge"]').exists()).toBe(false)
+    expect(render({ internalProcess: false }).find('[data-testid="agent-card-internal-badge"]').exists()).toBe(false)
   })
 })
 
 describe('agentCard terminal access', () => {
-  const badgeStubs = { MachineBadge: true, ProviderBadge: true, PromptInput: true }
-
-  // The terminal used to live in the agent modal's bottom drawer. Removing that
-  // drawer must not remove the only way to reach a live session's terminal.
   // AppModal teleports to <body>, so the overlay is asserted through the document.
   it('offers a terminal for a live-injectable agent', async () => {
     const w = mount(AgentCard, {
       props: { agent: { ...baseAgent, liveInjectable: true } },
-      global: { stubs: badgeStubs },
+      global: { stubs },
       attachTo: document.body,
     })
     expect(document.querySelector('[data-testid="agent-terminal-modal"]')).toBeNull()
-
     await w.get('[data-testid="agent-card-terminal"]').trigger('click')
     expect(document.querySelector('[data-testid="agent-terminal-modal"]')).not.toBeNull()
-
     w.unmount()
     document.body.innerHTML = ''
   })
 
   it('offers none when the session cannot be driven', () => {
-    const w = mount(AgentCard, {
-      props: { agent: { ...baseAgent, liveInjectable: false } },
-      global: { stubs: badgeStubs },
-    })
-    expect(w.find('[data-testid="agent-card-terminal"]').exists()).toBe(false)
+    expect(render({ liveInjectable: false }).find('[data-testid="agent-card-terminal"]').exists()).toBe(false)
   })
 })
 
 describe('agentCard — workspace identity', () => {
-  const inWorkspace = (over: Record<string, unknown>): Agent => ({
-    ...baseAgent,
+  const inWorkspace = (over: Record<string, unknown>): Partial<Agent> => ({
     projectName: 'Agent-Dashboard',
     workspace: {
       id: 'ws_main',
@@ -277,41 +242,44 @@ describe('agentCard — workspace identity', () => {
       repository: { id: 'repo_shared', name: 'Agent-Dashboard' },
       ...over,
     },
-  } as Agent)
+  } as Partial<Agent>)
 
-  /*
-   * The point of the checkpoint, at the level a person actually sees. These two
-   * agents share a repository and a project name; before the workspace field
-   * their cards were identical text.
-   */
-  it('makes two agents in different worktrees visibly distinguishable', () => {
-    const main = mount(AgentCard, { props: { agent: inWorkspace({}) } })
-    const worktree = mount(AgentCard, {
-      props: { agent: inWorkspace({ id: 'ws_wt', kind: 'git-worktree', branch: 'feat/ui-redesign' }) },
-    })
-
+  it('names the repository and makes two worktrees of it visibly distinguishable', () => {
+    const main = render(inWorkspace({}))
+    const worktree = render(inWorkspace({ id: 'ws_wt', kind: 'git-worktree', branch: 'feat/ui-redesign' }))
+    expect(main.get('[data-testid="agent-card-repository"]').text()).toBe('Agent-Dashboard')
+    expect(worktree.get('[data-testid="agent-card-repository"]').text()).toBe('Agent-Dashboard')
     expect(main.text()).toContain('feat/localscope-integration')
     expect(worktree.text()).toContain('feat/ui-redesign')
     expect(worktree.text()).toContain('worktree')
     expect(main.text()).not.toContain('feat/ui-redesign')
-    // Same repository, so the project name alone still cannot separate them.
-    // (friendlyProjectName renders the folder name as "Agent Dashboard".)
-    expect(main.text()).toContain('Agent Dashboard')
-    expect(worktree.text()).toContain('Agent Dashboard')
   })
 
-  it('shows no workspace hint when identity could not be resolved', () => {
-    const w = mount(AgentCard, { props: { agent: { ...baseAgent, workspace: null } } })
+  it('says the workspace is unknown instead of guessing one from the folder', () => {
+    const w = render({ workspace: null })
+    expect(w.get('[data-testid="agent-card-workspace-unknown"]').text()).toBe('Workspace unknown')
     expect(w.find('[data-testid="workspace-branch"]').exists()).toBe(false)
-    expect(w.find('[data-testid="workspace-branch-worktree"]').exists()).toBe(false)
-    // Everything else about the card is unchanged — this is additive.
-    expect(w.find('[data-testid="agent-card-project"]').exists()).toBe(true)
+    expect(w.text()).not.toContain('my-project')
   })
 
   it('exposes no filesystem path through the workspace badge', () => {
-    const w = mount(AgentCard, { props: { agent: inWorkspace({}) } })
-    const badge = w.get('[data-workspace-id]')
+    const badge = render(inWorkspace({})).get('[data-workspace-id]')
     expect(badge.html()).not.toContain('.git')
     expect(badge.html()).not.toContain('/home/user')
+  })
+})
+
+describe('agentCard — accessibility', () => {
+  it('has no axe violations with attention, workspace and actions present', async () => {
+    const w = mount(AgentCard, {
+      props: {
+        agent: { ...baseAgent, liveInjectable: true, working: true, workspace: { id: 'ws', name: 'web', kind: 'git-main', branch: 'main', repository: { id: 'r', name: 'web' } } } as Agent,
+        attention: item('blocking', 'Question waiting for your answer'),
+      },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    expect(await axe(w.element as Element)).toHaveNoViolations()
+    w.unmount()
   })
 })
