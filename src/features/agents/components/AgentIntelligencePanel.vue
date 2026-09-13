@@ -6,6 +6,7 @@ import { useNow } from '@/composables/useNow'
 import { formatUptime, secondsSince } from '@/utils/format'
 import { agentDisplayStatus, statusLabel } from '@/utils/statusColors'
 import AgentDiagram from './AgentDiagram.vue'
+import AgentWorkspaceProcesses from './AgentWorkspaceProcesses.vue'
 
 /*
  * The left column of the agent workspace: what this agent IS and is doing,
@@ -70,6 +71,13 @@ const recentTools = computed(() => props.agent.lastTools.slice(-4).reverse())
       </h3>
       <AgentDiagram :agent="agent" />
     </section>
+
+    <!--
+      Machine reality for this checkout. Sits beside Connections because both
+      answer "what else is running here", and it is the first surface to consume
+      process workspace identity.
+    -->
+    <AgentWorkspaceProcesses :agent="agent" />
 
     <!-- Task progress, only when the session wrote TodoWrite items -->
     <section v-if="taskProgress" class="flex flex-col gap-1.5" data-testid="intelligence-tasks">

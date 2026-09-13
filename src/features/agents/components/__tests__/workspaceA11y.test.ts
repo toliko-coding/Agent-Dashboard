@@ -3,8 +3,8 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from '@/utils/testA11y'
 
-vi.mock('@/features/localscope', () => ({
-  // Collector absent: the list is unknown, which is items: null — not [].
+vi.mock('@/features/localscope', async () => ({
+  // Collector absent: every list is unknown, which is items: null — not [].
   useMachineServices: () => ({
     data: {
       value: { source: 'unavailable', collectedAt: null, ageMs: null, degraded: [], items: null },
@@ -12,6 +12,17 @@ vi.mock('@/features/localscope', () => ({
     loaded: { value: true },
     refetch: async () => {},
   }),
+  // The panel now carries the workspace process section; same absent collector.
+  useMachineProcesses: () => ({
+    data: {
+      value: { source: 'unavailable', collectedAt: null, ageMs: null, degraded: [], items: null, total: null },
+    },
+    loaded: { value: true },
+    refetch: async () => {},
+  }),
+  EMPTY_PROCESSES: { source: 'unavailable', collectedAt: null, ageMs: null, degraded: [], items: null, total: null },
+  // The real indicator, so the a11y suite audits what actually renders.
+  DataFreshnessIndicator: (await import('@/features/localscope/components/DataFreshnessIndicator.vue')).default,
 }))
 
 const agent = {
