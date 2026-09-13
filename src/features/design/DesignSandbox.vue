@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import type { AttentionItem, AttentionQueue } from '@/features/attention'
 import type { Freshness } from '@/features/localscope'
+import type { Agent, WorkspaceRef } from '@/types'
 import { computed, ref } from 'vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppChip from '@/components/ui/AppChip.vue'
 import { NeedsYouBand } from '@/features/attention'
+import { ActiveWork, agentFootprint, CommandStatusStrip } from '@/features/cockpit'
 import { DataFreshnessIndicator } from '@/features/localscope'
 
 /*
@@ -110,6 +112,40 @@ const SAMPLE_ITEMS: AttentionItem[] = [
   { id: 'agent:sample-failed', level: 'failed', kind: 'api-error', subject: { type: 'agent', sessionId: 'sample-failed' }, agentSessionId: 'sample-failed', workspace: SAMPLE_WORKTREE, repository: SAMPLE_WORKTREE.repository, title: 'Codex session 9c01d2e4', reason: 'API error reported: Rate limited', detail: 'in the session\'s recent log', since: null, lastActivity: minutesAgo(12) },
   { id: 'task:sample-review', level: 'ready', kind: 'task-waiting', subject: { type: 'task', taskId: 'sample-review' }, agentSessionId: null, workspace: null, repository: null, title: 'Refactor billing export', reason: 'Pipeline task waiting for you', detail: 'Plan review', since: null, lastActivity: null },
 ]
+/*
+ * Command samples: the production status strip and Active work, fed example
+ * agents. Two repositories deliberately share the name "web", one has a
+ * worktree, one workspace is plain, and one agent's workspace is unresolved —
+ * the cases the identity grouping exists for.
+ */
+function sampleWorkspace(id: string, repoId: string | null, o: Partial<WorkspaceRef> = {}): WorkspaceRef {
+  return { id, name: 'web', kind: repoId ? 'git-main' : 'plain', branch: 'main', repository: repoId ? { id: repoId, name: 'web' } : null, ...o }
+}
+let samplePid = 0
+function sampleAgent(o: Partial<Agent>): Agent {
+  samplePid++
+  return {
+    pid: samplePid,
+    sessionId: `${samplePid}f0e1d2c-0000-4000-8000-000000000000`,
+    provider: 'claude',
+    status: 'active',
+    working: true,
+    lastActivity: minutesAgo(0.3),
+    model: 'claude-sonnet-5',
+    subagents: [],
+    workspace: null,
+    ...o,
+  } as Agent
+}
+const COMMAND_AGENTS: Agent[] = [
+  sampleAgent({ workspace: sampleWorkspace('ws-a-main', 'repo-a'), pipelineTaskTitle: 'Fix login redirect', pendingToolUse: { id: 't1', tool: 'Bash', pattern: '', patternDisplay: '' } }),
+  sampleAgent({ workspace: sampleWorkspace('ws-a-wt', 'repo-a', { kind: 'git-worktree', branch: 'feat/command-center-ui', name: 'web-command-center' }), spawnerName: 'Reviewer', subagents: [{ id: 's', type: 'subagent', status: 'active', currentAction: '', sessionFile: '', tokensUsed: 0, durationSeconds: 0, latestOutput: '' }] }),
+  sampleAgent({ workspace: sampleWorkspace('ws-b-main', 'repo-b'), provider: 'codex', model: undefined }),
+  sampleAgent({ workspace: sampleWorkspace('ws-plain', null, { name: 'scratch' }) }),
+  sampleAgent({ workspace: null, lastActivity: minutesAgo(2) }),
+]
+const QUIET_QUEUE: AttentionQueue = { status: 'ready', stale: false, items: [] }
+
 const ATTENTION_SAMPLES: { label: string, queue: AttentionQueue }[] = [
   { label: 'Blocking, failed and ready', queue: { status: 'ready', stale: false, items: SAMPLE_ITEMS } },
   { label: 'One failed item', queue: { status: 'ready', stale: false, items: [SAMPLE_ITEMS[2]] } },
@@ -175,6 +211,35 @@ const ATTENTION_SAMPLES: { label: string, queue: AttentionQueue }[] = [
             <AppBadge :variant="s" />
             <code class="text-[10px] text-fg-faint">{{ s }}</code>
           </div>
+        </div>
+      </section>
+
+      <!-- Command -->
+      <section class="flex flex-col gap-3" data-testid="sandbox-command">
+        <h2 class="text-[13px] font-semibold">
+          Command
+        </h2>
+        <p class="max-w-3xl text-[12px] text-fg-mute">
+          The production status strip, Needs you and Active work. Busy: attention waiting and five working agents across
+          two same-name repositories (one with a worktree), a plain workspace and an unresolved one. Quiet: nothing waiting,
+          nothing working — Needs you collapses to a line and Active work says so. The local runtime reading is live.
+        </p>
+        <div class="flex flex-col gap-3" data-testid="sandbox-command-busy" :class="showMotion ? '' : '[&_*]:!animate-none'">
+          <code class="text-[10px] text-fg-faint">Busy</code>
+          <CommandStatusStrip :attention="ATTENTION_SAMPLES[0].queue" :working="COMMAND_AGENTS.length" :footprint="agentFootprint(COMMAND_AGENTS)" :live="true" />
+          <NeedsYouBand :queue="ATTENTION_SAMPLES[0].queue" />
+          <ActiveWork :agents="COMMAND_AGENTS" status="ready" :stale="false" :total-agents="COMMAND_AGENTS.length + 2" />
+        </div>
+        <div class="flex flex-col gap-3" data-testid="sandbox-command-quiet">
+          <code class="text-[10px] text-fg-faint">Quiet</code>
+          <CommandStatusStrip :attention="QUIET_QUEUE" :working="0" :footprint="agentFootprint([])" :live="true" />
+          <NeedsYouBand :queue="QUIET_QUEUE" />
+          <ActiveWork :agents="[]" status="ready" :stale="false" :total-agents="2" />
+        </div>
+        <div class="flex flex-col gap-3" data-testid="sandbox-command-reconnecting">
+          <code class="text-[10px] text-fg-faint">Last known, reconnecting</code>
+          <CommandStatusStrip :attention="QUIET_QUEUE" :working="2" :footprint="agentFootprint(COMMAND_AGENTS.slice(0, 2))" :live="false" />
+          <ActiveWork :agents="COMMAND_AGENTS.slice(0, 2)" status="ready" :stale="true" :total-agents="2" />
         </div>
       </section>
 

@@ -1,8 +1,15 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import DesignSandbox from './DesignSandbox.vue'
+
+// The Command samples read the shared LocalScope snapshot; the sandbox test has no collector.
+vi.mock('@/features/localscope', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/features/localscope')>()
+  return { ...real, useLocalMachine: () => ({ snapshot: ref(real.EMPTY_SNAPSHOT), loaded: ref(true), refetch: vi.fn() }) }
+})
 
 /*
  * C: the development-only Design Sandbox shows the Phase 3B foundation.
@@ -10,6 +17,19 @@ import DesignSandbox from './DesignSandbox.vue'
  */
 
 const w = () => mount(DesignSandbox)
+
+describe('designSandbox — 3E command', () => {
+  it('renders the production Command components busy, quiet and reconnecting', () => {
+    const section = w().get('[data-testid="sandbox-command"]')
+    const busy = section.get('[data-testid="sandbox-command-busy"]')
+    expect(busy.find('[data-testid="command-status"]').exists()).toBe(true)
+    expect(busy.findAll('[data-testid="active-work-agent"]')).toHaveLength(5)
+    expect(busy.findAll('[data-testid="active-work-group"][data-kind="repository"]')).toHaveLength(2)
+    expect(busy.find('[data-testid="active-work-group"][data-kind="unknown"]').exists()).toBe(true)
+    expect(section.find('[data-testid="sandbox-command-quiet"] [data-testid="active-work-empty"]').exists()).toBe(true)
+    expect(section.find('[data-testid="sandbox-command-reconnecting"] [data-testid="active-work-stale"]').exists()).toBe(true)
+  })
+})
 
 describe('designSandbox — 3C attention states', () => {
   it('renders the production Needs you band in every supported state', () => {
