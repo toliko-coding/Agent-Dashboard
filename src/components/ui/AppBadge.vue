@@ -21,7 +21,9 @@ const props = defineProps<{ variant: Variant, label?: string }>()
  * the state.
  */
 const PRESENTATION: Record<Variant, { dot: string, label: string, motion: string }> = {
-  active: { dot: 'bg-state-live', label: 'text-success-text', motion: '' },
+  // Success, not live: an active agent is healthy and recently working. Live is
+  // reserved for data observation and flow, and no longer aliases success.
+  active: { dot: 'bg-state-success', label: 'text-success-text', motion: '' },
   working: { dot: 'bg-state-working', label: 'text-state-working', motion: 'motion-working' },
   waiting: { dot: 'bg-state-waiting', label: 'text-state-waiting', motion: '' },
   idle: { dot: 'bg-state-idle', label: 'text-fg-mute', motion: '' },

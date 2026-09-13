@@ -63,6 +63,43 @@
    * is applied as duration-[var(--duration-fast)].
    */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /*
+   * Type scale (Phase 3B). `--text-*` IS a Tailwind v4 theme namespace, so each
+   * token emits a real utility: text-title-lg, text-title, text-body, text-ui,
+   * text-ui-sm and text-label. Tokens first — the existing 10/11px text is
+   * migrated surface by surface as each is redesigned, not force-sized here.
+   *
+   *   title-lg  22  view titles, the loudest heading on a surface
+   *   title     18  section headings
+   *   body      15  running text
+   *   ui        13  controls and dense rows
+   *   ui-sm     12  the floor for readable text on redesigned surfaces
+   *   label     11  kind labels and technical captions only, never paragraphs
+   */
+  --text-title-lg: 22px;
+  --text-title-lg--line-height: 1.25;
+  --text-title: 18px;
+  --text-title--line-height: 1.3;
+  --text-body: 15px;
+  --text-body--line-height: 1.55;
+  --text-ui: 13px;
+  --text-ui--line-height: 1.45;
+  --text-ui-sm: 12px;
+  --text-ui-sm--line-height: 1.4;
+  --text-label: 11px;
+  --text-label--line-height: 1.35;
+
+  /*
+   * Radius (Phase 3B): two roles. `--radius-*` is also a Tailwind namespace, so
+   * these emit rounded-control and rounded-panel. Additive — existing rounded-*
+   * classes stay until their surface is redesigned, so nothing churns now.
+   *
+   *   control  4  controls, pills, compact nodes
+   *   panel    8  cards, panels, major surfaces
+   */
+  --radius-control: 4px;
+  --radius-panel: 8px;
 }
 
 /*
@@ -130,6 +167,25 @@
   --color-state-error: var(--state-error);
   --color-state-success: var(--state-success);
   --color-state-live: var(--state-live);
+
+  /*
+   * LIVE — observation and data flow (Phase 3B, decision D3).
+   *
+   * Its own hue, deliberately NOT an alias of success. Live means data is being
+   * observed or is flowing right now; success means something finished or is
+   * healthy. Until 3B the live state borrowed success green, so a live
+   * connection and a completed task were indistinguishable at a glance. Cyan is
+   * never the selection or action colour (that stays --accent) and is never
+   * decorative: if nothing is observing or flowing, nothing is cyan.
+   */
+  --color-live: var(--live);
+  --color-live-soft: var(--live-soft);
+  --color-live-text: var(--live-text);
+  --color-live-dot: var(--live-dot);
+  --color-live-line: var(--live-line);
+
+  /* Recessed surface: logs, transcripts, diagnostics, terminal-like detail. */
+  --color-recessed: var(--recessed);
 }
 
 :root {
@@ -206,7 +262,19 @@
   --state-waiting: var(--warning-text);
   --state-error: var(--danger-text);
   --state-success: var(--success-text);
-  --state-live: var(--success-dot);
+  --state-live: var(--live-dot);
+  /*
+   * Live family, light. Literal hex so the contrast test can read them: text
+   * #0e7490 (cyan-700) is about 5.4:1 on white; the dot #0891b2 (cyan-600)
+   * clears the 3:1 non-text minimum. Neither appears without a text label.
+   */
+  --live: #0e7490;
+  --live-soft: #ecfeff;
+  --live-text: #0e7490;
+  --live-dot: #0891b2;
+  --live-line: #a5f3fc;
+  /* Recessed: a step below --app, for logs and diagnostics. */
+  --recessed: #e7ecf2;
 }
 
 .dark {
@@ -253,7 +321,17 @@
   --state-waiting: var(--warning-text);
   --state-error: var(--danger-text);
   --state-success: var(--success-text);
-  --state-live: var(--success-dot);
+  --state-live: var(--live-dot);
+  /*
+   * Live family, dark: a restrained cyan-400. #22d3ee on --card (#12151c) is
+   * about 10:1. The soft fill stays a tint, never a glow.
+   */
+  --live: #22d3ee;
+  --live-soft: color-mix(in oklch, #22d3ee 14%, transparent);
+  --live-text: #22d3ee;
+  --live-dot: #22d3ee;
+  --live-line: #155e75;
+  --recessed: #07090d;
 }
 
 /*

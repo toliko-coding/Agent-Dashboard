@@ -24,18 +24,51 @@ const emit = defineEmits<{ close: [] }>()
 
 const STATES = ['active', 'working', 'waiting', 'idle', 'finished', 'completed', 'error', 'info'] as const
 
+interface MotionSample { cls: string, name: string, claim: string, color: string, flow?: boolean }
+
 /** The semantic motion vocabulary, with the claim each one makes. */
-const MOTIONS = [
+const MOTIONS: MotionSample[] = [
   { cls: 'motion-working', name: 'working', claim: 'The system is busy and nothing is wrong.', color: 'bg-state-working' },
   { cls: 'motion-tool', name: 'tool', claim: 'A discrete step is executing right now.', color: 'bg-state-tool' },
   { cls: 'motion-waiting', name: 'waiting', claim: 'A person has to act before this moves.', color: 'bg-state-waiting' },
   { cls: 'motion-success', name: 'success', claim: 'It finished. An event, not a state.', color: 'bg-state-success' },
+  // Drawn on an edge, not a dot: live flow says data is moving through a link.
+  { cls: 'motion-flow', name: 'live flow', claim: 'Data is flowing through this connection right now.', color: '', flow: true },
+]
+
+/*
+ * Phase 3B foundation. Each entry names the utility the token generates, so the
+ * sandbox doubles as proof that the token actually emits CSS.
+ */
+const TYPE_SCALE = [
+  { cls: 'text-title-lg', px: 22, role: 'View title' },
+  { cls: 'text-title', px: 18, role: 'Section heading' },
+  { cls: 'text-body', px: 15, role: 'Running text' },
+  { cls: 'text-ui', px: 13, role: 'Controls and dense rows' },
+  { cls: 'text-ui-sm', px: 12, role: 'Smallest readable UI text' },
+  { cls: 'text-label', px: 11, role: 'Kind labels and technical captions only' },
+]
+
+const RADII = [
+  { cls: 'rounded-control', px: 4, role: 'Controls, pills, compact nodes' },
+  { cls: 'rounded-panel', px: 8, role: 'Cards, panels, major surfaces' },
+]
+
+/* Semantic state colours: each is a word first, a colour second. */
+const STATE_COLORS = [
+  { token: '--state-working', dot: 'bg-state-working', text: 'text-state-working', label: 'Working', meaning: 'Busy, and nothing is wrong.' },
+  { token: '--state-waiting', dot: 'bg-state-waiting', text: 'text-state-waiting', label: 'Needs you', meaning: 'A person has to act.' },
+  { token: '--state-error', dot: 'bg-state-error', text: 'text-state-error', label: 'Error', meaning: 'A fault.' },
+  { token: '--state-success', dot: 'bg-state-success', text: 'text-state-success', label: 'Completed', meaning: 'Finished, or healthy.' },
+  { token: '--state-live', dot: 'bg-state-live', text: 'text-live-text', label: 'Live', meaning: 'Data observed or flowing right now.' },
+  { token: '--state-idle', dot: 'bg-state-idle', text: 'text-fg-mute', label: 'Idle', meaning: 'Nothing is happening.' },
 ]
 
 const SURFACES = [
   { token: '--app', cls: 'bg-app', role: 'The page ground.' },
   { token: '--card', cls: 'bg-card', role: 'A panel lifted off the ground.' },
   { token: '--raised', cls: 'bg-raised', role: 'A control or a nested block.' },
+  { token: '--recessed', cls: 'bg-recessed', role: 'Logs, transcripts, diagnostics.' },
 ]
 
 const TEXT = [
@@ -122,7 +155,7 @@ const showMotion = ref(true)
       </section>
 
       <!-- Motion vocabulary -->
-      <section class="flex flex-col gap-3">
+      <section class="flex flex-col gap-3" data-testid="sandbox-motion">
         <h2 class="text-[13px] font-semibold">
           Motion vocabulary
         </h2>
@@ -132,7 +165,21 @@ const showMotion = ref(true)
             :key="m.name"
             class="flex items-center gap-3 rounded-md border border-line bg-card px-3 py-2"
           >
+            <svg
+              v-if="m.flow"
+              class="h-2.5 w-10 shrink-0"
+              viewBox="0 0 40 10"
+              aria-hidden="true"
+              data-testid="sandbox-motion-flow"
+            >
+              <line
+                x1="1" y1="5" x2="39" y2="5"
+                stroke="var(--color-live-dot)" stroke-width="2" stroke-dasharray="6 6"
+                :class="showMotion ? m.cls : ''"
+              />
+            </svg>
             <span
+              v-else
               class="size-2.5 shrink-0 rounded-full"
               :class="[m.color, showMotion ? m.cls : '']"
               aria-hidden="true"
@@ -164,8 +211,100 @@ const showMotion = ref(true)
         </ul>
       </section>
 
+      <!-- Type scale (3B) -->
+      <section class="flex flex-col gap-3" data-testid="sandbox-type-scale">
+        <h2 class="text-[13px] font-semibold">
+          Type scale
+        </h2>
+        <p class="text-[12px] text-fg-mute">
+          Interface text stays in the system font. 12px is the floor for readable text on redesigned surfaces; 11px is
+          for kind labels and technical captions only.
+        </p>
+        <ul class="flex flex-col divide-y divide-line rounded-panel border border-line bg-card">
+          <li v-for="t in TYPE_SCALE" :key="t.cls" class="flex items-baseline gap-4 px-3 py-2" :data-testid="`sandbox-type-${t.cls}`">
+            <code class="w-28 shrink-0 text-[11px] text-fg-faint">{{ t.cls }}</code>
+            <code class="w-10 shrink-0 text-[11px] text-fg-faint tabular-nums">{{ t.px }}px</code>
+            <span class="text-fg" :class="t.cls">{{ t.role }}</span>
+          </li>
+        </ul>
+        <p class="text-ui-sm text-fg-mute">
+          Technical values use Fira Code, self-hosted:
+          <span class="font-mono text-fg-soft">feat/command-center-ui · pid 84451 · :5173 · claude-opus-5</span>
+        </p>
+      </section>
+
+      <!-- Radius (3B) -->
+      <section class="flex flex-col gap-3" data-testid="sandbox-radius">
+        <h2 class="text-[13px] font-semibold">
+          Radius
+        </h2>
+        <div class="flex flex-wrap gap-3">
+          <div
+            v-for="r in RADII"
+            :key="r.cls"
+            class="flex min-w-[220px] flex-1 flex-col gap-1 border border-line-strong bg-card p-3"
+            :class="r.cls"
+            :data-testid="`sandbox-radius-${r.cls}`"
+          >
+            <code class="text-[11px] text-fg-soft">{{ r.cls }} · {{ r.px }}px</code>
+            <span class="text-[12px] text-fg-mute">{{ r.role }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Semantic state colours (3B) -->
+      <section class="flex flex-col gap-3" data-testid="sandbox-state-colors">
+        <h2 class="text-[13px] font-semibold">
+          Semantic state colours
+        </h2>
+        <p class="text-[12px] text-fg-mute">
+          A colour is never the whole message: every swatch carries its word.
+        </p>
+        <ul class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <li
+            v-for="c in STATE_COLORS"
+            :key="c.token"
+            class="flex items-center gap-2 rounded-control border border-line bg-card px-3 py-2"
+            :data-testid="`sandbox-state-${c.token.replace('--state-', '')}`"
+          >
+            <span class="size-2.5 shrink-0 rounded-full" :class="c.dot" aria-hidden="true" />
+            <span class="text-[13px] font-medium" :class="c.text">{{ c.label }}</span>
+            <span class="text-[12px] text-fg-faint">{{ c.meaning }}</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Live vs success (3B, decision D3) -->
+      <section class="flex flex-col gap-3" data-testid="sandbox-live-vs-success">
+        <h2 class="text-[13px] font-semibold">
+          Live is not success
+        </h2>
+        <p class="text-[12px] text-fg-mute">
+          Cyan means data is being observed or is flowing right now. Green means something finished or is healthy.
+          Until 3B they shared a colour, so a live connection and a completed task looked the same.
+        </p>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div class="flex items-center gap-3 rounded-panel border border-live-line bg-live-soft px-3 py-2.5" data-testid="sandbox-live-example">
+            <svg class="h-2.5 w-10 shrink-0" viewBox="0 0 40 10" aria-hidden="true">
+              <line
+                x1="1" y1="5" x2="39" y2="5"
+                stroke="var(--color-live-dot)" stroke-width="2" stroke-dasharray="6 6"
+                :class="showMotion ? 'motion-flow' : ''"
+              />
+            </svg>
+            <span class="text-[13px] font-medium text-live-text">Live</span>
+            <span class="text-[12px] text-fg-mute">LocalScope reading arriving</span>
+          </div>
+          <div class="flex items-center gap-3 rounded-panel border border-success-line bg-success-soft px-3 py-2.5" data-testid="sandbox-success-example">
+            <span class="size-2.5 shrink-0 rounded-full bg-state-success" aria-hidden="true" />
+            <span class="text-[13px] font-medium text-success-text">Completed</span>
+            <span class="text-[12px] text-fg-mute">Task finished</span>
+          </div>
+        </div>
+      </section>
+
       <!-- Surfaces and text -->
-      <section class="grid gap-6 md:grid-cols-2">
+      <section class="grid gap-6 md:grid-cols-2" data-testid="sandbox-surfaces">
         <div class="flex flex-col gap-3">
           <h2 class="text-[13px] font-semibold">
             Surfaces
@@ -175,6 +314,7 @@ const showMotion = ref(true)
             :key="s.token"
             class="flex items-center gap-3 rounded-md border border-line p-3"
             :class="s.cls"
+            :data-testid="`sandbox-surface-${s.token.replace('--', '')}`"
           >
             <code class="w-20 shrink-0 text-[11px] text-fg-soft">{{ s.token }}</code>
             <span class="text-[12px] text-fg-mute">{{ s.role }}</span>
