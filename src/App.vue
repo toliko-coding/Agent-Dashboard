@@ -3,6 +3,7 @@ import type { Agent, PipelineTask } from './types'
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAgents } from '@/features/agents/composables/useAgents'
 import { useAttentionQueue } from '@/features/attention/useAttentionQueue'
+import { activeWorkAgents } from '@/features/cockpit/commandModel'
 import BacklogForm from '@/features/pipeline/components/BacklogForm.vue'
 import { useTasks } from '@/features/pipeline/composables/useTasks'
 import ApiKeySettings from '@/features/settings/components/ApiKeySettings.vue'
@@ -122,14 +123,16 @@ onMounted(() => {
   void loadServerConfig()
 })
 
-const { agents, costTrend, filteredAgents, selectedAgent, isLoading, error, live, selectAgent, selectAgentWhenAvailable, startStream: startAgents } = useAgents({ autoStart: false })
+const { agents, costTrend, filteredAgents, selectedAgent, isLoading, error, live, lastUpdatedAt, selectAgent, selectAgentWhenAvailable, startStream: startAgents } = useAgents({ autoStart: false })
 const { tasks, selectedTask, selectTask, startStream: startTasks } = useTasks({ autoStart: false })
 const { items: permissionItems, approve: approvePermission, deny: denyPermission } = usePendingPermissions(tasks)
 // The canonical attention queue, derived once here where the permission items
-// live, and handed to every consumer so the sidebar and the Overview count the
+// live, and handed to every consumer so the sidebar and Command count the
 // same things. It replaced a count that included every idle "your turn" agent.
 const attention = useAttentionQueue(permissionItems)
 const needsYouCount = computed(() => attention.value.items.length)
+// Command's Active work count, for the sidebar's environment line; null until agents are observed.
+const workingCount = computed(() => lastUpdatedAt.value === null ? null : activeWorkAgents(agents.value, attention.value.items).length)
 // The agents behind the queue's agent items, in queue order: what the triage
 // shortcuts (n / a / d / ⇧A) step through and act on. Derived from the queue,
 // never re-decided, so a key can only reach an item the band is showing.
@@ -322,6 +325,7 @@ onMounted(() => usageComposable.start())
         <AppSidebar
           :agent-count="filteredAgents.length"
           :attention-count="needsYouCount"
+          :working-count="workingCount"
           :task-count="tasks.length"
           :live="live"
           :theme="theme"

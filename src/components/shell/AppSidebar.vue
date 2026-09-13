@@ -3,7 +3,7 @@ import type { ActiveView } from '../../composables/useViewState'
 import { computed } from 'vue'
 import { useSidebar } from '../../composables/useSidebar'
 import { useViewState } from '../../composables/useViewState'
-import { NAV_GROUPS, NAV_ITEMS } from '../../utils/navConfig'
+import { navSections } from '../../utils/navConfig'
 import MachineCard from './MachineCard.vue'
 import NavItem from './NavItem.vue'
 import SidebarFooter from './SidebarFooter.vue'
@@ -11,6 +11,8 @@ import SidebarFooter from './SidebarFooter.vue'
 const props = defineProps<{
   agentCount: number
   attentionCount: number
+  /** Working agents (Command's Active work count); null before agents are observed. */
+  workingCount?: number | null
   taskCount: number
   live: boolean
   theme: 'dark' | 'light'
@@ -26,8 +28,16 @@ const emit = defineEmits<{
 const { expanded, pinned, togglePinned, setHovering, setFocused, collapseAfterSelect } = useSidebar()
 const { activeView } = useViewState()
 
-const grouped = computed(() =>
-  NAV_GROUPS.map(group => ({ group, items: NAV_ITEMS.filter(i => i.group === group) })))
+/*
+ * Destinations in order. A destination of several views gets a caption; a break
+ * separates any destination that is, or follows, such a group, so a single
+ * entry (Projects) never reads as the last item of the group above it.
+ */
+const grouped = computed(() => navSections().map((section, index, all) => ({
+  ...section,
+  caption: section.items.length > 1 ? section.group : null,
+  breakBefore: index > 0 && (section.items.length > 1 || all[index - 1].items.length > 1),
+})))
 
 function badgeFor(view: ActiveView): number | null {
   if (view === 'dashboard')
@@ -94,6 +104,17 @@ function selectView(view: ActiveView): void {
             />
             {{ live ? 'Agent updates live' : 'Reconnecting…' }}
           </span>
+          <!--
+            The environment in one line: the same working count as Command's
+            Active work and the same Needs you queue as the badge. No LocalScope
+            freshness here — the sidebar is on every page, and reading the
+            snapshot would start its poller everywhere.
+          -->
+          <span
+            v-if="workingCount !== null && workingCount !== undefined"
+            class="text-[11px] text-fg-faint tabular-nums truncate"
+            data-testid="sidebar-environment"
+          >{{ workingCount }} working · {{ attentionCount }} {{ attentionCount === 1 ? 'needs' : 'need' }} you</span>
         </div>
         <button
           type="button"
@@ -109,18 +130,20 @@ function selectView(view: ActiveView): void {
 
       <div class="flex-1 flex flex-col gap-0.5 overflow-y-auto">
         <div
-          v-for="(g, gi) in grouped"
+          v-for="g in grouped"
           :key="g.group"
           class="flex flex-col gap-0.5"
+          :data-testid="`nav-section-${g.group.toLowerCase()}`"
         >
-          <div v-if="expanded" class="px-2 pt-3 pb-1 text-[9px] uppercase tracking-wider text-fg-faint font-bold">
-            {{ g.group }}
+          <div v-if="expanded && g.caption" class="px-2 pt-3 pb-1 text-[9px] uppercase tracking-wider text-fg-faint font-bold">
+            {{ g.caption }}
           </div>
           <div
-            v-else-if="gi > 0"
+            v-else-if="g.breakBefore"
             aria-hidden="true"
             data-testid="nav-group-divider"
-            class="h-px w-6 bg-line self-center my-2"
+            class="h-px bg-line self-center my-2"
+            :class="expanded ? 'w-[calc(100%-1rem)]' : 'w-6'"
           />
           <NavItem
             v-for="item in g.items"
@@ -143,19 +166,16 @@ function selectView(view: ActiveView): void {
         </div>
 
         <!--
-          System group. Settings opens a modal rather than switching the active
-          view, so it is rendered here instead of living in NAV_ITEMS (which is
-          typed to ActiveView). It is never `active` for the same reason.
+          Settings, the last destination. It opens a modal rather than switching
+          the active view, so it is rendered here instead of living in NAV_ITEMS
+          (which is typed to ActiveView). It is never `active` for the same reason.
         -->
-        <div class="flex flex-col gap-0.5">
-          <div v-if="expanded" class="px-2 pt-3 pb-1 text-[9px] uppercase tracking-wider text-fg-faint font-bold">
-            System
-          </div>
+        <div class="flex flex-col gap-0.5" data-testid="nav-section-settings">
           <div
-            v-else
             aria-hidden="true"
             data-testid="nav-group-divider"
-            class="h-px w-6 bg-line self-center my-2"
+            class="h-px bg-line self-center my-2"
+            :class="expanded ? 'w-[calc(100%-1rem)]' : 'w-6'"
           />
           <NavItem
             icon="⚙"

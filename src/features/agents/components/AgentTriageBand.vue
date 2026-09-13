@@ -188,7 +188,7 @@ function openTask(item: AttentionItem): void {
 const totalRequestCount = computed(() => props.permissionItems.reduce((s, i) => s + i.requests.length, 0))
 
 // "2 blocking · 1 failed · 1 ready" — counted from the queue, so it can never
-// disagree with the count beside it or with the Overview.
+// disagree with the count beside it or with Command.
 const breakdown = computed(() => {
   const counts: Record<AttentionLevel, number> = { blocking: 0, failed: 0, stalled: 0, ready: 0 }
   for (const item of items.value)

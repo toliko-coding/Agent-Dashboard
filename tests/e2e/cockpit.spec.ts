@@ -96,8 +96,8 @@ test.describe('cockpit panels', () => {
   test('the cockpit does not replace the dashboard, it sits beside it', async ({ page }) => {
     await stubJson(page, '/api/github/summary', { error: 'github is not configured' }, 503)
     await openCockpit(page)
-    await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Dashboard' }).click()
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Dashboard')
+    await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Agents' }).click()
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Agents')
     await expect(page.getByTestId('cockpit')).toHaveCount(0)
   })
 })

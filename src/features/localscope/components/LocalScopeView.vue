@@ -346,7 +346,7 @@ function stateTone(state: string): string {
 
       <!--
         Network has a count and no detail view. The count is real — it comes
-        from the same snapshot the Overview reads — so this section states what
+        from the same snapshot the Command page reads — so this section states what
         exists rather than claiming nothing was collected.
       -->
       <section class="flex flex-col gap-2">

@@ -96,3 +96,22 @@ describe('appTopbar — 3D status truth', () => {
     expect(sidebar).toContain('live ? \'Agent updates live\' : \'Reconnecting…\'')
   })
 })
+
+describe('appTopbar — 3F navigation', () => {
+  it('titles the landing view Command', () => {
+    const w = mount(AppTopbar, { props: { activeView: 'cockpit' } })
+    expect(w.get('h1').text()).toBe('Command')
+    expect(w.find('[data-testid="topbar-section"]').exists()).toBe(false)
+  })
+
+  it('names the destination a grouped view belongs to, beside an unchanged heading', () => {
+    const w = mount(AppTopbar, { props: { activeView: 'localscope' } })
+    expect(w.get('[data-testid="topbar-section"]').text()).toContain('Runtime')
+    expect(w.get('h1').text()).toBe('LocalScope')
+    expect(mount(AppTopbar, { props: { activeView: 'workflows' } }).get('[data-testid="topbar-section"]').text()).toContain('Work')
+  })
+
+  it('still titles a saved Terminal view that left the navigation', () => {
+    expect(mount(AppTopbar, { props: { activeView: 'terminal' } }).get('h1').text()).toBe('Terminal')
+  })
+})

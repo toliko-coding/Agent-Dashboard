@@ -2,7 +2,7 @@
 import type { ActiveView } from '../../composables/useViewState'
 import { computed } from 'vue'
 import { useNow } from '../../composables/useNow'
-import { viewTitle } from '../../utils/navConfig'
+import { viewSection, viewTitle } from '../../utils/navConfig'
 import OfflineBadge from '../OfflineBadge.vue'
 
 const props = withDefaults(defineProps<{
@@ -19,6 +19,8 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ openSearch: [] }>()
 
 const title = computed(() => viewTitle(props.activeView))
+// Runtime, Work or Insights for a view inside one of them; nothing for a single-view destination.
+const section = computed(() => viewSection(props.activeView))
 
 const { nowMs } = useNow()
 // Ticks on the shared 30s clock, so the minute display can lag by up to 30s —
@@ -56,6 +58,7 @@ const initials = computed(() => (props.userLabel ?? '').trim().slice(0, 2).toUpp
 
 <template>
   <header class="h-12 shrink-0 flex items-center gap-3 px-4 border-b border-line bg-card">
+    <span v-if="section" class="text-[12px] text-fg-mute shrink-0" data-testid="topbar-section">{{ section }} <span aria-hidden="true">/</span></span>
     <h1 class="text-[15px] font-semibold text-fg shrink-0">
       {{ title }}
     </h1>

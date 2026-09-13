@@ -1,63 +1,58 @@
 import type { ActiveView } from '../composables/useViewState'
 import { describe, expect, it } from 'vitest'
-import { NAV_GROUPS, NAV_ITEMS, viewTitle } from './navConfig'
+import { ACTIVE_VIEWS } from '../composables/useViewState'
+import { NAV_GROUPS, NAV_ITEMS, navSections, viewSection, viewTitle } from './navConfig'
 
-describe('navConfig', () => {
-  it('has one item per ActiveView', () => {
-    const views = NAV_ITEMS.map(i => i.view).sort()
-    expect(views).toEqual([
-      'cockpit',
-      'cost',
-      'dashboard',
-      'eval',
-      'localscope',
-      'pipeline',
-      'projects',
-      'schedules',
-      'system',
-      'terminal',
-      'workflows',
+describe('navConfig — destinations', () => {
+  it('is organised as Command, Agents, Runtime, Work, Projects, Insights', () => {
+    expect(NAV_GROUPS).toEqual(['Command', 'Agents', 'Runtime', 'Work', 'Projects', 'Insights'])
+    expect(navSections().map(s => [s.group, s.items.map(i => i.view)])).toEqual([
+      ['Command', ['cockpit']],
+      ['Agents', ['dashboard']],
+      ['Runtime', ['localscope', 'system']],
+      ['Work', ['pipeline', 'schedules', 'workflows']],
+      ['Projects', ['projects']],
+      ['Insights', ['cost', 'eval']],
     ])
   })
 
-  // The two renamed destinations keep their original view ids because those ids
-  // are persisted in localStorage; only the label changed.
-  it('presents cockpit as Overview and dashboard as Agents', () => {
+  // View ids are persisted in localStorage; only labels change.
+  it('presents cockpit as Command and dashboard as Agents without renaming their ids', () => {
     expect(NAV_ITEMS[0].view).toBe('cockpit')
-    expect(viewTitle('cockpit')).toBe('Overview')
+    expect(viewTitle('cockpit')).toBe('Command')
     expect(viewTitle('dashboard')).toBe('Agents')
   })
 
-  it('groups are Main, Automation, Tools and Insights', () => {
-    expect(NAV_GROUPS).toEqual(['Main', 'Automation', 'Tools', 'Insights'])
+  it('keeps Projects its own destination, apart from Runtime', () => {
+    expect(NAV_ITEMS.find(i => i.view === 'projects')?.group).toBe('Projects')
+    expect(viewSection('projects')).toBeNull()
   })
 
-  it('keeps every previously shipped view reachable', () => {
-    const views = NAV_ITEMS.map(i => i.view)
-    for (const view of ['pipeline', 'schedules', 'workflows', 'cost', 'eval'] as ActiveView[])
-      expect(views).toContain(view)
-  })
-
-  it('groups Pipeline, Schedules and Workflows under Automation', () => {
-    const automation = NAV_ITEMS.filter(i => i.group === 'Automation').map(i => i.view)
-    expect(automation).toEqual(['pipeline', 'schedules', 'workflows'])
-  })
-
-  it('groups Cost and Eval under Insights', () => {
-    const insights = NAV_ITEMS.filter(i => i.group === 'Insights').map(i => i.view)
-    expect(insights).toEqual(['cost', 'eval'])
-  })
-
-  // Settings is a modal, not a view, so it must not appear here — AppSidebar
-  // renders it as its own trailing System group.
+  // Settings is a modal, not a view; AppSidebar renders it as the trailing entry.
   it('contains no Settings entry', () => {
     expect(NAV_ITEMS.some(i => i.label === 'Settings')).toBe(false)
-    expect(NAV_GROUPS).not.toContain('System' as never)
   })
 
-  it('every item belongs to a known group', () => {
-    for (const item of NAV_ITEMS)
-      expect(NAV_GROUPS).toContain(item.group)
+  it('names the section of a view inside a multi-view destination only', () => {
+    expect(viewSection('localscope')).toBe('Runtime')
+    expect(viewSection('workflows')).toBe('Work')
+    expect(viewSection('eval')).toBe('Insights')
+    expect(viewSection('cockpit')).toBeNull()
+    expect(viewSection('terminal')).toBeNull()
+  })
+})
+
+describe('navConfig — saved state and retired entries', () => {
+  it('lists every view except Terminal, which left the navigation', () => {
+    expect(NAV_ITEMS.map(i => i.view).sort()).toEqual(ACTIVE_VIEWS.filter(v => v !== 'terminal').sort())
+  })
+
+  // A saved view id must keep resolving: nothing a user stored is invalidated.
+  it('still titles every persisted view id, Terminal included', () => {
+    for (const view of ACTIVE_VIEWS as ActiveView[])
+      expect(viewTitle(view), view).not.toBe('')
+    expect(viewTitle('terminal')).toBe('Terminal')
+    expect(ACTIVE_VIEWS).toContain('terminal')
   })
 
   it('viewTitle returns the label for a view', () => {

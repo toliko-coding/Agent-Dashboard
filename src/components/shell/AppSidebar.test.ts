@@ -39,16 +39,17 @@ describe('appSidebar', () => {
     const { AppSidebar, useSidebar } = await load()
     useSidebar().togglePinned()
     const w = mount(AppSidebar, { props })
-    expect(w.text()).toContain('Main')
-    expect(w.text()).toContain('Automation')
-    expect(w.text()).toContain('Tools')
+    // Captions name only the destinations made of several views.
+    expect(w.text()).toContain('Runtime')
+    expect(w.text()).toContain('Work')
     expect(w.text()).toContain('Insights')
-    expect(w.text()).toContain('System')
+    for (const retired of ['Main', 'Automation', 'Tools'])
+      expect(w.text()).not.toContain(retired)
   })
 
   // Settings opens a modal, so it is not a view — it must emit rather than
   // setting activeView, and there must be exactly one of it in the rail.
-  it('emits openSettings from the System group without changing the view', async () => {
+  it('emits openSettings from the trailing Settings entry without changing the view', async () => {
     const { AppSidebar, useViewState, useSidebar } = await load()
     useSidebar().togglePinned()
     const w = mount(AppSidebar, { props })
@@ -108,18 +109,19 @@ describe('appSidebar', () => {
   it('separates the nav groups with a rule when collapsed', async () => {
     const { AppSidebar } = await load()
     const w = mount(AppSidebar, { props })
-    // Four nav groups plus the trailing System group: the first nav group needs
-    // no leading rule, so that is 3 + 1 = 4. The group captions that carry the
-    // split when expanded are hidden in the icon rail.
-    expect(w.findAll('[data-testid="nav-group-divider"]')).toHaveLength(4)
-    expect(w.text()).not.toContain('Main')
+    // Breaks before Runtime, Work, Projects (after the Work group) and Insights,
+    // plus the one before Settings. Command and Agents run together.
+    expect(w.findAll('[data-testid="nav-group-divider"]')).toHaveLength(5)
+    expect(w.text()).not.toContain('Runtime')
   })
 
-  it('drops the rules again once the captions are back', async () => {
+  it('keeps rules only where no caption separates the next destination', async () => {
     const { AppSidebar, useSidebar } = await load()
     useSidebar().togglePinned()
     const w = mount(AppSidebar, { props })
-    expect(w.findAll('[data-testid="nav-group-divider"]')).toHaveLength(0)
+    // Captions carry Runtime, Work and Insights; Projects and Settings keep a rule.
+    expect(w.findAll('[data-testid="nav-group-divider"]')).toHaveLength(2)
+    expect(w.find('[data-testid="nav-section-projects"] [data-testid="nav-group-divider"]').exists()).toBe(true)
   })
 
   it('keeps the rail at icon width while the hovered nav floats over the content', async () => {
@@ -279,5 +281,47 @@ describe('appSidebar — 3B.1 status truth', () => {
   // E: the line is a pure function of a prop — no request or timer of its own.
   it('opens no request and starts no timer for the status line', () => {
     expect(sidebarSource).not.toMatch(/setInterval|useIntervalFn|useTimeoutPoll|fetch\(|EventSource|useLocalMachine|useAgents/)
+  })
+})
+
+const sidebarSource = readFileSync(resolve(process.cwd(), 'src/components/shell/AppSidebar.vue'), 'utf8')
+
+describe('appSidebar — 3F navigation', () => {
+  it('lists the destinations in order, with Terminal no longer among them', async () => {
+    const { AppSidebar, useSidebar } = await load()
+    useSidebar().togglePinned()
+    const w = mount(AppSidebar, { props })
+    const order = ['Command', 'Agents', 'LocalScope', 'System', 'Pipeline', 'Schedules', 'Workflows', 'Projects', 'Cost', 'Eval', 'Settings']
+    // Each nav button also carries its icon glyph and any badge, so match by the label it contains.
+    const labels = w.findAll('nav button')
+      .map(b => [...order, 'Terminal', 'Overview'].find(label => b.text().includes(label)))
+      .filter((label): label is string => Boolean(label))
+    expect(labels).toEqual(order)
+  })
+
+  it('opens Command from its entry', async () => {
+    const { AppSidebar, useViewState } = await load()
+    useViewState().activeView.value = 'pipeline'
+    const w = mount(AppSidebar, { props })
+    await w.findAll('button').find(b => b.text().includes('Command'))!.trigger('click')
+    expect(useViewState().activeView.value).toBe('cockpit')
+  })
+
+  it('states working agents and the Needs you count in one line when both are known', async () => {
+    const { AppSidebar, useSidebar } = await load()
+    useSidebar().togglePinned()
+    const w = mount(AppSidebar, { props: { ...props, workingCount: 3, attentionCount: 1 } })
+    expect(w.get('[data-testid="sidebar-environment"]').text()).toBe('3 working · 1 needs you')
+  })
+
+  it('omits the environment line before agents are observed rather than claiming zero', async () => {
+    const { AppSidebar, useSidebar } = await load()
+    useSidebar().togglePinned()
+    const w = mount(AppSidebar, { props: { ...props, workingCount: null } })
+    expect(w.find('[data-testid="sidebar-environment"]').exists()).toBe(false)
+  })
+
+  it('reads no LocalScope snapshot, so it starts no poller on every page', () => {
+    expect(sidebarSource).not.toMatch(/useLocalMachine|features\/localscope/)
   })
 })
