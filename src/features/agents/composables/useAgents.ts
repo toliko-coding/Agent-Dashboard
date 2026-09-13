@@ -29,6 +29,10 @@ const error = ref<string | null>(null)
 // apart from `error`, which is a failed request shown to the user; a stream
 // that is retrying is not an error to display, but it is not live either.
 const streamDown = ref(false)
+// When agent data last arrived, or null before any has. Separates "nothing is
+// known yet" from "known, and empty" — which isLoading cannot, since a failed
+// first read also clears it.
+const lastUpdatedAt = ref<number | null>(null)
 /**
  * Agent updates are arriving: the stream is open (or a poll succeeded) and the
  * last request did not fail. The only thing the shell's live indicators may
@@ -69,6 +73,7 @@ function handleAgentData(data: Agent[], _trend: TrendPoint[] | undefined, decisi
 
   error.value = null
   streamDown.value = false
+  lastUpdatedAt.value = Date.now()
   isLoading.value = false
 
   if (selectedAgent.value) {
@@ -217,6 +222,7 @@ export function useAgents(options?: { autoStart?: boolean }) {
     isLoading,
     error,
     live,
+    lastUpdatedAt,
     searchQuery,
     selectAgent,
     dismissAgent,

@@ -194,3 +194,29 @@ describe('useAgents live', () => {
     wrapper.unmount()
   })
 })
+
+describe('useAgents last-known data', () => {
+  const lastSource = () => MockEventSource.instances.at(-1)!
+  const frameWith = (agents: unknown[]) => ({ data: JSON.stringify({ agents, trend: [] }) } as MessageEvent)
+
+  it('has no observation time until agent data arrives', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
+    const { result, wrapper } = withSetup(() => useAgents.useAgents({ autoStart: true }))
+    await flushPromises()
+    expect(result.lastUpdatedAt.value).toBeNull()
+    lastSource().onmessage?.(frameWith([]))
+    expect(result.lastUpdatedAt.value).toEqual(expect.any(Number))
+    wrapper.unmount()
+  })
+
+  // N: a dropped stream does not erase what was last observed.
+  it('keeps the last agents while the stream reconnects', async () => {
+    const { result, wrapper } = withSetup(() => useAgents.useAgents({ autoStart: true }))
+    await flushPromises()
+    lastSource().onmessage?.(frameWith([{ sessionId: 'kept', pid: 1, tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 }, costEstimate: 0 }]))
+    lastSource().onerror?.({} as Event)
+    expect(result.live.value).toBe(false)
+    expect(result.agents.value.map(a => a.sessionId)).toEqual(['kept'])
+    wrapper.unmount()
+  })
+})
