@@ -1,4 +1,4 @@
-import type { Agent } from '../types'
+import type { Agent, WorkspaceRef } from '../types'
 import { AGENT_STATUSES, SPAWNER_SOURCE_ENV } from '../types'
 import { STATUS_ORDER } from './agentSort'
 import { secondsSince, shortModel } from './format'
@@ -19,6 +19,9 @@ export const AGENT_GROUP_OPTIONS = [
   { value: 'status', label: 'Status' },
   { value: 'model', label: 'Model' },
   { value: 'spawner', label: 'Spawner' },
+  // Two levels — repository, then workspace — keyed on opaque identity ids.
+  // See groupByWorkspace for why neither level alone is enough.
+  { value: 'workspace', label: 'Repository & workspace' },
 ] as const
 
 export type AgentSort = typeof AGENT_SORT_OPTIONS[number]['value']
@@ -38,12 +41,61 @@ export function resolveGroup(groupBy: AgentGroup, spawnerFilter: string): AgentG
   return agentGroupOptions(spawnerFilter).some(o => o.value === groupBy) ? groupBy : 'none'
 }
 
+/**
+ * What a group structurally is. Set only by the repository-and-workspace mode;
+ * every other mode leaves it undefined and renders exactly as before.
+ */
+export type AgentGroupKind = 'repository' | 'local' | 'unknown' | 'workspace'
+
 export interface AgentGrouping {
   key: string
   label: string | null
   agents: Agent[]
   /** Set when the grouping was derived rather than recorded; carries the why. */
   derivedFrom?: string
+  kind?: AgentGroupKind
+  /**
+   * The second level. Present on repository and local sections only. Every
+   * agent in `agents` appears in exactly one child, so the parent's count and
+   * cost stay the sum of what it contains.
+   */
+  children?: AgentGrouping[]
+  /** The workspace a second-level group stands for, for its row to describe. */
+  workspace?: WorkspaceRef
+}
+
+const LOCAL_WORKSPACES_KEY = 'workspace-section:local'
+const UNKNOWN_WORKSPACE_KEY = 'workspace-section:unknown'
+
+/**
+ * The words for a workspace: a title and what kind of checkout it is.
+ *
+ * Shared by the roster row and anything else that names a workspace, so a
+ * detached worktree reads "Detached HEAD" everywhere rather than as a branch
+ * that happens to be missing.
+ */
+export function workspaceDisplay(ws: WorkspaceRef): { title: string, kind: string } {
+  if (ws.kind === 'plain')
+    return { title: ws.name, kind: 'not a Git repository' }
+  const title = ws.detached ? 'Detached HEAD' : (ws.branch || 'Branch unknown')
+  return { title, kind: ws.kind === 'git-worktree' ? 'worktree' : 'main checkout' }
+}
+
+/** The structural word a first-level group is introduced with, if any. */
+export function groupPrefix(group: AgentGrouping): string | undefined {
+  return group.kind === 'repository' ? 'Repository' : undefined
+}
+
+/**
+ * A workspace count, only where it says something.
+ *
+ * Omitted for a single workspace: nearly every repository has exactly one
+ * active checkout, and "1 workspace" on each of them is noise. Two or more is
+ * the fact worth stating — it is how a worktree announces itself.
+ */
+export function groupDetail(group: AgentGrouping): string | undefined {
+  const n = group.children?.length ?? 0
+  return n >= 2 ? `${n} workspaces` : undefined
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -133,5 +185,78 @@ export function groupAgents(list: Agent[], groupBy: AgentGroup): AgentGrouping[]
       Number(a.key === UNASSIGNED_SPAWNER_KEY) - Number(b.key === UNASSIGNED_SPAWNER_KEY))
   }
 
+  if (groupBy === 'workspace')
+    return groupByWorkspace(list)
+
   return [{ key: 'all', label: null, agents: list }]
+}
+
+// Main checkout before its worktrees, so the primary branch leads its repository.
+const WORKSPACE_KIND_ORDER: Record<string, number> = { 'git-main': 0, 'git-worktree': 1, 'plain': 2 }
+
+/*
+ * Repository -> workspace, read straight off each agent's WorkspaceRef.
+ *
+ * Grouping keys are opaque ids and nothing else: the repository id for the
+ * first level, the workspace id for the second. Names are display only — two
+ * clones both called "web" are two repositories that share a label, and a
+ * rename changes a heading, never a group. (The `project` mode keys on
+ * projectName, which is basename(cwd); it is left exactly as it was.)
+ *
+ * Why two levels rather than one: repository identity is what makes a worktree
+ * recognisably the same project, and workspace identity is what keeps it a
+ * separate one, with its own branch, agents and services. One level on the
+ * repository id would merge two worktrees; one level on the workspace id would
+ * scatter a repository into unrelated-looking groups.
+ *
+ * Plain (non-git) workspaces have no repository, so they sit under a "Local
+ * workspaces" section rather than inside a synthesised one. Agents with no
+ * workspace identity trail in "Workspace unknown": present, never dropped, and
+ * never attached to a repository whose name happens to match.
+ */
+function groupByWorkspace(list: Agent[]): AgentGrouping[] {
+  const repositories = new Map<string, AgentGrouping>()
+  const local: AgentGrouping = { key: LOCAL_WORKSPACES_KEY, label: 'Local workspaces', kind: 'local', agents: [], children: [] }
+  const unknown: AgentGrouping = { key: UNKNOWN_WORKSPACE_KEY, label: 'Workspace unknown', kind: 'unknown', agents: [] }
+
+  for (const agent of list) {
+    const ws = agent.workspace
+    if (!ws?.id) {
+      unknown.agents.push(agent)
+      continue
+    }
+
+    let parent = local
+    if (ws.repository?.id) {
+      const key = `repository:${ws.repository.id}`
+      let repo = repositories.get(key)
+      if (!repo) {
+        // A bare repository or a submodule has no working-tree name to show.
+        repo = { key, label: ws.repository.name || 'Repository', kind: 'repository', agents: [], children: [] }
+        repositories.set(key, repo)
+      }
+      parent = repo
+    }
+
+    parent.agents.push(agent)
+    const childKey = `workspace:${ws.id}`
+    let child = parent.children!.find(c => c.key === childKey)
+    if (!child) {
+      child = { key: childKey, label: workspaceDisplay(ws).title, kind: 'workspace', workspace: ws, agents: [] }
+      parent.children!.push(child)
+    }
+    child.agents.push(agent)
+  }
+
+  const sections = [...repositories.values()]
+  if (local.children!.length > 0)
+    sections.push(local)
+  for (const section of sections) {
+    section.children!.sort((a, b) =>
+      (WORKSPACE_KIND_ORDER[a.workspace!.kind] ?? 3) - (WORKSPACE_KIND_ORDER[b.workspace!.kind] ?? 3))
+  }
+  // The residual bucket trails the identified ones, as Unassigned does for spawners.
+  if (unknown.agents.length > 0)
+    sections.push(unknown)
+  return sections
 }

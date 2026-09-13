@@ -3,7 +3,9 @@ import type { Agent } from '@/types'
 import type { AgentGroup, AgentGrouping } from '@/utils/agentGroup'
 import { computed, ref, watch } from 'vue'
 import GroupHeader from '@/components/shell/GroupHeader.vue'
+import { groupDetail, groupPrefix } from '@/utils/agentGroup'
 import AgentCard from './AgentCard.vue'
+import WorkspaceGroupRow from './WorkspaceGroupRow.vue'
 
 const props = defineProps<{
   agents: Agent[]
@@ -104,9 +106,36 @@ watch(() => props.groups, (groups) => {
           :agents="group.agents"
           :collapsed="isCollapsed(group.key)"
           :derived-from="group.derivedFrom"
+          :prefix="groupPrefix(group)"
+          :detail="groupDetail(group)"
           @toggle="toggleGroup(group.key)"
         />
+        <!--
+          Second level (repository-and-workspace mode only): each workspace is
+          its own group with its own compact row. The repository collapses as a
+          unit; workspaces stay open beneath it to keep the roster light.
+        -->
         <div
+          v-if="group.children"
+          v-show="!isCollapsed(group.key)"
+          class="flex flex-col gap-2 mt-2"
+          data-testid="group-workspaces"
+        >
+          <div v-for="child in group.children" :key="child.key" class="flex flex-col gap-1.5">
+            <WorkspaceGroupRow :workspace="child.workspace!" :agents="child.agents" />
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="group-card-grid">
+              <AgentCard
+                v-for="agent in child.agents"
+                :key="agent.pid"
+                :agent="agent"
+                @select="$emit('select', agent)"
+                @dismiss="$emit('dismiss', $event)"
+              />
+            </div>
+          </div>
+        </div>
+        <div
+          v-else
           v-show="!isCollapsed(group.key)"
           class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-2"
           data-testid="group-card-grid"

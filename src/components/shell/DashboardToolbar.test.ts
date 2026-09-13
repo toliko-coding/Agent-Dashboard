@@ -103,7 +103,8 @@ describe('dashboardToolbar', () => {
   it('offers spawner grouping while no spawner is filtered', async () => {
     const w = mountToolbar()
     const panel = await openListbox(w.get('[data-testid="select-group"]'))
-    expect(panel.querySelectorAll('[role="option"]')).toHaveLength(5)
+    // none, project, status, model, spawner, repository & workspace.
+    expect(panel.querySelectorAll('[role="option"]')).toHaveLength(6)
     expect(optionByLabel(panel, 'Spawner')).toBeTruthy()
   })
 
@@ -111,8 +112,10 @@ describe('dashboardToolbar', () => {
     const w = mountToolbar({ spawner: 'claude' })
     const panel = await openListbox(w.get('[data-testid="select-group"]'))
     const labels = [...panel.querySelectorAll('[role="option"]')].map(o => o.textContent?.trim())
-    expect(labels).toHaveLength(4)
+    expect(labels).toHaveLength(5)
     expect(labels).not.toContain('Spawner')
+    // Only spawner grouping is redundant under a spawner filter.
+    expect(labels).toContain('Repository & workspace')
   })
 
   // The resolved grouping now comes from useViewState, so the control renders
@@ -186,5 +189,21 @@ describe('dashboardToolbar', () => {
     await nextTick()
 
     expect(document.activeElement).toBe(w.get('[data-testid="toolbar-search"]').element)
+  })
+})
+
+describe('dashboardToolbar — repository & workspace grouping', () => {
+  it('offers repository & workspace grouping', async () => {
+    const w = mountToolbar()
+    const panel = await openListbox(w.get('[data-testid="select-group"]'))
+    expect(optionByLabel(panel, 'Repository & workspace')).toBeTruthy()
+  })
+
+  it('emits the workspace grouping when it is chosen', async () => {
+    const w = mountToolbar()
+    const panel = await openListbox(w.get('[data-testid="select-group"]'))
+    optionByLabel(panel, 'Repository & workspace').dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await w.vm.$nextTick()
+    expect(w.emitted('update:groupBy')?.[0]).toEqual(['workspace'])
   })
 })
