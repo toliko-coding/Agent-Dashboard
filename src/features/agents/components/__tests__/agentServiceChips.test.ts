@@ -250,3 +250,59 @@ describe('agentServiceChips — shared resource', () => {
     vi.useRealTimers()
   })
 })
+
+/*
+ * Zero and unknown must not look alike. Strict identity made both render as
+ * nothing until these states existed.
+ */
+describe('agentServiceChips — attribution honesty', () => {
+  it('shows a neutral marker when the agent has no workspace identity', async () => {
+    const agent = { cwd: '/gh/X', sessionId: 'x', projectName: 'X', workspace: null } as unknown as Agent
+    const w = await mountChips(agent, { data: [svc({ id: 'a', workspace: { ...WS } })] })
+
+    const marker = w.get('[data-testid="agent-service-identity-unknown"]')
+    expect(marker.text()).toContain('identity unknown')
+    // Neutral, not an error: an unidentifiable workspace is an ordinary state.
+    expect(marker.classes().join(' ')).toMatch(/neutral/)
+    expect(marker.classes().join(' ')).not.toMatch(/danger/)
+    // And it is not the chip row.
+    expect(w.find('[data-testid="agent-service-chips"]').exists()).toBe(false)
+  })
+
+  it('renders nothing at all for a genuine zero, never a marker', async () => {
+    const w = await mountChips(agentAt('/gh/Quiet'), {
+      data: [svc({ id: 'a', workspace: { ...WS, id: 'ws_elsewhere' } })],
+    })
+    expect(w.find('[data-testid="agent-service-identity-unknown"]').exists()).toBe(false)
+    expect(w.find('[data-testid="agent-service-chips"]').exists()).toBe(false)
+  })
+
+  it('renders nothing when the collector reported no list', async () => {
+    // Already stated on the Overview; repeating it per card adds nothing.
+    const w = await mountChips(agentAt('/gh/LocalScope'), { reachable: false, data: null })
+    expect(w.find('[data-testid="agent-service-identity-unknown"]').exists()).toBe(false)
+    expect(w.find('[data-testid="agent-service-chips"]').exists()).toBe(false)
+  })
+
+  it('keeps known matches and notes what could not be attributed', async () => {
+    const w = await mountChips(agentAt('/gh/LocalScope'), {
+      data: [
+        svc({ id: 'a', port: 5173, workspace: { ...WS } }),
+        svc({ id: 'b', port: 9999, workspace: null }),
+      ],
+    })
+    // The good match is shown in full…
+    expect(w.find('[data-testid="agent-service-5173"]').exists()).toBe(true)
+    // …the unattributed one is neither shown nor attached…
+    expect(w.find('[data-testid="agent-service-9999"]').exists()).toBe(false)
+    // …and the list does not pretend to be complete.
+    expect(w.get('[data-testid="agent-service-unattributed"]').text()).toContain('1')
+  })
+
+  it('says nothing about unattributed observations when everything resolved', async () => {
+    const w = await mountChips(agentAt('/gh/LocalScope'), {
+      data: [svc({ id: 'a', port: 5173, workspace: { ...WS } })],
+    })
+    expect(w.find('[data-testid="agent-service-unattributed"]').exists()).toBe(false)
+  })
+})

@@ -7,14 +7,21 @@ import { useAgentServices } from '../composables/useAgentServices'
  * Compact runtime indicator for an agent card: the listening ports LocalScope
  * observed inside this agent's project.
  *
- * Rendering rules, all of them omissions rather than placeholders:
- *   - LocalScope unreachable/erroring → render nothing. The Overview and the
- *     LocalScope view already say the collector is down; an error badge on
- *     every card would repeat it once per agent for no added information.
- *   - collector healthy but no correlated service → render nothing. In
- *     particular never "Services 0": this component cannot distinguish
- *     "collected and none belong to this project" from "this project was not
- *     represented in the sample", and only the former would justify a zero.
+ * Rendering rules:
+ *   - source-unavailable → render nothing. The Overview and the LocalScope view
+ *     already say the collector is down; an error badge on every card would
+ *     repeat it once per agent for no added information.
+ *   - agent-unresolved → a small NEUTRAL marker. A list exists but this agent
+ *     has no workspace identity, so attribution was never attempted; rendering
+ *     nothing here would silently claim "no services", which is a different
+ *     statement and not one this component is entitled to make. Neutral, not
+ *     danger: unresolvable identity is an ordinary condition (a process with no
+ *     readable cwd has none either), not a fault to alarm anyone about.
+ *   - resolved with matches → the chips.
+ *   - resolved, zero matches, nothing unattributed → render nothing. This is
+ *     the one true zero, and it stays an omission rather than "Services 0".
+ *   - resolved with unattributed observations alongside → the matches are shown
+ *     in full and the remainder is noted, never attached.
  *
  * The count is per-agent by construction — it is the correlated subset, never
  * a machine-wide total, so a card can never display the whole machine's
@@ -27,7 +34,7 @@ import { useAgentServices } from '../composables/useAgentServices'
  */
 const props = defineProps<{ agent: Agent }>()
 
-const { available, services } = useAgentServices(() => props.agent)
+const { available, attribution, services, unresolvedCount } = useAgentServices(() => props.agent)
 
 // Two chips keep the card compact; the rest are counted rather than listed.
 const MAX_CHIPS = 2
@@ -48,8 +55,24 @@ const CHIP_CLASS = 'inline-flex items-center gap-1 rounded px-1 py-0.5 bg-succes
 </script>
 
 <template>
+  <!--
+    Attribution could not be attempted: a list was observed, but this agent has
+    no workspace identity to compare it against. Saying nothing would read as
+    "no services", so this says the true thing instead.
+  -->
   <span
-    v-if="available && services.length > 0"
+    v-if="attribution === 'agent-unresolved'"
+    class="inline-flex items-center gap-1 shrink-0 rounded px-1 py-0.5 bg-neutral-soft text-neutral-text text-[10px] font-mono leading-none"
+    data-testid="agent-service-identity-unknown"
+    title="This agent's workspace could not be identified, so local services cannot be attributed to it. This is not an error, and does not mean the workspace has no services."
+  >
+    <span class="size-1.5 rounded-full bg-state-idle shrink-0" aria-hidden="true" />
+    <span aria-hidden="true">identity unknown</span>
+    <span class="sr-only">Workspace identity unavailable, so local services cannot be attributed to this agent.</span>
+  </span>
+
+  <span
+    v-else-if="available && services.length > 0"
     class="flex items-center gap-1 shrink-0"
     data-testid="agent-service-chips"
     :title="label"
@@ -87,6 +110,21 @@ const CHIP_CLASS = 'inline-flex items-center gap-1 rounded px-1 py-0.5 bg-succes
         <span class="size-1.5 rounded-full bg-success-dot shrink-0" aria-hidden="true" />:{{ s.port }}
       </span>
     </template>
+
+    <!--
+      Some observations in the sample carry no identity, so this agent's list is
+      "everything I could attribute", not "everything there is". Stated quietly
+      beside the matches rather than allowed to silently qualify them.
+    -->
+    <span
+      v-if="unresolvedCount > 0"
+      class="text-[10px] font-mono text-fg-faint"
+      data-testid="agent-service-unattributed"
+      :title="`${unresolvedCount} local ${unresolvedCount === 1 ? 'service' : 'services'} could not be attributed to any workspace, so this list may be incomplete.`"
+    >
+      <span aria-hidden="true">?{{ unresolvedCount }}</span>
+      <span class="sr-only">{{ unresolvedCount }} unattributed local {{ unresolvedCount === 1 ? 'service' : 'services' }} not included.</span>
+    </span>
 
     <span
       v-if="overflow > 0"

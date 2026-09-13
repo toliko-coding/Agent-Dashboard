@@ -252,3 +252,88 @@ describe('useAgentServices — availability semantics (unchanged)', () => {
     w.unmount()
   })
 })
+
+/*
+ * Attribution state. "No services" and "cannot tell" are different claims, and
+ * strict identity made them render identically until these distinctions existed.
+ */
+describe('useAgentServices — attribution state', () => {
+  it('reports resolved with matches when both sides are identified', async () => {
+    const { result, w } = await correlate(agentIn(ws('ws_a')), {
+      data: [svc({ id: 'a', workspace: ws('ws_a') })],
+    })
+    expect(result.attribution.value).toBe('resolved')
+    expect(result.services.value.map(s => s.id)).toEqual(['a'])
+    expect(result.unresolvedCount.value).toBe(0)
+    w.unmount()
+  })
+
+  // D — the one true zero: attribution ran over a fully identified list.
+  it('reports a genuine zero distinctly from an unknown', async () => {
+    const { result, w } = await correlate(agentIn(ws('ws_a')), {
+      data: [svc({ id: 'x', workspace: ws('ws_elsewhere') })],
+    })
+    expect(result.attribution.value).toBe('resolved')
+    expect(result.services.value).toEqual([])
+    expect(result.unresolvedCount.value).toBe(0)
+    w.unmount()
+  })
+
+  // B — a list exists, but this agent cannot be compared against it.
+  it('reports agent-unresolved rather than an empty result', async () => {
+    const { result, w } = await correlate(agentIn(null), {
+      data: [svc({ id: 'a', workspace: ws('ws_a') })],
+    })
+    expect(result.attribution.value).toBe('agent-unresolved')
+    expect(result.services.value).toEqual([])
+    w.unmount()
+  })
+
+  // A — no list at all outranks everything: there is nothing to attribute.
+  it('reports source-unavailable, and outranks a missing agent identity', async () => {
+    const { result, w } = await correlate(agentIn(null), { reachable: false, data: null })
+    expect(result.attribution.value).toBe('source-unavailable')
+    w.unmount()
+  })
+
+  it('reports source-unavailable even when the agent IS identified', async () => {
+    const { result, w } = await correlate(agentIn(ws('ws_a')), { reachable: false, data: null })
+    expect(result.attribution.value).toBe('source-unavailable')
+    expect(result.services.value).toEqual([])
+    w.unmount()
+  })
+
+  // C — known-good matches survive alongside observations nothing could place.
+  it('keeps known matches and counts what could not be attributed', async () => {
+    const { result, w } = await correlate(agentIn(ws('ws_a')), {
+      data: [
+        svc({ id: 'mine', workspace: ws('ws_a') }),
+        svc({ id: 'nobody', workspace: null }),
+        svc({ id: 'alsonobody', workspace: null }),
+        svc({ id: 'theirs', workspace: ws('ws_b') }),
+      ],
+    })
+    expect(result.attribution.value).toBe('resolved')
+    expect(result.services.value.map(s => s.id)).toEqual(['mine'])
+    expect(result.unresolvedCount.value).toBe(2)
+    w.unmount()
+  })
+
+  it('never counts unresolved observations when attribution did not run', async () => {
+    // The number would describe the sample, not this agent.
+    const { result, w } = await correlate(agentIn(null), {
+      data: [svc({ id: 'nobody', workspace: null })],
+    })
+    expect(result.unresolvedCount.value).toBe(0)
+    w.unmount()
+  })
+
+  it('does not attach an unresolved service to an identified agent', async () => {
+    const { result, w } = await correlate(agentIn(ws('ws_a')), {
+      data: [svc({ id: 'nobody', cwd: '/Users/x/Repo', workspace: null })],
+    })
+    expect(result.services.value).toEqual([])
+    expect(result.unresolvedCount.value).toBe(1)
+    w.unmount()
+  })
+})

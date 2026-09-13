@@ -42,6 +42,21 @@ import { useMachineServices } from '@/features/localscope'
  * a softer one. A false negative leaves a service off a card; a false positive
  * puts another workspace's server on it, which is a claim about the machine
  * that is simply untrue.
+ *
+ * BUT "no match" is not one fact, and collapsing it into one was the honest
+ * gap strict identity introduced. Four different situations produced an empty
+ * list and looked identical on screen:
+ *
+ *   source-unavailable  no list was observed at all
+ *   agent-unresolved    a list exists, but this agent has no identity to
+ *                       compare, so attribution could not even be attempted
+ *   resolved, partial   attribution ran; some observations carry no identity,
+ *                       so "none here" cannot be claimed with certainty
+ *   resolved, empty     attribution ran over a fully-identified list and this
+ *                       workspace genuinely runs nothing
+ *
+ * Only the last is a zero. `attribution` and `unresolvedCount` below keep the
+ * four apart, which is what lets a card say "unknown" instead of implying none.
  */
 
 export interface AgentServiceCorrelation {
@@ -55,12 +70,32 @@ export interface AgentServiceCorrelation {
   services: MachineService[]
 }
 
+/**
+ * How much of the attribution question could actually be answered.
+ *
+ * Deliberately not a boolean: "no services" and "cannot tell" are different
+ * claims about the machine and must not render the same way.
+ */
+export type ServiceAttribution = 'source-unavailable' | 'agent-unresolved' | 'resolved'
+
 /** Pure correlation, exported so it can be tested without mounting anything. */
 export function servicesForAgent(services: MachineService[], agentWorkspace: WorkspaceRef | null): MachineService[] {
   const id = agentWorkspace?.id
   if (!id)
     return []
   return services.filter(s => s.workspace?.id === id)
+}
+
+/**
+ * Observations the collector reported but nothing could attribute.
+ *
+ * Not a failure — a process with no readable cwd has no identity to resolve,
+ * and three of forty-six live processes are exactly that. It matters only
+ * because it is the difference between "this workspace runs nothing" and "this
+ * workspace runs nothing I could see".
+ */
+export function unresolvedCountIn(services: MachineService[]): number {
+  return services.filter(s => !s.workspace?.id).length
 }
 
 /**
@@ -94,8 +129,29 @@ export function useAgentServices(agent: (() => Agent) | Agent) {
 
   const available = computed(() => items.value !== null)
 
-  const services = computed<MachineService[]>(() =>
-    items.value === null ? [] : servicesForAgent(items.value, toValue(agent).workspace))
+  /*
+   * Precedence is strict: no list outranks no agent identity, because with no
+   * list there is nothing to attribute either way. Only when both a list and an
+   * agent workspace exist has attribution actually been attempted.
+   */
+  const attribution = computed<ServiceAttribution>(() => {
+    if (items.value === null)
+      return 'source-unavailable'
+    if (!toValue(agent).workspace?.id)
+      return 'agent-unresolved'
+    return 'resolved'
+  })
 
-  return { available, services }
+  const services = computed<MachineService[]>(() =>
+    attribution.value === 'resolved' ? servicesForAgent(items.value!, toValue(agent).workspace) : [])
+
+  /*
+   * Counted only when attribution ran. Under the other two states the number
+   * would describe the sample rather than this agent, and reporting it would
+   * invite a claim about a workspace that was never compared.
+   */
+  const unresolvedCount = computed(() =>
+    attribution.value === 'resolved' ? unresolvedCountIn(items.value!) : 0)
+
+  return { available, attribution, services, unresolvedCount }
 }
