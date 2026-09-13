@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import type { AttentionItem, AttentionQueue } from '@/features/attention'
 import type { Freshness } from '@/features/localscope'
 import { computed, ref } from 'vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppChip from '@/components/ui/AppChip.vue'
+import { NeedsYouBand } from '@/features/attention'
 import { DataFreshnessIndicator } from '@/features/localscope'
 
 /*
@@ -94,6 +96,28 @@ const reducedMotion = computed(() =>
   typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches)
 
 const showMotion = ref(true)
+
+/*
+ * Attention states, rendered by the production NeedsYouBand. Stalled has no
+ * producer in the queue yet (see features/attention/queue.ts), so it is not
+ * shown as if it could happen.
+ */
+const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
+const SAMPLE_WORKTREE = { id: 'ws-sample', name: 'Agent-Dashboard', kind: 'git-worktree' as const, branch: 'feat/command-center-ui', repository: { id: 'repo-sample', name: 'Agent-Dashboard' } }
+const SAMPLE_ITEMS: AttentionItem[] = [
+  { id: 'agent:sample-question', level: 'blocking', kind: 'question', subject: { type: 'agent', sessionId: 'sample-question' }, agentSessionId: 'sample-question', workspace: SAMPLE_WORKTREE, repository: SAMPLE_WORKTREE.repository, title: 'Claude session 3f2a1b9c', reason: 'Question waiting for your answer', since: null, lastActivity: minutesAgo(6) },
+  { id: 'agent:sample-permission', level: 'blocking', kind: 'permission', subject: { type: 'agent', sessionId: 'sample-permission' }, agentSessionId: 'sample-permission', workspace: null, repository: null, title: 'Fix login redirect', reason: 'Permission request waiting', detail: 'Bash', since: minutesAgo(3), lastActivity: minutesAgo(3) },
+  { id: 'agent:sample-failed', level: 'failed', kind: 'api-error', subject: { type: 'agent', sessionId: 'sample-failed' }, agentSessionId: 'sample-failed', workspace: SAMPLE_WORKTREE, repository: SAMPLE_WORKTREE.repository, title: 'Codex session 9c01d2e4', reason: 'Rate limited', detail: 'API error reported by the session', since: null, lastActivity: minutesAgo(12) },
+  { id: 'task:sample-review', level: 'ready', kind: 'task-waiting', subject: { type: 'task', taskId: 'sample-review' }, agentSessionId: null, workspace: null, repository: null, title: 'Refactor billing export', reason: 'Pipeline task waiting for you', detail: 'Plan review', since: null, lastActivity: null },
+]
+const ATTENTION_SAMPLES: { label: string, queue: AttentionQueue }[] = [
+  { label: 'Blocking, failed and ready', queue: { status: 'ready', stale: false, items: SAMPLE_ITEMS } },
+  { label: 'One failed item', queue: { status: 'ready', stale: false, items: [SAMPLE_ITEMS[2]] } },
+  { label: 'Last known, reconnecting', queue: { status: 'ready', stale: true, items: [SAMPLE_ITEMS[1]] } },
+  { label: 'Quiet', queue: { status: 'ready', stale: false, items: [] } },
+  { label: 'Loading', queue: { status: 'loading', stale: false, items: [] } },
+  { label: 'Unavailable', queue: { status: 'unavailable', stale: false, items: [] } },
+]
 </script>
 
 <template>
@@ -151,6 +175,28 @@ const showMotion = ref(true)
             <AppBadge :variant="s" />
             <code class="text-[10px] text-fg-faint">{{ s }}</code>
           </div>
+        </div>
+      </section>
+
+      <!-- Attention -->
+      <section class="flex flex-col gap-3" data-testid="sandbox-attention">
+        <h2 class="text-[13px] font-semibold">
+          Needs you
+        </h2>
+        <p class="max-w-3xl text-[12px] text-fg-mute">
+          The production band. Blocking is amber and rings once as it arrives, failed is red, ready is neutral; nothing
+          loops. Stalled has no producer yet, so it is not illustrated. Empty, it is a single line that makes no claim
+          about health.
+        </p>
+        <div
+          v-for="sample in ATTENTION_SAMPLES"
+          :key="sample.label"
+          class="flex flex-col gap-1"
+          :data-testid="`sandbox-attention-${sample.queue.status}-${sample.queue.items.length}`"
+          :class="showMotion ? '' : '[&_*]:!animate-none'"
+        >
+          <code class="text-[10px] text-fg-faint">{{ sample.label }}</code>
+          <NeedsYouBand :queue="sample.queue" />
         </div>
       </section>
 

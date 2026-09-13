@@ -11,6 +11,18 @@ import DesignSandbox from './DesignSandbox.vue'
 
 const w = () => mount(DesignSandbox)
 
+describe('designSandbox — 3C attention states', () => {
+  it('renders the production Needs you band in every supported state', () => {
+    const section = w().get('[data-testid="sandbox-attention"]')
+    for (const id of ['ready-4', 'ready-1', 'ready-0', 'loading-0', 'unavailable-0'])
+      expect(section.find(`[data-testid="sandbox-attention-${id}"] [data-testid="needs-you"]`).exists(), id).toBe(true)
+    const levels = section.findAll('[data-testid="needs-you-level"]').map(l => l.text())
+    expect(levels).toEqual(expect.arrayContaining(['Blocking', 'Failed', 'Ready']))
+    expect(levels).not.toContain('Stalled')
+    expect(section.find('[data-testid="needs-you-quiet"]').exists()).toBe(true)
+  })
+})
+
 describe('designSandbox — 3B foundation (C)', () => {
   it('shows the full type scale, each row using its own utility', () => {
     const scale = w().get('[data-testid="sandbox-type-scale"]')
