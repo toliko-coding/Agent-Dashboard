@@ -32,14 +32,14 @@ describe('groupHeader', () => {
     const w = mount(GroupHeader, {
       props: { label: 'Active', agents: [makeAgent(1.5), makeAgent(0.5)] as Agent[] },
     })
-    expect(w.text()).toContain('$2.00 today')
+    expect(w.text()).toContain('$2.00 session cost')
   })
 
   it('renders — when total cost is zero', () => {
     const w = mount(GroupHeader, {
       props: { label: 'Active', agents: [makeAgent(0)] as Agent[] },
     })
-    expect(w.text()).toContain('— today')
+    expect(w.text()).toContain('— session cost')
   })
 
   it('renders an expanded chevron when not collapsed', () => {

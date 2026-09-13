@@ -53,6 +53,7 @@ const ariaLabel = computed(() => {
     <span v-if="detail" class="text-[11px] text-fg-faint" data-testid="group-header-detail">{{ detail }}</span>
     <span class="text-[11px] text-fg-faint">{{ agents.length }} {{ agents.length === 1 ? 'agent' : 'agents' }}</span>
     <span class="flex-1 h-px bg-line" />
-    <span class="font-mono text-[11px] text-fg-faint">{{ formatCost(totalCost) }} today</span>
+    <!-- The sum of these sessions' cost estimates, not a calendar-day figure: the status bar reports that from the persisted ledger. -->
+    <span class="font-mono text-[11px] text-fg-faint">{{ formatCost(totalCost) }} session cost</span>
   </button>
 </template>
