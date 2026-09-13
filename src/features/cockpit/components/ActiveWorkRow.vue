@@ -2,9 +2,8 @@
 import type { Agent } from '@/types'
 import { computed } from 'vue'
 import { useNow } from '@/composables/useNow'
-import { agentTitle } from '@/features/attention'
+import { agentTitle, workActivity } from '@/utils/agentLabels'
 import { formatRelativeActivity, secondsSince, shortModel } from '@/utils/format'
-import { workActivity } from '../commandModel'
 
 /*
  * One working agent as an operational row: state, name, what it is doing, the

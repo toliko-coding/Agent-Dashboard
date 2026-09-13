@@ -1,7 +1,7 @@
 import type { PermissionItem } from '@/composables/usePendingPermissions'
 import type { PendingCapabilityDecision } from '@/sdk.generated'
 import type { Agent, PendingPermission, PipelineTask, RepositoryRef, WorkspaceRef } from '@/types'
-import { shortId } from '@/composables/useCopyId'
+import { agentTitle } from '@/utils/agentLabels'
 import { attentionFor } from '@/utils/attention'
 import { formatErrorState } from '@/utils/format'
 import { STAGE_LABELS } from '@/utils/stageLabels'
@@ -49,6 +49,9 @@ import { STAGE_LABELS } from '@/utils/stageLabels'
  * turn. "Your turn" is the resting state of every interactive session, and
  * counting it made every idle agent look like a request.
  */
+
+// Re-exported: the name lives in utils/agentLabels, shared with Active work and the agent cards.
+export { agentTitle }
 
 export const ATTENTION_LEVELS = ['blocking', 'failed', 'stalled', 'ready'] as const
 export type AttentionLevel = typeof ATTENTION_LEVELS[number]
@@ -101,13 +104,6 @@ export interface AttentionSources {
 
 const LEVEL_RANK: Record<AttentionLevel, number> = { blocking: 0, failed: 1, stalled: 2, ready: 3 }
 
-const PROVIDER_LABELS: Record<string, string> = {
-  claude: 'Claude',
-  codex: 'Codex',
-  gemini: 'Gemini',
-  junie: 'Junie',
-}
-
 function validIso(value: string | null | undefined): string | null {
   return value && !Number.isNaN(Date.parse(value)) ? value : null
 }
@@ -125,17 +121,6 @@ function oldest(values: (string | null | undefined)[]): string | null {
 
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`
-}
-
-/**
- * The agent's name. The pipeline task it runs when there is one; otherwise
- * the provider and a short session id. Never the folder name: basename(cwd)
- * collides across checkouts, and the WHERE line carries the real identity.
- */
-export function agentTitle(agent: Agent): string {
-  if (agent.pipelineTaskTitle)
-    return agent.pipelineTaskTitle
-  return `${PROVIDER_LABELS[agent.provider] ?? 'Agent'} session ${shortId(agent.sessionId)}`
 }
 
 function permissionDetail(requests: PendingPermission[]): string {

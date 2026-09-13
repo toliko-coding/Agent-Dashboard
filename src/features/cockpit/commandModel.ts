@@ -51,16 +51,6 @@ export function agentFootprint(agents: Agent[]): AgentFootprint {
   return { repositories: repositories.size, workspaces: workspaces.size, unresolved }
 }
 
-export type WorkState = 'working' | 'tool'
-
-/**
- * What a working agent is doing, as far as the payload says without exposing
- * anything: a tool call that is open right now names its tool — the name only,
- * never its arguments — and otherwise the agent is simply working.
- */
-export function workActivity(agent: Agent): { state: WorkState, label: string } {
-  const tool = agent.pendingToolUse?.tool
-  if (tool && tool !== 'AskUserQuestion')
-    return { state: 'tool', label: `Using ${tool}` }
-  return { state: 'working', label: 'Working' }
-}
+// Re-exported: the helper lives in utils/agentLabels, shared with the agent cards.
+export { workActivity } from '@/utils/agentLabels'
+export type { WorkState } from '@/utils/agentLabels'
