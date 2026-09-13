@@ -13,9 +13,12 @@ describe('livePulse', () => {
     expect(w.text()).toContain('Reconnecting')
   })
 
-  it('pulse dot disables animation under reduced motion', () => {
-    const w = mount(LivePulse, { props: { live: true } })
-    expect(w.get('[data-dot]').classes()).toContain('motion-reduce:animate-none')
+  // A steady connection is not ongoing activity, so the dot must not pulse.
+  it('does not pulse, and shows the live colour rather than success', () => {
+    const dot = mount(LivePulse, { props: { live: true } }).get('[data-dot]')
+    expect(dot.classes().join(' ')).not.toMatch(/animate-|motion-/)
+    expect(dot.classes()).toContain('bg-live-dot')
+    expect(dot.classes().join(' ')).not.toMatch(/green|success/)
   })
 
   it('exposes a status role for screen readers', () => {

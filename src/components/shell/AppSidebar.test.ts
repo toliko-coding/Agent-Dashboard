@@ -219,3 +219,24 @@ describe('appSidebar', () => {
     expect(nav.classes()).toContain('w-[220px]')
   })
 })
+
+describe('appSidebar — 3B', () => {
+  // L: canonical product name.
+  it('names the product Agent Dashboard', async () => {
+    const { AppSidebar, useSidebar } = await load()
+    useSidebar().togglePinned()
+    const w = mount(AppSidebar, { props })
+    expect(w.text()).toContain('Agent Dashboard')
+    expect(w.text()).not.toContain('Agent Overview')
+  })
+
+  // E: the permanent pulse identified by the 3A audit is gone.
+  it('shows the live connection as a static live-coloured dot', async () => {
+    const { AppSidebar, useSidebar } = await load()
+    useSidebar().togglePinned()
+    const w = mount(AppSidebar, { props })
+    const dot = w.get('[role="status"] span')
+    expect(dot.classes().join(' ')).not.toMatch(/animate-|motion-/)
+    expect(dot.classes()).toContain('bg-live-dot')
+  })
+})

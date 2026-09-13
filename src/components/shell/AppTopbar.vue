@@ -32,10 +32,17 @@ const statusLabel = computed(() => {
   return props.live ? 'System Online' : 'Reconnecting'
 })
 
+/*
+ * Static on purpose. A connected stream is a steady state, not ongoing activity,
+ * so it must not pulse forever to look alive — that is exactly the decorative
+ * motion that teaches the eye to ignore the motion that does mean something.
+ * Connected is shown in the live colour, because it describes live observation,
+ * not success.
+ */
 const statusDotClass = computed(() => {
   if (props.live === undefined)
     return 'bg-fg-faint'
-  return props.live ? 'bg-success motion-safe:animate-pulse' : 'bg-warning'
+  return props.live ? 'bg-live-dot' : 'bg-warning'
 })
 
 const initials = computed(() => (props.userLabel ?? '').trim().slice(0, 2).toUpperCase())
@@ -49,7 +56,9 @@ const initials = computed(() => (props.userLabel ?? '').trim().slice(0, 2).toUpp
 
     <!--
       A button, not an input. It opens the existing global Spotlight (⌘K), which
-      already searches agents and tasks. A real <input> here would re-introduce
+      searches tasks and agents — and the copy says exactly that. It promised
+      "agents, projects, or commands" until 3B; neither projects nor commands are
+      searchable yet, so the trigger names only what the palette really does. A real <input> here would re-introduce
       the bug the topbar test guards against: a field that looks like a filter
       but narrows nothing on any view except the agent roster.
     -->
@@ -57,12 +66,12 @@ const initials = computed(() => (props.userLabel ?? '').trim().slice(0, 2).toUpp
       type="button"
       data-testid="topbar-search"
       class="hidden md:flex items-center gap-2 flex-1 max-w-[420px] h-8 px-3 rounded-md border border-line bg-app text-fg-faint hover:text-fg-mute hover:border-line-strong transition-colors duration-[var(--duration-fast)] ease-standard focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent focus-visible:border-accent"
-      aria-label="Search agents, projects, or commands"
+      aria-label="Search tasks and agents"
       aria-keyshortcuts="Meta+K Control+K"
       @click="emit('openSearch')"
     >
       <span aria-hidden="true" class="text-[12px]">⌕</span>
-      <span class="text-[12px] truncate">Search agents, projects, or commands…</span>
+      <span class="text-[12px] truncate">Search tasks and agents…</span>
       <kbd class="ml-auto shrink-0 font-mono text-[10px] px-1.5 py-0.5 rounded border border-line text-fg-faint">⌘K</kbd>
     </button>
 
