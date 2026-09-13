@@ -1,19 +1,51 @@
 <script setup lang="ts">
 import type { SystemInfo } from '../../../composables/useSystemResources'
 import { computed } from 'vue'
+import { DataFreshnessIndicator, useLocalMachine } from '@/features/localscope'
 import AppCard from '../../../components/ui/AppCard.vue'
 import { useBuildVersion } from '../../../composables/useBuildVersion'
 import { useSystemResources } from '../../../composables/useSystemResources'
 
 /*
- * Everything here comes from GET /api/system, which is real. Deliberately NOT
- * shown, because the collector does not provide them: network throughput,
- * listening ports, processes and emulators. Those belong to LocalScope and are
- * absent rather than zeroed.
+ * Host resources come from GET /api/system. The local runtime counts come from
+ * the dashboard's normalized LocalScope snapshot — the same lightweight reading,
+ * on the same shared poller, that the Overview already uses. No list is fetched
+ * here: this view says how many, and detail stays with the Runtime surfaces.
+ *
+ * Until Phase 3B this view said listening ports, processes and emulators were
+ * "Not collected yet". That stopped being true when LocalScope began collecting
+ * them, so the page was stating something false about the machine.
+ *
+ * The rules come from the snapshot model and are not reinterpreted here:
+ *   - a number, including 0, is a measurement;
+ *   - null means "not collected" and is never rendered as 0;
+ *   - an unavailable collector makes every count unknown;
+ *   - stale and degraded readings keep their values and say so.
+ * Network throughput genuinely is not collected — LocalScope counts active
+ * connections, not bytes — so that single gap is still named.
  */
 const resources = useSystemResources()
 const info = computed<SystemInfo | null>(() => resources.info.value)
 const { version } = useBuildVersion()
+const { snapshot: machine, loaded: machineLoaded } = useLocalMachine()
+
+const runtimeUnavailable = computed(() => machine.value.source === 'unavailable')
+
+const runtimeRows = computed(() => {
+  const c = machine.value.counts
+  return [
+    { key: 'services', label: 'Listening services', value: c.services, unit: 'listening' },
+    {
+      key: 'processes',
+      label: 'Developer processes',
+      value: c.processesRelevant,
+      // The denominator is its own measurement; omit it rather than guess.
+      unit: c.processesTotal === null ? '' : `of ${c.processesTotal}`,
+    },
+    { key: 'devices', label: 'Devices', value: c.devices, unit: 'connected' },
+    { key: 'network', label: 'Network connections', value: c.network, unit: 'active' },
+  ]
+})
 
 function gib(bytes: number): string {
   return `${(bytes / 1024 ** 3).toFixed(1)} GiB`
@@ -131,18 +163,54 @@ const gauges = computed(() => {
       </AppCard>
 
       <!--
-        Named explicitly so the gap is visible rather than silently missing.
-        These become real when a LocalScope collector exists.
+        Local runtime, as counts. Unknown is stated as unknown: an unavailable
+        collector is a sentence, and a null count reads "Not collected" — neither
+        is ever rendered as 0. Freshness is the snapshot's own qualifier, shown
+        once for the whole reading because degradation cannot be attributed to
+        a single count.
       -->
-      <AppCard>
+      <AppCard data-testid="system-runtime">
         <template #header>
-          <span class="text-[11px] uppercase tracking-wider text-fg-mute font-bold">Not collected yet</span>
+          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span class="text-[11px] uppercase tracking-wider text-fg-mute font-bold">Local runtime</span>
+            <span class="text-[11px] text-fg-faint">observed by LocalScope</span>
+            <DataFreshnessIndicator :reading="machine" testid="system-runtime-freshness" />
+          </div>
         </template>
-        <ul class="p-3 flex flex-wrap gap-2 text-[11px] text-fg-faint">
-          <li v-for="item in ['Network throughput', 'Listening ports', 'Processes', 'Emulators']" :key="item" class="border border-line rounded px-2 py-1 opacity-70">
-            {{ item }} — n/a
-          </li>
-        </ul>
+
+        <p v-if="!machineLoaded" class="p-3 text-[12px] text-fg-mute" data-testid="system-runtime-connecting">
+          Connecting to LocalScope…
+        </p>
+        <p v-else-if="runtimeUnavailable" class="p-3 text-[12px] text-fg-mute" data-testid="system-runtime-unavailable">
+          LocalScope is not connected, so these counts are unknown — not zero.
+        </p>
+        <dl v-else class="p-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-[12px]">
+          <div
+            v-for="row in runtimeRows"
+            :key="row.key"
+            :data-testid="`system-runtime-${row.key}`"
+            :data-state="row.value === null ? 'unknown' : 'measured'"
+          >
+            <dt class="text-[10px] text-fg-faint uppercase tracking-wide">
+              {{ row.label }}
+            </dt>
+            <dd v-if="row.value === null" class="text-fg-faint">
+              Not collected
+            </dd>
+            <!--
+              A flex gap, not a literal space: the template compiler condenses
+              whitespace between elements, which rendered "8listening".
+            -->
+            <dd v-else class="flex items-baseline gap-1 text-fg-soft">
+              <span class="font-mono tabular-nums">{{ row.value }}</span>
+              <span v-if="row.unit" class="text-fg-faint">{{ row.unit }}</span>
+            </dd>
+          </div>
+        </dl>
+
+        <p class="px-3 pb-3 text-[11px] text-fg-faint" data-testid="system-runtime-throughput">
+          Network throughput is not collected.
+        </p>
       </AppCard>
     </template>
   </section>
