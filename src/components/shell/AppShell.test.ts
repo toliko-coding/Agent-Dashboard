@@ -31,3 +31,19 @@ describe('appShell', () => {
     expect(main.attributes('tabindex')).toBe('-1')
   })
 })
+
+// K: every view scrolls inside #main-content and nowhere else.
+describe('appShell — scroll containment (3B)', () => {
+  it('makes the scroll container the containing block for positioned descendants', () => {
+    const main = mount(AppShell).get('#main-content')
+    // `relative` is the fix: without it an absolutely positioned descendant with
+    // no positioned ancestor (sr-only) is placed against the document instead,
+    // and a long view stretches the page past the shell.
+    expect(main.classes()).toEqual(expect.arrayContaining(['relative', 'overflow-y-auto', 'min-h-0', 'flex-1']))
+  })
+
+  it('keeps the shell viewport-bound, so only the content region scrolls', () => {
+    const w = mount(AppShell)
+    expect(w.classes()).toEqual(expect.arrayContaining(['h-screen', 'flex', 'flex-col']))
+  })
+})
