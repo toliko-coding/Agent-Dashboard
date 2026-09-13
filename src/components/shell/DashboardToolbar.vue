@@ -52,7 +52,7 @@ const activeFilters = computed<ActiveFilter[]>(() => {
   if (props.searchQuery)
     list.push({ key: 'search', label: `Search: "${props.searchQuery}"`, clear: () => emit('update:searchQuery', '') })
   if (props.project !== 'all')
-    list.push({ key: 'project', label: `Project: ${projectLabel.value}`, clear: () => emit('update:project', 'all') })
+    list.push({ key: 'project', label: `Folder: ${projectLabel.value}`, clear: () => emit('update:project', 'all') })
   if (props.spawner !== 'all')
     list.push({ key: 'spawner', label: `Spawner: ${spawnerLabel.value}`, clear: () => emit('update:spawner', 'all') })
   return list
@@ -119,13 +119,19 @@ async function clearAll(): Promise<void> {
         data-testid="filter-menu"
       >
         <div class="flex flex-col gap-3">
+          <!--
+            "Folder", not "Project": this filters on the agent's folder name
+            (projectName). The persisted Dashboard Project is a different thing
+            and keeps its name. The `project` prop, event and testid are
+            unchanged, so saved filter state is untouched.
+          -->
           <label class="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wider text-fg-faint">
-            Project
+            Folder
             <AppSelect
               :model-value="project"
               :options="projectOptions"
               size="compact"
-              aria-label="Filter by project"
+              aria-label="Filter by folder"
               data-testid="select-project"
               @update:model-value="$emit('update:project', $event)"
             />

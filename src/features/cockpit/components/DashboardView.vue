@@ -54,8 +54,11 @@ const statusCounts = computed(() => {
   return statusFilterCounts(base)
 })
 const rosterGroups = computed(() => groupAgents(rosterAgents.value, dashboardGroup.value))
+// Folder filter. Internally still `project`/projectName — the stored value and
+// its localStorage key are unchanged — but it filters on the agent's folder
+// name, not on a persisted Dashboard Project, so the copy says "folders".
 const projectOptions = computed(() => [
-  { value: 'all', label: 'All projects' },
+  { value: 'all', label: 'All folders' },
   ...[...new Set(agents.value.map(a => a.projectName))].sort().map(n => ({ value: n, label: friendlyProjectName(n) })),
 ])
 const spawnerOptions = computed(() => [

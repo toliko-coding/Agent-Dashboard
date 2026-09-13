@@ -207,3 +207,29 @@ describe('dashboardToolbar — repository & workspace grouping', () => {
     expect(w.emitted('update:groupBy')?.[0]).toEqual(['workspace'])
   })
 })
+
+describe('dashboardToolbar — folder terminology', () => {
+  it('renders the projectName grouping as Folder', () => {
+    const w = mountToolbar({ groupBy: 'project' })
+    expect(w.get('[data-testid="select-group"]').text()).toContain('Folder')
+    expect(w.get('[data-testid="select-group"]').text()).not.toContain('Project')
+  })
+
+  it('labels the filter field Folder, with a matching accessible name', async () => {
+    const w = mountToolbar()
+    await openFilterMenu(w)
+    expect(document.body.querySelector('[aria-label="Filter by folder"]')).toBeTruthy()
+    expect(document.body.querySelector('[aria-label="Filter by project"]')).toBeNull()
+    expect(document.body.textContent).toContain('Folder')
+  })
+
+  it('names an active folder filter "Folder:"', async () => {
+    const w = mountToolbar({
+      project: 'Agent-Dashboard',
+      projectOptions: [{ value: 'all', label: 'All folders' }, { value: 'Agent-Dashboard', label: 'Agent Dashboard' }],
+    })
+    await openFilterMenu(w)
+    expect(document.body.textContent).toContain('Folder: Agent Dashboard')
+    expect(document.body.textContent).not.toContain('Project: Agent Dashboard')
+  })
+})

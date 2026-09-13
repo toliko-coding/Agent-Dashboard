@@ -15,7 +15,11 @@ export const AGENT_SORT_OPTIONS = [
 // name the dimension alone instead of repeating "Group by …" in every row.
 export const AGENT_GROUP_OPTIONS = [
   { value: 'none', label: 'No grouping' },
-  { value: 'project', label: 'Project' },
+  // The value stays `project` so saved selections keep working. The label says
+  // what this actually groups by: the agent's folder name (projectName, which is
+  // basename(cwd)). It is NOT the persisted Dashboard Project, and it is not a
+  // repository or a workspace — those have their own mode and their own words.
+  { value: 'project', label: 'Folder' },
   { value: 'status', label: 'Status' },
   { value: 'model', label: 'Model' },
   { value: 'spawner', label: 'Spawner' },
