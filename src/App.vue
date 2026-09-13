@@ -2,6 +2,7 @@
 import type { Agent, PipelineTask } from './types'
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAgents } from '@/features/agents/composables/useAgents'
+import { useAttentionQueue } from '@/features/attention/useAttentionQueue'
 import BacklogForm from '@/features/pipeline/components/BacklogForm.vue'
 import { useTasks } from '@/features/pipeline/composables/useTasks'
 import ApiKeySettings from '@/features/settings/components/ApiKeySettings.vue'
@@ -121,10 +122,14 @@ onMounted(() => {
   void loadServerConfig()
 })
 
-const { agents, costTrend, filteredAgents, attentionAgents, attentionCount, pendingCapabilityDecisions, selectedAgent, isLoading, error, live, selectAgent, selectAgentWhenAvailable, startStream: startAgents } = useAgents({ autoStart: false })
+const { agents, costTrend, filteredAgents, attentionAgents, selectedAgent, isLoading, error, live, selectAgent, selectAgentWhenAvailable, startStream: startAgents } = useAgents({ autoStart: false })
 const { tasks, selectedTask, selectTask, startStream: startTasks } = useTasks({ autoStart: false })
 const { items: permissionItems, approve: approvePermission, deny: denyPermission } = usePendingPermissions(tasks)
-const combinedAttentionCount = computed(() => attentionCount.value + permissionItems.value.length + pendingCapabilityDecisions.value.length)
+// The canonical attention queue, derived once here where the permission items
+// live, and handed to every consumer so the sidebar and the Overview count the
+// same things. It replaced a count that included every idle "your turn" agent.
+const attention = useAttentionQueue(permissionItems)
+const needsYouCount = computed(() => attention.value.items.length)
 // Today's persisted spend — reuses the shared cost-summary logic so the footer
 // and Cost view agree. Distinct from totalCost (cost of agents running now).
 const { todayUsd, start: startTodayCost } = useTodayCost()
@@ -306,7 +311,7 @@ onMounted(() => usageComposable.start())
       <template #sidebar>
         <AppSidebar
           :agent-count="filteredAgents.length"
-          :attention-count="combinedAttentionCount"
+          :attention-count="needsYouCount"
           :task-count="tasks.length"
           :live="live"
           :theme="theme"
@@ -354,7 +359,7 @@ onMounted(() => usageComposable.start())
           Error: {{ error }}
         </p>
 
-        <CockpitView v-else-if="activeView === 'cockpit'" @new-agent="showSpawnDialog = true" />
+        <CockpitView v-else-if="activeView === 'cockpit'" :attention="attention" @new-agent="showSpawnDialog = true" @open-task="(taskId) => navigateTo({ taskId })" />
 
         <DashboardView
           v-else-if="activeView === 'dashboard'"

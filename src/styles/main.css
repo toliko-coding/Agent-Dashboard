@@ -509,6 +509,12 @@ html, body {
 .motion-waiting { animation: state-attention var(--motion-attention) var(--ease-standard) infinite; }
 .motion-flow { animation: state-flow var(--motion-flow) linear infinite; }
 .motion-success { animation: state-settle var(--motion-settle) var(--ease-standard) 1; }
+/*
+ * Something newly needs the user: the attention ring, once, as the item
+ * arrives — then still. A blocking item that kept pulsing would compete with
+ * every other signal for as long as the user took to answer it.
+ */
+.motion-arrive-attention { animation: state-attention var(--motion-attention) var(--ease-standard) 1; }
 
 /*
  * WCAG 2.3.3 — suppress motion when the user has requested reduced motion.
