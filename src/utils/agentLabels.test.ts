@@ -16,6 +16,13 @@ describe('agentTitle', () => {
   })
 })
 
+describe('agentTitle — incomplete payloads', () => {
+  it('still names an agent whose payload carries no session id', () => {
+    expect(agentTitle({ provider: 'claude' } as Agent)).toBe('Claude session')
+    expect(agentTitle({} as Agent)).toBe('Agent session')
+  })
+})
+
 describe('workActivity', () => {
   it('names an open tool call by its tool only', () => {
     expect(workActivity(agent({ pendingToolUse: { id: 't', tool: 'Bash', pattern: 'rm -rf /', patternDisplay: 'rm -rf /' } }))).toEqual({ state: 'tool', label: 'Using Bash' })

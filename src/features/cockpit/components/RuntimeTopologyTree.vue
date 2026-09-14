@@ -2,7 +2,7 @@
 import type { Agent } from '@/types'
 import { computed } from 'vue'
 import { DataFreshnessIndicator, useMachineProcesses, useMachineServices } from '@/features/localscope'
-import { friendlyProjectName } from '@/utils/friendlyProjectName'
+import { agentTitle } from '@/utils/agentLabels'
 import { agentDisplayStatus, statusLabel } from '@/utils/statusColors'
 import { buildRuntimeTopology } from '../runtimeTopology'
 import TopologyWorkspaceNode from './TopologyWorkspaceNode.vue'
@@ -139,7 +139,7 @@ function plural(n: number, one: string, many: string): string {
             data-testid="topology-unresolved-agent"
           >
             <span class="text-label uppercase tracking-wider text-fg-faint w-16 shrink-0">Agent</span>
-            <span class="text-fg truncate">{{ friendlyProjectName(a.projectName) }} · {{ statusLabel(agentDisplayStatus(a)) }}</span>
+            <span class="text-fg truncate">{{ agentTitle(a) }} · {{ statusLabel(agentDisplayStatus(a)) }}</span>
           </li>
           <li v-if="unresolved.processes" class="text-fg-mute" data-testid="topology-unresolved-processes">
             {{ plural(unresolved.processes, 'process', 'processes') }} could not be attributed to any workspace

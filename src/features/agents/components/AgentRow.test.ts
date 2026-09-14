@@ -56,3 +56,12 @@ describe('agentRow internal process badge', () => {
     expect(wrapper.find('[data-testid="agent-row-internal-badge"]').exists()).toBe(false)
   })
 })
+
+describe('agentRow — canonical name (3I)', () => {
+  it('names the agent like the card does, not by folder', async () => {
+    const { agentTitle } = await import('@/utils/agentLabels')
+    const w = mount(AgentRow, { props: { agent: { ...baseAgent, projectName: 'secret-folder' } } })
+    expect(w.text()).toContain(agentTitle(baseAgent))
+    expect(w.text()).not.toMatch(/secret[- ]folder/i)
+  })
+})

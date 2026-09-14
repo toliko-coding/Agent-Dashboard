@@ -257,3 +257,42 @@ describe('agentModal — right-side detail panel (3H)', () => {
     w.unmount()
   })
 })
+
+describe('agentModal — name and diagnostics (3I)', () => {
+  it('titles the panel with the canonical agent name, the same one the card shows', async () => {
+    const { agentTitle } = await import('@/utils/agentLabels')
+    const { default: AgentCard } = await import('./AgentCard.vue')
+    const modal = mountModal()
+    const card = mount(AgentCard, { props: { agent: baseAgent }, global: { stubs: { MachineBadge: true, ProviderBadge: true, PromptInput: true } } })
+    const title = modal.get('[data-testid="agent-modal-title"]').text()
+    expect(title).toBe(agentTitle(baseAgent))
+    expect(title).toBe(card.get('[data-testid="agent-card-title"]').text())
+  })
+
+  it('does not use the folder name as the title', () => {
+    const title = mountModal({ ...baseAgent, projectName: 'my-project' }).get('[data-testid="agent-modal-title"]').text()
+    expect(title).not.toContain('my-project')
+  })
+
+  // D: an explicit details surface may show where the session runs.
+  it('still shows the working folder and its path as a diagnostic', () => {
+    const folder = mountModal().get('[data-testid="intelligence-working-folder"]')
+    expect(folder.text()).toContain('Working folder')
+    expect(folder.text()).toContain('/home/user/my-project')
+    expect(folder.text()).not.toContain('Project')
+  })
+
+  it('closes only the metrics popover on Escape, not the panel around it', async () => {
+    const w = mountModal()
+    const wrap = w.get('[data-testid="agent-modal-metrics-wrap"]')
+    await wrap.trigger('focusin')
+    expect(w.find('[data-testid="metrics-popover"]').exists()).toBe(true)
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+    const bubbled = vi.fn()
+    w.element.addEventListener('keydown', bubbled)
+    wrap.element.dispatchEvent(event)
+    await nextTick()
+    expect(w.find('[data-testid="metrics-popover"]').exists()).toBe(false)
+    expect(bubbled).not.toHaveBeenCalled()
+  })
+})

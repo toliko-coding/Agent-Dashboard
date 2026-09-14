@@ -13,9 +13,9 @@ import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { toast } from '@/composables/useToast'
 import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
+import { agentTitle } from '@/utils/agentLabels'
 import { attentionFor } from '@/utils/attention'
 import { formatErrorState, formatRelativeActivity, secondsSince, shortModel } from '@/utils/format'
-import { friendlyProjectName } from '@/utils/friendlyProjectName'
 
 const props = defineProps<{
   /**
@@ -469,7 +469,7 @@ async function allowTool(agent: Agent) {
     })
     if (!res.ok)
       throw new Error(`HTTP ${res.status}`)
-    toast.success(`Allowed ${pending.tool} for ${friendlyProjectName(agent.projectName)} — future runs won't ask (the paused run still needs your reply in its terminal)`)
+    toast.success(`Allowed ${pending.tool} for ${agentTitle(agent)} — future runs won't ask (the paused run still needs your reply in its terminal)`)
     emit('remembered')
   }
   catch (err) {
@@ -593,7 +593,7 @@ watch([() => props.agents, () => capabilityDecisions.value], ([agents, decisions
       if (announcedRequestIds.has(key))
         continue
       announcedRequestIds.add(key)
-      freshPermissions.push(`${friendlyProjectName(agent.projectName)}: ${permissionLabel(req)}`)
+      freshPermissions.push(`${agentTitle(agent)}: ${permissionLabel(req)}`)
     }
   }
   const freshCapabilities: string[] = []
@@ -949,7 +949,7 @@ watch(() => props.focusedSessionId, (id) => {
           >
             <div class="flex items-center gap-2 min-w-0">
               <span aria-hidden="true" class="text-[15px] shrink-0">{{ getIdentity(agent.projectPath).emoji }}</span>
-              <span class="font-semibold text-[13px] text-fg truncate">{{ friendlyProjectName(agent.projectName) }}</span>
+              <span class="font-semibold text-[13px] text-fg truncate">{{ agentTitle(agent) }}</span>
               <span class="font-mono text-[11px] text-fg-faint shrink-0">{{ shortModel(agent.model ?? null) }}</span>
               <span
                 class="ml-auto text-[10px] font-bold uppercase tracking-wide shrink-0"
@@ -983,7 +983,7 @@ watch(() => props.focusedSessionId, (id) => {
 
             <!-- Orchestrated agent with pending permissions (not covered by task items) -->
             <template v-else-if="agent.pipelineTaskId && agent.pendingPermissions?.length">
-              <ul class="m-0 p-0 list-none flex flex-col gap-1" :aria-label="`Pending permissions for ${agent.projectName}`">
+              <ul class="m-0 p-0 list-none flex flex-col gap-1" :aria-label="`Pending permissions for ${agentTitle(agent)}`">
                 <li
                   v-for="p in agent.pendingPermissions"
                   :key="p.id"
@@ -1014,7 +1014,7 @@ watch(() => props.focusedSessionId, (id) => {
                   variant="success"
                   size="sm"
                   :disabled="agentResolving[agent.sessionId]"
-                  :aria-label="`Approve permissions for ${agent.projectName}`"
+                  :aria-label="`Approve permissions for ${agentTitle(agent)}`"
                   @click="handleResolveAgent(agent, 'granted')"
                 >
                   Approve
@@ -1023,7 +1023,7 @@ watch(() => props.focusedSessionId, (id) => {
                   variant="danger"
                   size="sm"
                   :disabled="agentResolving[agent.sessionId]"
-                  :aria-label="`Deny permissions for ${agent.projectName}`"
+                  :aria-label="`Deny permissions for ${agentTitle(agent)}`"
                   @click="handleResolveAgent(agent, 'denied')"
                 >
                   Deny
@@ -1033,9 +1033,9 @@ watch(() => props.focusedSessionId, (id) => {
                     v-model="rememberPerAgent[agent.sessionId]"
                     type="checkbox"
                     class="accent-success"
-                    :aria-label="`Don't ask again for ${agent.projectName}`"
+                    :aria-label="`Don't ask again for ${agentTitle(agent)}`"
                   >
-                  <span class="font-mono">{{ friendlyProjectName(agent.projectName) }}</span>
+                  <span class="font-mono">{{ agentTitle(agent) }}</span>
                 </label>
               </template>
 
@@ -1074,7 +1074,7 @@ watch(() => props.focusedSessionId, (id) => {
                     size="sm"
                     :disabled="deciding[request.id]"
                     :aria-busy="deciding[request.id] ? 'true' : undefined"
-                    :aria-label="`Allow ${permissionLabel(request)} once for ${friendlyProjectName(agent.projectName)} — the run continues immediately`"
+                    :aria-label="`Allow ${permissionLabel(request)} once for ${agentTitle(agent)} — the run continues immediately`"
                     data-testid="permission-decide-allow"
                     @click="decidePermission(agent, request, 'allow')"
                   >
@@ -1085,7 +1085,7 @@ watch(() => props.focusedSessionId, (id) => {
                     size="sm"
                     :disabled="deciding[request.id]"
                     :aria-busy="deciding[request.id] ? 'true' : undefined"
-                    :aria-label="`Deny ${permissionLabel(request)} for ${friendlyProjectName(agent.projectName)} — the session is told no and carries on`"
+                    :aria-label="`Deny ${permissionLabel(request)} for ${agentTitle(agent)} — the session is told no and carries on`"
                     data-testid="permission-decide-deny"
                     @click="decidePermission(agent, request, 'deny')"
                   >
@@ -1118,7 +1118,7 @@ watch(() => props.focusedSessionId, (id) => {
                 class="ml-auto"
                 :disabled="allowing[agent.sessionId]"
                 :title="`Allow ${blockedDetail(agent)} for this project going forward. The paused run still needs your reply in its terminal.`"
-                :aria-label="`Allow ${agent.pendingToolUse?.tool} for ${friendlyProjectName(agent.projectName)} going forward`"
+                :aria-label="`Allow ${agent.pendingToolUse?.tool} for ${agentTitle(agent)} going forward`"
                 @click="allowTool(agent)"
               >
                 Allow {{ agent.pendingToolUse?.tool }}
@@ -1128,7 +1128,7 @@ watch(() => props.focusedSessionId, (id) => {
                 variant="outline"
                 size="sm"
                 :class="!(agent.pipelineTaskId && agent.pendingPermissions?.length) && !agentAttentionMap.get(agent.sessionId)?.grantableToolUse ? 'ml-auto' : ''"
-                :aria-label="`Open details for ${agent.projectName}`"
+                :aria-label="`Open details for ${agentTitle(agent)}`"
                 @click="emit('select', agent)"
               >
                 Open ↗

@@ -24,7 +24,10 @@ const PROVIDER_LABELS: Record<string, string> = {
 export function agentTitle(agent: Agent): string {
   if (agent.pipelineTaskTitle)
     return agent.pipelineTaskTitle
-  return `${PROVIDER_LABELS[agent.provider] ?? 'Agent'} session ${shortId(agent.sessionId)}`
+  // A payload without a session id still gets a name rather than breaking the
+  // surface that renders it (the details panel header renders this directly).
+  const provider = PROVIDER_LABELS[agent.provider] ?? 'Agent'
+  return agent.sessionId ? `${provider} session ${shortId(agent.sessionId)}` : `${provider} session`
 }
 
 export type WorkState = 'working' | 'tool'

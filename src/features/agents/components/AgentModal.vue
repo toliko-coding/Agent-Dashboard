@@ -12,7 +12,9 @@ import AppModal from '@/components/ui/AppModal.vue'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { toast } from '@/composables/useToast'
 import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
+import { useMetricsDisclosure } from '@/features/agents/composables/useMetricsDisclosure'
 import { PluginSlot } from '@/features/plugins'
+import { agentTitle } from '@/utils/agentLabels'
 import { formatCost, formatTokens, shortModel, totalTokenCount } from '@/utils/format'
 import { agentDisplayStatus } from '@/utils/statusColors'
 import AgentChatStream from './AgentChatStream.vue'
@@ -27,7 +29,8 @@ const emit = defineEmits<{ close: [], navigate: [taskId: string] }>()
 const localMessages = ref<OutputMessage[]>([])
 const promptInputRef = ref<InstanceType<typeof PromptInput> | null>(null)
 const chatStreamRef = ref<InstanceType<typeof AgentChatStream> | null>(null)
-const showMetrics = ref(false)
+const metrics = useMetricsDisclosure()
+const metricsOpen = metrics.open
 
 /*
  * The workspace supersedes the Overview/Transcript tabs of the previous drawer.
@@ -151,24 +154,28 @@ watch(() => props.agent?.sessionId, (sessionId) => {
         <div class="flex items-center gap-2.5 min-w-0">
           <AppBadge :variant="agentDisplayStatus(agent)" />
           <span aria-hidden="true">{{ getIdentity(agent.projectPath).emoji }}</span>
-          <span :id="`agent-modal-title-${agent.pid}`" class="font-semibold text-sm text-fg truncate">{{ agent.projectName }}</span>
+          <!-- The same name the cards, Needs you and Command use; the working folder is a diagnostic in the column below. -->
+          <span :id="`agent-modal-title-${agent.pid}`" class="font-semibold text-sm text-fg truncate" data-testid="agent-modal-title">{{ agentTitle(agent) }}</span>
           <MachineBadge v-if="agent.machine" :machine="agent.machine" />
 
           <span
             class="relative shrink-0 ml-1"
-            @mouseenter="showMetrics = true"
-            @mouseleave="showMetrics = false"
-            @focusin="showMetrics = true"
-            @focusout="showMetrics = false"
+            data-testid="agent-modal-metrics-wrap"
+            @mouseenter="metrics.onPointerEnter"
+            @mouseleave="metrics.onPointerLeave"
+            @focusin="metrics.onFocusIn"
+            @focusout="metrics.onFocusOut"
+            @keydown.escape="metrics.onEscape"
           >
             <button
               type="button"
               class="inline-flex items-center justify-center min-w-6 min-h-6 text-fg-mute hover:text-fg-soft text-[11px] leading-none rounded focus-visible:outline-2 focus-visible:outline-ring"
               aria-label="Show token and cost breakdown"
               data-testid="agent-modal-metrics"
-              @click="showMetrics = !showMetrics"
+              :aria-expanded="metricsOpen"
+              @click="metrics.toggle"
             >ⓘ</button>
-            <MetricsPopover v-if="showMetrics" :agent="agent" />
+            <MetricsPopover v-if="metricsOpen" :agent="agent" />
           </span>
 
           <button

@@ -106,10 +106,14 @@ const recentTools = computed(() => props.agent.lastTools.slice(-4).reverse())
       </p>
     </section>
 
-    <!-- Project -->
-    <section class="flex flex-col gap-1">
+    <!--
+      Working folder. A diagnostic on an explicitly opened details surface, so
+      the path is shown here and nowhere on the default surfaces. Not called
+      "Project": that word means the user-curated Dashboard Project.
+    -->
+    <section class="flex flex-col gap-1" data-testid="intelligence-working-folder">
       <h3 class="text-[10px] uppercase tracking-wider text-fg-faint font-bold">
-        Project
+        Working folder
       </h3>
       <p class="text-[12px] text-fg">
         {{ agent.projectName }}

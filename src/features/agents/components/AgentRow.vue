@@ -8,9 +8,9 @@ import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { toast } from '@/composables/useToast'
 import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
+import { agentTitle } from '@/utils/agentLabels'
 import { attentionFor } from '@/utils/attention'
 import { formatBurnRate, formatCost, formatRelativeActivity, isAwaitingInput, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
-import { friendlyProjectName } from '@/utils/friendlyProjectName'
 import { agentDisplayStatus } from '@/utils/statusColors'
 
 const props = defineProps<{ agent: Agent }>()
@@ -29,7 +29,8 @@ const att = computed(() => attentionFor(props.agent))
 const awaitingInput = computed(() => isAwaitingInput(props.agent))
 const relActivity = computed(() => formatRelativeActivity(secSince.value))
 const burnRate = computed(() => formatBurnRate(props.agent.costEstimate, props.agent.uptime))
-const projectTitle = computed(() => friendlyProjectName(props.agent.projectName))
+// The canonical agent name (utils/agentLabels), the same one the card and Command show.
+const agentName = computed(() => agentTitle(props.agent))
 
 const toneClass: Record<string, string> = {
   warning: 'border-warning-dot',
@@ -72,7 +73,7 @@ async function handleResolve(outcome: 'granted' | 'denied') {
       type="button"
       class="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer min-h-[40px] w-full text-left hover:bg-app focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent focus-visible:ring-inset"
       :aria-expanded="expanded"
-      :aria-label="`${projectTitle} — ${agent.status}`"
+      :aria-label="`${agentName} — ${agent.status}`"
       @click="expanded = !expanded"
     >
       <!-- Status dot -->
@@ -85,7 +86,7 @@ async function handleResolve(outcome: 'granted' | 'denied') {
       <!-- Project emoji + name -->
       <span aria-hidden="true" class="text-[14px] shrink-0">{{ getIdentity(agent.projectPath).emoji }}</span>
       <span class="font-semibold text-sm text-fg shrink-0 w-[156px] overflow-hidden text-ellipsis whitespace-nowrap">
-        {{ projectTitle }}
+        {{ agentName }}
       </span>
 
       <!--
@@ -114,7 +115,7 @@ async function handleResolve(outcome: 'granted' | 'denied') {
             variant="success"
             size="sm"
             :disabled="resolving[agent.sessionId]"
-            :aria-label="`Approve permission for ${projectTitle}`"
+            :aria-label="`Approve permission for ${agentName}`"
             @click="handleResolve('granted')"
           >
             ✓ Approve
@@ -123,7 +124,7 @@ async function handleResolve(outcome: 'granted' | 'denied') {
             variant="danger"
             size="sm"
             :disabled="resolving[agent.sessionId]"
-            :aria-label="`Deny permission for ${projectTitle}`"
+            :aria-label="`Deny permission for ${agentName}`"
             @click="handleResolve('denied')"
           >
             ✕ Deny
@@ -189,7 +190,7 @@ async function handleResolve(outcome: 'granted' | 'denied') {
           variant="outline"
           size="sm"
           class="ml-auto"
-          :aria-label="`Open details for ${projectTitle}`"
+          :aria-label="`Open details for ${agentName}`"
           @click="emit('select', agent)"
         >
           Open ↗

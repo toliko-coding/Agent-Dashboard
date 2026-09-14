@@ -225,7 +225,7 @@ async function finish() {
             <p class="mb-2">
               No existing sessions found &mdash; start one from a terminal, then come back here.
             </p>
-            <ChannelScriptCallout />
+            <ChannelScriptCallout show-full-path />
           </div>
           <ul v-else class="flex flex-col gap-2">
             <li

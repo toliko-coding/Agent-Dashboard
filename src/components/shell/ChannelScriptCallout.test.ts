@@ -9,7 +9,7 @@ vi.mock('../../composables/useServerConfig', () => ({
   useServerConfig: vi.fn(),
 }))
 
-function mountWithScriptPath(path: string) {
+function mountWithScriptPath(path: string, props: { showFullPath?: boolean } = {}) {
   vi.mocked(useServerConfig).mockReturnValue({
     scriptPath: ref(path),
     mcpServerName: ref(''),
@@ -18,14 +18,25 @@ function mountWithScriptPath(path: string) {
     loaded: ref(true),
     loadServerConfig: vi.fn().mockResolvedValue(undefined),
   })
-  return mount(ChannelScriptCallout)
+  return mount(ChannelScriptCallout, { props })
 }
 
 describe('channelScriptCallout', () => {
-  it('renders the script path from server config', async () => {
+  // C: a default surface names the command; the path on this machine is not shown.
+  it('shows the command by name, without the absolute path', async () => {
+    const w = mountWithScriptPath('/Users/someone/Documents/GitHub/Agent-Dashboard/.air-tmp/agent-dashboard live')
+    await flushPromises()
+    const btn = w.get('[data-testid="channel-script-path"]')
+    expect(btn.text()).toBe('agent-dashboard live')
+    expect(w.html()).not.toContain('/Users/someone')
+    expect(btn.attributes('aria-label')).toBe('Copy channel command agent-dashboard live')
+  })
+
+  it('names a bare script by its file name', async () => {
     const w = mountWithScriptPath('/home/u/.claude/channel.mjs')
     await flushPromises()
-    expect(w.text()).toContain('/home/u/.claude/channel.mjs')
+    expect(w.get('[data-testid="channel-script-path"]').text()).toBe('channel.mjs')
+    expect(w.text()).not.toContain('/home/u')
   })
 
   it('renders nothing when scriptPath is absent', async () => {
@@ -34,25 +45,26 @@ describe('channelScriptCallout', () => {
     expect(w.text()).not.toContain('Channel command')
   })
 
-  it('copies the path to clipboard on click', async () => {
+  it('still copies the full command, which the action needs', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
-    const w = mountWithScriptPath('/p/channel.mjs')
+    const w = mountWithScriptPath('/p/agent-dashboard live')
     await flushPromises()
-    await w.get('[data-testid="channel-script-path"]').trigger('click')
-    expect(writeText).toHaveBeenCalledWith('/p/channel.mjs')
+    await w.get('button[data-testid="channel-script-path"]').trigger('click')
+    expect(writeText).toHaveBeenCalledWith('/p/agent-dashboard live')
   })
 
-  it('copy target is a native button with a non-empty aria-label', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined)
-    vi.stubGlobal('navigator', { clipboard: { writeText } })
-    const w = mountWithScriptPath('/q/channel.mjs')
+  it('shows the full path on an explicit setup surface that asks for it', async () => {
+    const w = mountWithScriptPath('/q/channel.mjs', { showFullPath: true })
     await flushPromises()
-    const btn = w.find('button[data-testid="channel-script-path"]')
-    expect(btn.exists()).toBe(true)
-    expect(btn.attributes('aria-label')).toBeTruthy()
-    expect(btn.attributes('aria-label')).toContain('/q/channel.mjs')
-    await btn.trigger('click')
-    expect(writeText).toHaveBeenCalledWith('/q/channel.mjs')
+    expect(w.get('[data-testid="channel-script-path"]').text()).toBe('/q/channel.mjs')
+  })
+
+  it('is only shown full-path in onboarding, not on the Agents view', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const read = (f: string) => readFileSync(resolve(process.cwd(), f), 'utf8')
+    expect(read('src/components/onboarding/OnboardingFlow.vue')).toContain('<ChannelScriptCallout show-full-path />')
+    expect(read('src/features/cockpit/components/DashboardView.vue')).toMatch(/<ChannelScriptCallout\s*\/>/)
   })
 })

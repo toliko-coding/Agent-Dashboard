@@ -3,8 +3,8 @@ import type { TopologyWorkspace } from '../runtimeTopology'
 import type { Agent } from '@/types'
 import { computed } from 'vue'
 import { workspaceDisplay } from '@/utils/agentGroup'
+import { agentTitle } from '@/utils/agentLabels'
 import { shortModel } from '@/utils/format'
-import { friendlyProjectName } from '@/utils/friendlyProjectName'
 import { agentDisplayStatus, statusLabel } from '@/utils/statusColors'
 
 /*
@@ -42,7 +42,7 @@ const ports = computed(() =>
   [...new Set(props.node.services.map(s => s.port))].sort((a, b) => a - b).map(p => `:${p}`).join(' '))
 
 function agentLabel(agent: Agent): string {
-  return `${friendlyProjectName(agent.projectName)} · ${statusLabel(agentDisplayStatus(agent))} · ${shortModel(agent.model ?? null)}`
+  return `${agentTitle(agent)} · ${statusLabel(agentDisplayStatus(agent))} · ${shortModel(agent.model ?? null)}`
 }
 
 const listLabel = computed(() => isPlain.value

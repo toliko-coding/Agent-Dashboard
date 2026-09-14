@@ -865,3 +865,24 @@ describe('agentTriageBand — canonical attention (3D)', () => {
       expect(w.get(`[data-testid="${id}"]`).text()).not.toContain('npm publish')
   })
 })
+
+describe('agentTriageBand — decision context and names (3I)', () => {
+  // E: the explicit decision surface keeps the exact call being approved, for sight and for screen readers.
+  it('shows the exact command it asks about, and names it in the decision controls', () => {
+    const w = mountBand(makeAgent({ heldPermissions: [{ id: 'req-1', tool: 'Bash', pattern: 'git push --force origin main', requestedAt: new Date().toISOString() }] }))
+    expect(w.text()).toContain('Bash(git push --force origin main)')
+    expect(w.get('[data-testid="permission-decide-allow"]').attributes('aria-label')).toContain('Bash(git push --force origin main)')
+  })
+
+  it('shows the exact question it asks the user to answer', () => {
+    const w = mountBand(makeAgent({ pendingQuestion: { header: 'deploy', question: 'Deploy to production now?', multiSelect: false, options: [{ index: 1, label: 'Yes' }, { index: 2, label: 'No' }], typeSomethingIndex: 3, chatAboutIndex: 4 } }))
+    expect(w.text()).toContain('Deploy to production now?')
+  })
+
+  it('names agents canonically, not by folder, in the card and its controls', () => {
+    const w = mountBand(makeAgent({ projectName: 'secret-folder', heldPermissions: [{ id: 'req-1', tool: 'Bash', pattern: 'ls', requestedAt: new Date().toISOString() }] }))
+    expect(w.text()).not.toContain('secret-folder')
+    expect(w.get('[data-testid="permission-decide-deny"]').attributes('aria-label')).toContain('Claude session')
+    expect(w.html()).not.toContain('secret-folder')
+  })
+})

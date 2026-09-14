@@ -258,3 +258,14 @@ describe('runtimeTopology — the collapsible section', () => {
     expect(localStorage.getItem('system-map-topology-expanded')).toBe('true')
   })
 })
+
+describe('runtime topology — agent names (3I)', () => {
+  it('names agents canonically, never by folder name', () => {
+    const named = { ...agent({ id: 'ws_n', name: 'n', kind: 'git-main', branch: 'main', repository: { id: 'repo_n', name: 'repo-n' } }, 'secret-folder'), provider: 'claude', sessionId: '3f2a1b9c-0000' } as Agent
+    const orphan = { ...agent(null, 'other-secret-folder'), provider: 'codex', sessionId: '9c01d2e4-0000' } as Agent
+    const w = mountTree([named, orphan])
+    expect(w.get('[data-testid="topology-agent"]').text()).toContain('Claude session 3f2a1b9c')
+    expect(w.get('[data-testid="topology-unresolved-agent"]').text()).toContain('Codex session 9c01d2e4')
+    expect(w.html()).not.toMatch(/secret[- ]folder/i)
+  })
+})
