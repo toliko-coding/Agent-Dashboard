@@ -17,6 +17,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"github.com/lx-wnk/agent-dashboard/sdk"
 	"github.com/lx-wnk/agent-dashboard/server/internal/sanitize"
@@ -416,6 +417,11 @@ type fullScanUsage struct {
 	// Used only for diagnostics — the token total does not depend on it.
 	hasCompaction bool
 	sdk.TokenUsage
+	// customTitle and aiTitle are the last non-empty session-title records in
+	// the file (see sessionTitle). They ride on this scan because title records
+	// are written anywhere in the log — often long before its tail.
+	customTitle string
+	aiTitle     string
 }
 
 // scanFullFileTokenUsage does a single linear pass over path and sums every
@@ -432,6 +438,12 @@ type fullScanUsage struct {
 func scanFullFileTokenUsage(path string) (fullScanUsage, error) {
 	var total fullScanUsage
 	err := ScanMessages(path, 0, func(m Message) error {
+		if m.CustomTitle != "" {
+			total.customTitle = m.CustomTitle
+		}
+		if m.AITitle != "" {
+			total.aiTitle = m.AITitle
+		}
 		if isCompactBoundaryType(m.Type, m.Subtype) {
 			// Record that compaction happened (diagnostics only). The token total
 			// is the whole-file sum and is unaffected by the boundary — per-message
@@ -462,9 +474,11 @@ func scanFullFileTokenUsage(path string) (fullScanUsage, error) {
 // the JSONL is append-only (CI-4), so a lifetime total is an exact running sum
 // of appended bytes and never needs to re-read history.
 type tokenOffsetCacheEntry struct {
-	inode   uint64
-	offset  int64
-	running sdk.TokenUsage
+	inode       uint64
+	offset      int64
+	running     sdk.TokenUsage
+	customTitle string
+	aiTitle     string
 }
 
 var (
@@ -502,17 +516,23 @@ func tokenUsageForFile(path string) (fullScanUsage, error) {
 	tokenOffsetCacheMu.Unlock()
 
 	if ok && entry.inode == inode && size >= entry.offset {
-		usage, newOffset, scanErr := ScanMessagesFrom(path, entry.offset)
+		scan, newOffset, scanErr := scanAppended(path, entry.offset)
 		if scanErr == nil {
 			tokenOffsetCacheMu.Lock()
-			entry.running.InputTokens += usage.InputTokens
-			entry.running.OutputTokens += usage.OutputTokens
-			entry.running.CacheCreationTokens += usage.CacheCreationTokens
-			entry.running.CacheReadTokens += usage.CacheReadTokens
+			entry.running.InputTokens += scan.usage.InputTokens
+			entry.running.OutputTokens += scan.usage.OutputTokens
+			entry.running.CacheCreationTokens += scan.usage.CacheCreationTokens
+			entry.running.CacheReadTokens += scan.usage.CacheReadTokens
+			if scan.customTitle != "" {
+				entry.customTitle = scan.customTitle
+			}
+			if scan.aiTitle != "" {
+				entry.aiTitle = scan.aiTitle
+			}
 			entry.offset = newOffset
-			running := entry.running
+			result := fullScanUsage{TokenUsage: entry.running, customTitle: entry.customTitle, aiTitle: entry.aiTitle}
 			tokenOffsetCacheMu.Unlock()
-			return fullScanUsage{TokenUsage: running}, nil
+			return result, nil
 		}
 		slog.Warn("parser: incremental token scan failed — falling back to full rescan", "path", path, "err", scanErr)
 	}
@@ -525,7 +545,7 @@ func tokenUsageForFile(path string) (fullScanUsage, error) {
 	if !ok && len(tokenOffsetCache) >= tokenOffsetCacheMaxEntries {
 		tokenOffsetCache = make(map[string]*tokenOffsetCacheEntry, tokenOffsetCacheMaxEntries)
 	}
-	tokenOffsetCache[path] = &tokenOffsetCacheEntry{inode: inode, offset: size, running: full.TokenUsage}
+	tokenOffsetCache[path] = &tokenOffsetCacheEntry{inode: inode, offset: size, running: full.TokenUsage, customTitle: full.customTitle, aiTitle: full.aiTitle}
 	tokenOffsetCacheMu.Unlock()
 	return full, nil
 }
@@ -552,6 +572,40 @@ type SessionData struct {
 	LastBtw             *sdk.BtwMessage
 	PendingToolUse      *sdk.PendingToolUse
 	TurnOpen            bool
+	// Title is the session's name as Claude Code shows it (see sessionTitle);
+	// TitleSource is sdk.AgentTitleCustom or sdk.AgentTitleAI, "" with no title.
+	Title       string
+	TitleSource string
+}
+
+// maxTitleRunes bounds a session title on the wire. Claude Code's generated
+// titles are a few words; a longer custom name is cut rather than rejected.
+const maxTitleRunes = 80
+
+/*
+ * sessionTitle picks the name Claude Code itself displays for a session: the
+ * name the user set with /rename (custom-title) and otherwise the title Claude
+ * generated (ai-title). Both record types are "last wins" in Claude Code's own
+ * reader, which is what the scans keep. The value is a name, not transcript
+ * text: whitespace is collapsed, control characters dropped, and length capped.
+ */
+func sessionTitle(customTitle, aiTitle string) (string, string) {
+	if t := cleanTitle(customTitle); t != "" {
+		return t, sdk.AgentTitleCustom
+	}
+	if t := cleanTitle(aiTitle); t != "" {
+		return t, sdk.AgentTitleAI
+	}
+	return "", ""
+}
+
+func cleanTitle(raw string) string {
+	fields := strings.FieldsFunc(raw, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) })
+	title := strings.Join(fields, " ")
+	if runes := []rune(title); len(runes) > maxTitleRunes {
+		title = strings.TrimSpace(string(runes[:maxTitleRunes-1])) + "…"
+	}
+	return title
 }
 
 // sessionFileCandidate holds mtime + inode info gathered via os.Stat (cheap).
@@ -1000,6 +1054,7 @@ func ParseSessionFile(path string) (*SessionData, error) {
 				"output", full.OutputTokens)
 		}
 		data.TokenUsage = full.TokenUsage
+		data.Title, data.TitleSource = sessionTitle(full.customTitle, full.aiTitle)
 	}
 
 	kept := recentTools

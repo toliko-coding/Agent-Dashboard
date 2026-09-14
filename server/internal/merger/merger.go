@@ -527,6 +527,8 @@ func (m *Merger) buildAgent(ctx context.Context, proc scanner.ProcessInfo, sessi
 		PendingConfirm:            pendingConfirm,
 		Uptime:                    proc.Uptime,
 		LastActivity:              formatActivity(session.LastActivity),
+		Title:                     session.Title,
+		TitleSource:               session.TitleSource,
 		CurrentAction:             strPtr(session.CurrentAction),
 		LastTools:                 append(make([]sdk.RecentTool, 0), session.LastTools...),
 		Tasks:                     append(make([]sdk.TaskInfo, 0), session.Tasks...),

@@ -1,12 +1,26 @@
 import type { Agent } from '../types'
 import { describe, expect, it } from 'vitest'
-import { agentTitle, workActivity } from './agentLabels'
+import { agentSessionLabel, agentTitle, workActivity } from './agentLabels'
 
 const agent = (o: Partial<Agent>) => ({ sessionId: '3f2a1b9c-0000-4000-8000-000000000000', provider: 'claude', projectName: 'my-folder', ...o }) as Agent
 
 describe('agentTitle', () => {
   it('uses the pipeline task title when there is one', () => {
     expect(agentTitle(agent({ pipelineTaskTitle: 'Fix login' }))).toBe('Fix login')
+  })
+
+  // 3N: the session's own name, as Claude Code shows it.
+  it('uses the session title after a pipeline task, never over it', () => {
+    expect(agentTitle(agent({ title: 'Fix login redirect', titleSource: 'ai' }))).toBe('Fix login redirect')
+    expect(agentTitle(agent({ title: 'Billing export', pipelineTaskTitle: 'Task title' }))).toBe('Task title')
+  })
+
+  it('ignores a blank title', () => {
+    expect(agentTitle(agent({ title: '   ' }))).toBe('Claude session 3f2a1b9c')
+  })
+
+  it('keeps the session handle available beside a human name', () => {
+    expect(agentSessionLabel(agent({ title: 'Fix login redirect' }))).toBe('Claude session 3f2a1b9c')
   })
 
   it('otherwise names the provider and a short session id, never the folder', () => {

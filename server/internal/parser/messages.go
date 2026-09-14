@@ -24,6 +24,11 @@ type Message struct {
 	Model     string
 	Usage     *sdk.TokenUsage
 	Content   json.RawMessage
+	// CustomTitle and AITitle carry a session-title record's value: the name set
+	// with /rename (type "custom-title") or the title Claude Code generated for
+	// the session (type "ai-title"). Empty on every other line.
+	CustomTitle string
+	AITitle     string
 }
 
 // decodeMessageLine decodes one JSONL line into a Message. ok is false for a
@@ -32,10 +37,12 @@ type Message struct {
 // shared by ScanMessages and ScanMessagesFrom so the two scans can never diverge.
 func decodeMessageLine(line []byte) (Message, bool) {
 	var outer struct {
-		Type      string          `json:"type"`
-		Subtype   string          `json:"subtype"`
-		Timestamp string          `json:"timestamp"`
-		Message   json.RawMessage `json:"message"`
+		Type        string          `json:"type"`
+		Subtype     string          `json:"subtype"`
+		Timestamp   string          `json:"timestamp"`
+		Message     json.RawMessage `json:"message"`
+		CustomTitle string          `json:"customTitle"`
+		AITitle     string          `json:"aiTitle"`
 	}
 	if err := json.Unmarshal(line, &outer); err != nil {
 		return Message{}, false
@@ -66,7 +73,7 @@ func decodeMessageLine(line []byte) (Message, bool) {
 		}
 	}
 
-	return Message{
+	msg := Message{
 		Type:      outer.Type,
 		Subtype:   outer.Subtype,
 		Timestamp: ts,
@@ -74,7 +81,14 @@ func decodeMessageLine(line []byte) (Message, bool) {
 		Model:     inner.Model,
 		Usage:     usage,
 		Content:   inner.Content,
-	}, true
+	}
+	switch outer.Type {
+	case "custom-title":
+		msg.CustomTitle = outer.CustomTitle
+	case "ai-title":
+		msg.AITitle = outer.AITitle
+	}
+	return msg, true
 }
 
 // ScanMessages opens path, reads up to maxBytes (0 = whole file), decodes each
@@ -106,24 +120,40 @@ func ScanMessages(path string, maxBytes int64, fn func(m Message) error) error {
 // left unconsumed for the next call. size <= offset (nothing appended) returns
 // zero usage and the offset unchanged.
 func ScanMessagesFrom(path string, offset int64) (sdk.TokenUsage, int64, error) {
+	scan, newOffset, err := scanAppended(path, offset)
+	return scan.usage, newOffset, err
+}
+
+// appendedScan is what one pass over a session file's appended bytes yields:
+// the summed assistant usage and the last non-empty session-title values.
+type appendedScan struct {
+	usage       sdk.TokenUsage
+	customTitle string
+	aiTitle     string
+}
+
+// scanAppended is ScanMessagesFrom's pass, also keeping the last session-title
+// records it passes (both are "last wins" in Claude Code's own reader).
+func scanAppended(path string, offset int64) (appendedScan, int64, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return sdk.TokenUsage{}, offset, fmt.Errorf("open %s: %w", path, err)
+		return appendedScan{}, offset, fmt.Errorf("open %s: %w", path, err)
 	}
 	defer f.Close() //nolint:errcheck
 
 	info, err := f.Stat()
 	if err != nil {
-		return sdk.TokenUsage{}, offset, fmt.Errorf("stat %s: %w", path, err)
+		return appendedScan{}, offset, fmt.Errorf("stat %s: %w", path, err)
 	}
 	if info.Size() <= offset {
-		return sdk.TokenUsage{}, offset, nil
+		return appendedScan{}, offset, nil
 	}
 	if _, err := f.Seek(offset, io.SeekStart); err != nil {
-		return sdk.TokenUsage{}, offset, fmt.Errorf("seek %s: %w", path, err)
+		return appendedScan{}, offset, fmt.Errorf("seek %s: %w", path, err)
 	}
 
-	var total sdk.TokenUsage
+	var scan appendedScan
+	total := &scan.usage
 	newOffset := offset
 	reader := bufio.NewReaderSize(f, 256*1024)
 	for {
@@ -131,11 +161,19 @@ func ScanMessagesFrom(path string, offset int64) (sdk.TokenUsage, int64, error) 
 		if len(line) > 0 && line[len(line)-1] == '\n' {
 			newOffset += int64(len(line))
 			if trimmed := bytes.TrimSpace(line); len(trimmed) > 0 {
-				if m, ok := decodeMessageLine(trimmed); ok && m.Role == "assistant" && m.Usage != nil {
-					total.InputTokens += m.Usage.InputTokens
-					total.OutputTokens += m.Usage.OutputTokens
-					total.CacheCreationTokens += m.Usage.CacheCreationTokens
-					total.CacheReadTokens += m.Usage.CacheReadTokens
+				if m, ok := decodeMessageLine(trimmed); ok {
+					if m.Role == "assistant" && m.Usage != nil {
+						total.InputTokens += m.Usage.InputTokens
+						total.OutputTokens += m.Usage.OutputTokens
+						total.CacheCreationTokens += m.Usage.CacheCreationTokens
+						total.CacheReadTokens += m.Usage.CacheReadTokens
+					}
+					if m.CustomTitle != "" {
+						scan.customTitle = m.CustomTitle
+					}
+					if m.AITitle != "" {
+						scan.aiTitle = m.AITitle
+					}
 				}
 			}
 		}
@@ -143,8 +181,8 @@ func ScanMessagesFrom(path string, offset int64) (sdk.TokenUsage, int64, error) 
 			if errors.Is(readErr, io.EOF) {
 				break // trailing partial line — left for the next call
 			}
-			return sdk.TokenUsage{}, offset, fmt.Errorf("read %s: %w", path, readErr)
+			return appendedScan{}, offset, fmt.Errorf("read %s: %w", path, readErr)
 		}
 	}
-	return total, newOffset, nil
+	return scan, newOffset, nil
 }

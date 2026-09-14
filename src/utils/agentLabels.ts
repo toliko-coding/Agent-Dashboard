@@ -17,13 +17,27 @@ const PROVIDER_LABELS: Record<string, string> = {
 }
 
 /**
- * The agent's name: the pipeline task it runs when there is one; otherwise the
- * provider and a short session id. Never the folder name — basename(cwd)
- * collides across checkouts, and the repository and workspace carry identity.
+ * The agent's name, in order: the pipeline task it runs; the session's own
+ * name as Claude Code shows it (the /rename name, else the title Claude Code
+ * generated — `agent.title`, from the server); otherwise the provider and a
+ * short session id. Never the folder name — basename(cwd) collides across
+ * checkouts, and the repository and workspace carry identity.
  */
 export function agentTitle(agent: Agent): string {
   if (agent.pipelineTaskTitle)
     return agent.pipelineTaskTitle
+  const title = agent.title?.trim()
+  if (title)
+    return title
+  return agentSessionLabel(agent)
+}
+
+/**
+ * The session's stable handle — provider and short session id — which stays
+ * the same when a title is generated or renamed. Shown beside a human name so
+ * two sessions that share a title remain distinguishable.
+ */
+export function agentSessionLabel(agent: Agent): string {
   // A payload without a session id still gets a name rather than breaking the
   // surface that renders it (the details panel header renders this directly).
   const provider = PROVIDER_LABELS[agent.provider] ?? 'Agent'
