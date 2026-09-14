@@ -143,18 +143,32 @@ describe('agentModal — workspace', () => {
     })
   }
 
-  it('renders a wide right-side panel, never the old narrow drawer', () => {
+  // 3N.2: a large centred workspace, not a drawer that leaves the page beside it unused.
+  it('renders a large centred workspace with the conversation as the main surface', () => {
     const w = workspace()
     const box = w.get('[data-testid="agent-workspace"]')
     const classes = box.classes().join(' ')
-    expect(box.attributes('data-layout')).toBe('side-panel')
-    // A full-height sheet below 1024px, then wide panels — explicitly not 560px.
-    expect(classes).toContain('h-full')
-    expect(classes).toContain('w-screen')
-    expect(classes).toContain('min-[1024px]:w-[min(960px,92vw)]')
-    expect(classes).toContain('min-[1440px]:w-[min(1180px,78vw)]')
-    expect(classes).not.toContain('560px')
+    expect(box.attributes('data-layout')).toBe('workspace')
+    expect(classes).toContain('min-[1024px]:w-[min(1480px,calc(100vw-4rem))]')
+    expect(classes).toContain('min-[1024px]:h-[min(940px,calc(100dvh-3rem))]')
+    expect(classes).not.toContain('min-[1440px]:w-[min(1180px,78vw)]')
+    const grid = box.get('.grid')
+    expect(grid.classes().join(' ')).toContain('lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]')
+    expect(box.get('[aria-label="Conversation"]').classes()).toContain('lg:col-start-1')
     expect(w.find('[data-testid="agent-details-panel"]').exists()).toBe(false)
+  })
+
+  it('names the agent in its header with state, handle and topic, and offers Stop and Delete through the shared confirmation', async () => {
+    const { useAgentLifecycle } = await import('@/composables/useAgentLifecycle')
+    const w = workspace({ ...baseAgent, status: 'active', displayName: 'Portfolio', title: 'Refactoring responsive navigation' } as Agent)
+    expect(w.get('[data-testid="agent-modal-title"]').text()).toBe('Portfolio')
+    expect(w.get('[data-testid="agent-modal-technical"]').text()).toMatch(/^Claude · /)
+    expect(w.get('[data-testid="agent-modal-topic"]').text()).toBe('Refactoring responsive navigation')
+    await w.get('[data-testid="agent-modal-stop"]').trigger('click')
+    expect(useAgentLifecycle().pending.value).toMatchObject({ action: 'stop' })
+    await w.get('[data-testid="agent-modal-delete"]').trigger('click')
+    expect(useAgentLifecycle().pending.value).toMatchObject({ action: 'delete' })
+    useAgentLifecycle().cancel()
   })
 
   it('gives the conversation its own labelled region', () => {
@@ -162,11 +176,17 @@ describe('agentModal — workspace', () => {
     expect(w.find('section[aria-label="Conversation"]').exists()).toBe(true)
   })
 
-  it('exposes no pause or stop action — no such endpoint exists', () => {
+  // Stop exists now (3N.2) — through the shared confirmation; Pause still does not.
+  it('exposes no pause action, and Stop only through the confirmation', async () => {
     const w = workspace()
-    const text = w.text().toLowerCase()
-    expect(text).not.toContain('pause')
-    expect(text).not.toContain('stop')
+    expect(w.text().toLowerCase()).not.toContain('pause')
+    const stop = w.find('[data-testid="agent-modal-stop"]')
+    if (stop.exists()) {
+      const { useAgentLifecycle } = await import('@/composables/useAgentLifecycle')
+      await stop.trigger('click')
+      expect(useAgentLifecycle().pending.value?.action).toBe('stop')
+      useAgentLifecycle().cancel()
+    }
   })
 
   // A "Phase 3/7" for a plain agent would be invented; only pipeline-linked
@@ -220,13 +240,13 @@ describe('agentModal — right-side detail panel (3H)', () => {
     document.body.innerHTML = ''
   })
 
-  it('opens against the right edge through AppModal\'s end placement', async () => {
+  it('opens centred through AppModal\'s centre placement', async () => {
     const w = mount(AgentModal, { props: { agent: baseAgent }, global: { stubs: panelStubs }, attachTo: document.body })
     await nextTick()
     const dialog = document.querySelector('[role="dialog"]')!
     expect(dialog.getAttribute('aria-modal')).toBe('true')
-    expect(dialog.className).toContain('justify-end')
-    expect(dialog.className).toContain('items-stretch')
+    expect(dialog.className).toContain('justify-center')
+    expect(dialog.className).not.toContain('justify-end')
     expect(dialog.getAttribute('aria-labelledby')).toBe(`agent-modal-title-${baseAgent.pid}`)
     w.unmount()
   })

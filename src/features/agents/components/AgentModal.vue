@@ -10,12 +10,15 @@ import ToolTimeline from '@/components/ToolTimeline.vue'
 import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
+import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
+import { agentIsRunning, editorLabel, openInEditor, useAgentLifecycle } from '@/composables/useAgentLifecycle'
+import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { toast } from '@/composables/useToast'
 import { useMetricsDisclosure } from '@/features/agents/composables/useMetricsDisclosure'
 import { PluginSlot } from '@/features/plugins'
-import { agentTitle } from '@/utils/agentLabels'
-import { formatCost, formatTokens, shortModel, totalTokenCount } from '@/utils/format'
+import { agentTechnical, agentTitle, agentTopic } from '@/utils/agentLabels'
+import { formatCost, formatRelativeActivity, formatTokens, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
 import { agentDisplayStatus } from '@/utils/statusColors'
 import AgentChatStream from './AgentChatStream.vue'
 import AgentIntelligencePanel from './AgentIntelligencePanel.vue'
@@ -31,6 +34,16 @@ const promptInputRef = ref<InstanceType<typeof PromptInput> | null>(null)
 const chatStreamRef = ref<InstanceType<typeof AgentChatStream> | null>(null)
 const metrics = useMetricsDisclosure()
 const metricsOpen = metrics.open
+
+// Workspace header (3N.2): who, what and the everyday and destructive actions.
+const { nowMs } = useNow()
+const { requestStop, requestDelete } = useAgentLifecycle()
+const editor = editorLabel()
+const technical = computed(() => props.agent ? agentTechnical(props.agent) : null)
+const topic = computed(() => props.agent ? agentTopic(props.agent) : null)
+const since = computed(() => props.agent ? formatRelativeActivity(secondsSince(props.agent.lastActivity, nowMs.value)) : '')
+const canAct = computed(() => !!props.agent && !props.agent.machine && !props.agent.internalProcess)
+const running = computed(() => canAct.value && agentIsRunning(props.agent!))
 
 /*
  * The workspace supersedes the Overview/Transcript tabs of the previous drawer.
@@ -127,34 +140,44 @@ watch(() => props.agent?.sessionId, (sessionId) => {
     :open="!!agent"
     :z-index="1000"
     size="auto"
-    placement="end"
+    placement="center"
     :labelled-by="agent ? `agent-modal-title-${agent.pid}` : undefined"
     @close="emit('close')"
   >
     <!--
-      The agent's details, as a panel against the right edge: the page it was
-      opened from stays in view beside it, which a centred dialog covered.
-
-      Wide on purpose. A 560px drawer once forced the conversation into a
-      column narrower than a phone, so the panel is ~1180px from 1440px up and
-      ~960px from 1024px — the conversation stays primary, with the
-      intelligence column beside it — and below 1024px it is a full-height,
-      full-width sheet with the conversation alone. AppModal's end placement
-      supplies the focus trap, Escape, scroll lock, focus return and the slide.
+      The agent's workspace (3N.2): a large surface centred over the dashboard,
+      not a drawer against the right edge that left the page beside it blurred
+      and unused. The conversation takes most of the width; session context sits
+      in a column beside it. AppModal's centre placement supplies the focus trap,
+      Escape, scroll lock and focus return.
     -->
     <div
       v-if="agent"
       data-testid="agent-workspace"
-      data-layout="side-panel"
-      class="h-full w-screen min-[1024px]:w-[min(960px,92vw)] min-[1440px]:w-[min(1180px,78vw)] bg-card border-l border-line shadow-modal flex flex-col overflow-hidden"
+      data-layout="workspace"
+      class="cc-card flex h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-line shadow-modal min-[1024px]:h-[min(940px,calc(100dvh-3rem))] min-[1024px]:w-[min(1480px,calc(100vw-4rem))]"
     >
       <!-- Header spans the full width -->
-      <header class="bg-raised px-4 py-2.5 flex flex-col gap-2 flex-shrink-0 border-b border-line">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <AppBadge :variant="agentDisplayStatus(agent)" />
-          <AgentGlyph :agent="agent" size="sm" />
-          <!-- The same name the cards, Needs you and Command use; the working folder is a diagnostic in the column below. -->
-          <span :id="`agent-modal-title-${agent.pid}`" class="font-semibold text-sm text-fg truncate" data-testid="agent-modal-title">{{ agentTitle(agent) }}</span>
+      <header class="flex flex-shrink-0 flex-col gap-3 border-b border-line bg-raised/40 px-5 py-4">
+        <div class="flex items-center gap-3 min-w-0">
+          <AgentGlyph :agent="agent" size="lg" />
+          <div class="flex min-w-0 flex-1 flex-col gap-1">
+            <div class="flex min-w-0 items-center gap-2.5">
+              <!-- The same name the cards, Needs you and Command use; the working folder is a diagnostic in the column beside the chat. -->
+              <span :id="`agent-modal-title-${agent.pid}`" class="truncate text-title font-semibold text-fg" data-testid="agent-modal-title">{{ agentTitle(agent) }}</span>
+              <span v-if="technical" class="shrink-0 rounded-md border border-line bg-raised/60 px-1.5 py-0.5 font-mono text-label text-fg-mute" data-testid="agent-modal-technical">{{ technical }}</span>
+            </div>
+            <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-ui-sm text-fg-mute">
+              <AppBadge :variant="agentDisplayStatus(agent)" />
+              <span data-testid="agent-modal-since">{{ since }}</span>
+              <template v-if="agent.workspace">
+                <span v-if="agent.workspace.repository" class="truncate font-mono text-fg-soft" data-testid="agent-modal-repository">{{ agent.workspace.repository.name || 'Repository' }}</span>
+                <span v-else class="truncate font-mono text-fg-soft">{{ agent.workspace.name }} <span class="font-sans text-fg-faint">local</span></span>
+                <WorkspaceBadge :workspace="agent.workspace" class="max-w-[16rem]" />
+              </template>
+              <span v-if="topic" class="min-w-0 truncate text-fg-soft" data-testid="agent-modal-topic">{{ topic }}</span>
+            </div>
+          </div>
           <MachineBadge v-if="agent.machine" :machine="agent.machine" />
 
           <span
@@ -177,10 +200,39 @@ watch(() => props.agent?.sessionId, (sessionId) => {
             <MetricsPopover v-if="metricsOpen" :agent="agent" />
           </span>
 
+          <div class="ml-auto flex shrink-0 items-center gap-2" data-testid="agent-modal-actions">
+            <button
+              v-if="canAct && agent.cwd"
+              type="button"
+              class="inline-flex h-8 cursor-pointer items-center rounded-lg border border-line bg-raised/50 px-3 text-ui-sm text-accent hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+              data-testid="agent-modal-editor"
+              @click="openInEditor(agent.cwd)"
+            >
+              Open in {{ editor }}
+            </button>
+            <button
+              v-if="running"
+              type="button"
+              class="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-danger-line/70 px-3 text-ui-sm font-medium text-danger-text hover:bg-danger-soft focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+              data-testid="agent-modal-stop"
+              @click="requestStop(agent)"
+            >
+              <span class="size-2 rounded-[2px] bg-danger-text" aria-hidden="true" />Stop
+            </button>
+            <button
+              v-if="canAct"
+              type="button"
+              class="inline-flex h-8 cursor-pointer items-center rounded-lg border border-line px-3 text-ui-sm text-fg-mute hover:border-danger-line hover:bg-danger-soft hover:text-danger-text focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+              data-testid="agent-modal-delete"
+              @click="requestDelete(agent)"
+            >
+              Delete
+            </button>
+          </div>
           <button
             type="button"
             aria-label="Close"
-            class="ml-auto shrink-0 bg-transparent border-none text-fg-mute text-base cursor-pointer px-2 py-1 rounded hover:bg-card hover:text-fg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+            class="shrink-0 bg-transparent border-none text-fg-mute text-base cursor-pointer px-2 py-1 rounded hover:bg-card hover:text-fg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
             @click="emit('close')"
           >
             ✕
@@ -188,8 +240,8 @@ watch(() => props.agent?.sessionId, (sessionId) => {
         </div>
 
         <!--
-          Facts, each rendered only when it is backed by real data. There is no
-          Pause and no Stop: no such endpoint exists for an agent process.
+          Facts, each rendered only when it is backed by real data. Stop and
+          Delete sit in the header, through the shared confirmation; there is no Pause.
         -->
         <dl class="flex items-center gap-x-5 gap-y-1 flex-wrap text-[11px] min-w-0">
           <div class="flex items-baseline gap-1.5 min-w-0">
@@ -244,19 +296,19 @@ watch(() => props.agent?.sessionId, (sessionId) => {
       />
 
       <!--
-        Intelligence ~32% / conversation ~68% on desktop. Below lg the
+        Conversation first, with the session column beside it on the right (3N.2). Below lg the
         intelligence column is dropped rather than stacked: on a narrow screen
         the conversation is the whole point, and a stacked sidebar would push
         it off-screen.
       -->
-      <div class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,32%)_minmax(0,68%)]">
+      <div class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]">
         <AgentIntelligencePanel
           v-if="!openSubagent"
           :agent="agent"
-          class="hidden lg:flex"
+          class="hidden lg:col-start-2 lg:row-start-1 lg:flex"
         />
 
-        <section class="flex flex-col min-h-0 min-w-0 lg:col-start-2" aria-label="Conversation">
+        <section class="flex flex-col min-h-0 min-w-0 lg:col-start-1 lg:row-start-1" aria-label="Conversation">
           <template v-if="openSubagent">
             <div class="flex items-center gap-2 px-4 py-2 border-b border-line text-xs flex-shrink-0">
               <button
@@ -274,7 +326,7 @@ watch(() => props.agent?.sessionId, (sessionId) => {
               :agent="null"
               :session-id="openSubagent.id"
               data-testid="subagent-transcript"
-              class="flex-1 min-h-0 overflow-y-auto p-4"
+              class="flex-1 min-h-0 overflow-y-auto px-6 py-5"
             />
           </template>
 
@@ -294,7 +346,7 @@ watch(() => props.agent?.sessionId, (sessionId) => {
               ref="chatStreamRef"
               :agent="agent"
               :local-messages="localMessages"
-              class="flex-1 min-h-0 overflow-y-auto p-4"
+              class="flex-1 min-h-0 overflow-y-auto px-6 py-5"
             />
           </template>
 
@@ -308,6 +360,7 @@ watch(() => props.agent?.sessionId, (sessionId) => {
             ref="promptInputRef"
             :agent="agent"
             variant="full"
+            class="[&_textarea]:min-h-[3.5rem] [&_textarea]:text-[14px]"
             :approve-handler="approveHandler"
             @message-sent="onMessageSent"
           />
