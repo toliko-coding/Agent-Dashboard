@@ -248,8 +248,13 @@ describe('formatRelativeActivity', () => {
     expect(formatRelativeActivity(null)).toBe('—')
   })
 
+  it('reads the first seconds as Just now', () => {
+    expect(formatRelativeActivity(0)).toBe('Just now')
+    expect(formatRelativeActivity(9)).toBe('Just now')
+  })
+
   it('formats seconds under 60 as Ns ago', () => {
-    expect(formatRelativeActivity(0)).toBe('0s ago')
+    expect(formatRelativeActivity(10)).toBe('10s ago')
     expect(formatRelativeActivity(12)).toBe('12s ago')
     expect(formatRelativeActivity(59)).toBe('59s ago')
   })
@@ -269,6 +274,40 @@ describe('formatRelativeActivity', () => {
   it('boundary: 59s shows seconds, 60s shows minutes', () => {
     expect(formatRelativeActivity(59)).toBe('59s ago')
     expect(formatRelativeActivity(60)).toBe('1m ago')
+  })
+})
+
+// 3N.0: last activity for a brand-new agent must read as recent, never ~24h old.
+describe('last activity — recency regressions', () => {
+  it('a newly created agent reads Just now, then seconds', () => {
+    const nowMs = Date.parse('2026-09-14T16:35:05.000Z')
+    expect(formatRelativeActivity(secondsSince('2026-09-14T16:35:02Z', nowMs))).toBe('Just now')
+    expect(formatRelativeActivity(secondsSince('2026-09-14T16:34:57Z', nowMs))).toBe('Just now')
+    expect(formatRelativeActivity(secondsSince('2026-09-14T16:34:45Z', nowMs))).toBe('20s ago')
+    expect(formatRelativeActivity(secondsSince('2026-09-14T16:34:05Z', nowMs))).toBe('1m ago')
+  })
+
+  it('an explicit offset is the same instant as its UTC form', () => {
+    const nowMs = Date.parse('2026-09-13T21:00:13Z')
+    expect(secondsSince('2026-09-14T00:00:05+03:00', nowMs)).toBe(8)
+    expect(secondsSince('2026-09-13T21:00:05Z', nowMs)).toBe(8)
+  })
+
+  it('crossing local and UTC midnight does not add a day', () => {
+    // Local midnight at +03:00 is 21:00 UTC; UTC midnight is 03:00 local.
+    expect(secondsSince('2026-09-13T23:59:58+03:00', Date.parse('2026-09-14T00:00:04+03:00'))).toBe(6)
+    expect(secondsSince('2026-09-13T23:59:58Z', Date.parse('2026-09-14T00:00:04Z'))).toBe(6)
+    expect(formatRelativeActivity(secondsSince('2026-09-13T20:59:55Z', Date.parse('2026-09-14T00:00:30+03:00')))).toBe('35s ago')
+  })
+
+  it('a missing activity time reads as unknown, not as a time', () => {
+    expect(secondsSince('')).toBeNull()
+    expect(formatRelativeActivity(secondsSince(''))).toBe('—')
+  })
+
+  it('a genuinely old agent still reads as old', () => {
+    const nowMs = Date.parse('2026-09-14T16:00:00Z')
+    expect(formatRelativeActivity(secondsSince('2026-09-11T16:00:00Z', nowMs))).toBe('72h 0m ago')
   })
 })
 

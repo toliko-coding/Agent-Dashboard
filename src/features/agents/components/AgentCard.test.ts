@@ -109,7 +109,7 @@ describe('agentCard — compact worker (3G)', () => {
 
   it('shows role, last activity and cost as facts', () => {
     const w = render({ spawnerName: 'Reviewer' })
-    expect(w.get('[data-testid="agent-card-facts"]').text()).toMatch(/Reviewer · \d+s ago/)
+    expect(w.get('[data-testid="agent-card-facts"]').text()).toMatch(/Reviewer · (Just now|\d+s ago)/)
     expect(w.get('[data-testid="agent-card-cost"]').text()).toBe('$1.25')
   })
 

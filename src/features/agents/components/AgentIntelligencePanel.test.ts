@@ -51,6 +51,13 @@ describe('agentIntelligencePanel', () => {
     expect(w.text()).toContain('/gh/LocalScope')
   })
 
+  // 3N.0: one wording for recency everywhere, and an unknown time is omitted rather than invented.
+  it('states last activity with the shared recency wording', async () => {
+    expect((await mountPanel({ lastActivity: new Date().toISOString() })).text()).toContain('last activity Just now')
+    expect((await mountPanel({ lastActivity: new Date(Date.now() - 95_000).toISOString() })).text()).toContain('last activity 1m ago')
+    expect((await mountPanel({ lastActivity: '' })).text()).not.toContain('last activity')
+  })
+
   // Progress must be earned by TodoWrite items, and never called a phase.
   it('omits task progress when the session wrote no items', async () => {
     const w = await mountPanel()

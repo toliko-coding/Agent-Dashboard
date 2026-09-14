@@ -3,7 +3,7 @@ import type { Agent } from '@/types'
 import { computed } from 'vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import { useNow } from '@/composables/useNow'
-import { formatUptime, secondsSince } from '@/utils/format'
+import { formatRelativeActivity, secondsSince } from '@/utils/format'
 import { agentDisplayStatus, statusLabel } from '@/utils/statusColors'
 import AgentDiagram from './AgentDiagram.vue'
 import AgentWorkspaceProcesses from './AgentWorkspaceProcesses.vue'
@@ -38,7 +38,7 @@ const currentTask = computed(() =>
 const lastActivity = computed(() => {
   // secondsSince returns null when the server sent no parseable timestamp.
   const secs = secondsSince(props.agent.lastActivity, nowMs.value)
-  return secs === null || !Number.isFinite(secs) ? null : formatUptime(secs)
+  return secs === null || !Number.isFinite(secs) ? null : formatRelativeActivity(secs)
 })
 
 const recentTools = computed(() => props.agent.lastTools.slice(-4).reverse())
@@ -60,7 +60,7 @@ const recentTools = computed(() => props.agent.lastTools.slice(-4).reverse())
         <span v-if="agent.errorState" class="text-[11px] text-danger-text">{{ agent.errorState }}</span>
       </div>
       <p class="text-[11px] text-fg-mute">
-        {{ statusLabel(displayStatus) }}<span v-if="lastActivity"> · last activity {{ lastActivity }} ago</span>
+        {{ statusLabel(displayStatus) }}<span v-if="lastActivity"> · last activity {{ lastActivity }}</span>
       </p>
     </section>
 

@@ -25,6 +25,9 @@ export function secondsSince(iso: string | null, nowMs: number = Date.now()): nu
 export function formatRelativeActivity(seconds: number | null): string {
   if (seconds == null)
     return '—'
+  // The shared clock ticks every 30s, so the first seconds read as a moment, not a count.
+  if (seconds < 10)
+    return 'Just now'
   if (seconds < 60)
     return `${seconds}s ago`
   const m = Math.floor(seconds / 60)
