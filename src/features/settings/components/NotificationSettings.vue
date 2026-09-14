@@ -124,13 +124,13 @@ async function handleSaveConfig() {
               <!-- F004 / F018 — scope="col" on all column headers -->
               <th
                 scope="col"
-                class="text-left text-[10px] uppercase tracking-wide text-fg-faint px-3 py-2 font-medium"
+                class="text-left text-label uppercase tracking-wide text-fg-faint px-3 py-2 font-medium"
               >
                 Event
               </th>
               <th
                 scope="col"
-                class="text-center text-[10px] uppercase tracking-wide text-fg-faint px-3 py-2 font-medium"
+                class="text-center text-label uppercase tracking-wide text-fg-faint px-3 py-2 font-medium"
               >
                 Enabled
               </th>
@@ -138,7 +138,7 @@ async function handleSaveConfig() {
                 v-for="ch in CHANNELS"
                 :key="ch"
                 scope="col"
-                class="text-center text-[10px] uppercase tracking-wide text-fg-faint px-2 py-2 font-medium capitalize"
+                class="text-center text-label uppercase tracking-wide text-fg-faint px-2 py-2 font-medium capitalize"
               >
                 {{ ch }}
               </th>
@@ -157,7 +157,7 @@ async function handleSaveConfig() {
                 <p class="font-medium text-fg">
                   {{ ev.label }}
                 </p>
-                <p class="text-fg-faint text-[10px] mt-0.5">
+                <p class="text-fg-faint text-ui-sm mt-0.5">
                   {{ ev.description }}
                 </p>
               </th>
@@ -200,7 +200,7 @@ async function handleSaveConfig() {
       </div>
 
       <!-- F043 — auto-save hint below channel table -->
-      <p class="text-[10px] text-fg-faint mt-1">
+      <p class="text-ui-sm text-fg-faint mt-1">
         Channel changes save automatically.
       </p>
 

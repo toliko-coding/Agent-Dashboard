@@ -30,12 +30,17 @@ watch(error, (msg) => {
 })
 
 // ── Adapter-type display helpers ────────────────────────────────────────────
+/*
+ * Adapter types are kinds, not states: one neutral badge, told apart by its
+ * word. The per-type tints spent the state colours (cyan is live observation,
+ * amber is attention) on a classification, and failed contrast in light.
+ */
 const ADAPTER_TYPE_BADGE: Record<SpawnerAdapterType, string> = {
   claude: 'bg-raised text-fg-soft',
-  ollama: 'bg-cyan-50 dark:bg-cyan-950/30 text-cyan-600 dark:text-cyan-400',
-  openai: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400',
-  custom: 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400',
-  acp: 'bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400',
+  ollama: 'bg-raised text-fg-soft',
+  openai: 'bg-raised text-fg-soft',
+  custom: 'bg-raised text-fg-soft',
+  acp: 'bg-raised text-fg-soft',
 }
 
 function adapterTypeOf(spawner: Spawner): SpawnerAdapterType {
@@ -338,7 +343,7 @@ async function handleSetDefault(id: string) {
     <!-- Header (hidden while inspecting a single spawner — detail view owns its own header) -->
     <div v-if="!viewingSpawner" class="flex items-start justify-between gap-3">
       <div v-if="!hideTitle">
-        <h3 class="text-[17px] font-bold text-fg mb-1">
+        <h3 class="settings-heading mb-1">
           Spawners
         </h3>
         <p class="text-xs text-fg-mute">
@@ -369,19 +374,19 @@ async function handleSetDefault(id: string) {
       <table v-if="!formVisible || spawners.length > 0" class="w-full border-collapse text-[13px]">
         <thead>
           <tr>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Name
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Adapter
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Detail
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Type
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Actions
             </th>
           </tr>
@@ -393,7 +398,7 @@ async function handleSetDefault(id: string) {
                 <span class="font-semibold text-fg">{{ spawner.name }}</span>
                 <span
                   v-if="spawner.isDefault"
-                  class="text-[9px] font-semibold uppercase tracking-wider px-1 py-px rounded bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400"
+                  class="text-label font-semibold uppercase tracking-wider px-1 py-px rounded-control border border-line text-fg-soft"
                   title="Used when a task or its project names no spawner"
                 >★ Default</span>
               </div>
@@ -403,7 +408,7 @@ async function handleSetDefault(id: string) {
             </td>
             <td class="px-3 py-2.5 border-b border-line">
               <span
-                class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-px rounded"
+                class="text-label font-semibold uppercase tracking-wider px-1.5 py-px rounded"
                 :class="ADAPTER_TYPE_BADGE[adapterTypeOf(spawner)]"
               >{{ adapterTypeOf(spawner) }}</span>
             </td>
@@ -412,7 +417,7 @@ async function handleSetDefault(id: string) {
             </td>
             <td class="px-3 py-2.5 border-b border-line">
               <span
-                class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-px rounded"
+                class="text-label font-semibold uppercase tracking-wider px-1.5 py-px rounded"
                 :class="spawner.builtIn
                   ? 'bg-raised text-fg-mute'
                   : 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'"
@@ -438,7 +443,7 @@ async function handleSetDefault(id: string) {
                 <button
                   v-if="!spawner.isDefault"
                   type="button"
-                  class="bg-transparent border-none text-fg-mute cursor-pointer text-sm px-2 py-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:text-emerald-600 dark:hover:text-emerald-400 mr-1 disabled:opacity-50"
+                  class="bg-transparent border-none text-fg-mute cursor-pointer text-sm px-2 py-1 rounded hover:bg-raised hover:text-fg mr-1 disabled:opacity-50"
                   :disabled="settingDefaultId === spawner.id"
                   @click="handleSetDefault(spawner.id)"
                 >
@@ -482,7 +487,7 @@ async function handleSetDefault(id: string) {
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="sp-name">Name</label>
+            <label class="field-label mb-1" for="sp-name">Name</label>
             <input
               id="sp-name"
               v-model="form.name"
@@ -492,7 +497,7 @@ async function handleSetDefault(id: string) {
             >
           </div>
           <div>
-            <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="sp-slug">Slug</label>
+            <label class="field-label mb-1" for="sp-slug">Slug</label>
             <input
               id="sp-slug"
               v-model="form.slug"
@@ -501,12 +506,12 @@ async function handleSetDefault(id: string) {
               class="w-full bg-card border border-line rounded px-2.5 py-1.5 text-sm text-fg font-mono focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent focus-visible:border-accent read-only:opacity-60 read-only:cursor-not-allowed"
               placeholder="my-spawner"
             >
-            <p v-if="editingBuiltIn" class="text-[10px] text-fg-mute mt-0.5">
+            <p v-if="editingBuiltIn" class="field-help mt-0.5">
               Built-in slug is locked.
             </p>
           </div>
           <div>
-            <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="sp-adapter-type">Adapter Type</label>
+            <label class="field-label mb-1" for="sp-adapter-type">Adapter Type</label>
             <AppSelect
               id="sp-adapter-type"
               :model-value="form.adapterType"
@@ -519,7 +524,7 @@ async function handleSetDefault(id: string) {
             </p>
           </div>
           <div>
-            <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="sp-desc">Description (optional)</label>
+            <label class="field-label mb-1" for="sp-desc">Description (optional)</label>
             <input
               id="sp-desc"
               v-model="form.description"
@@ -532,7 +537,7 @@ async function handleSetDefault(id: string) {
           <!-- Claude / custom: command + args + model -->
           <template v-if="showCommandFields">
             <div class="col-span-2">
-              <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="sp-command">
+              <label class="field-label mb-1" for="sp-command">
                 Command <span class="normal-case font-normal">(claude, claude-code, npx, or absolute path not under /tmp)</span>
               </label>
               <input
@@ -544,7 +549,7 @@ async function handleSetDefault(id: string) {
               >
             </div>
             <div class="col-span-2">
-              <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="sp-args">Args (one per line)</label>
+              <label class="field-label mb-1" for="sp-args">Args (one per line)</label>
               <textarea
                 id="sp-args"
                 v-model="form.argsRaw"
@@ -554,7 +559,7 @@ async function handleSetDefault(id: string) {
               />
             </div>
             <div class="col-span-2">
-              <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="sp-model">Model Override (optional)</label>
+              <label class="field-label mb-1" for="sp-model">Model Override (optional)</label>
               <input
                 id="sp-model"
                 v-model="form.modelOverride"
@@ -568,7 +573,7 @@ async function handleSetDefault(id: string) {
           <!-- Reasoning effort: claude-only, always shown so the other adapter
                types state why it does not apply rather than omitting it. -->
           <div class="col-span-2">
-            <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="sp-effort">
+            <label class="field-label mb-1" for="sp-effort">
               Reasoning Effort (optional)
             </label>
             <AppSelect
@@ -579,10 +584,10 @@ async function handleSetDefault(id: string) {
               class="w-full"
               @update:model-value="onEffortSelect"
             />
-            <p v-if="!effortSupported" class="text-[10px] text-fg-mute mt-0.5">
+            <p v-if="!effortSupported" class="field-help mt-0.5">
               Not supported by the {{ form.adapterType }} adapter — only claude reads this setting.
             </p>
-            <p v-else-if="effortUnrecognized" class="text-[10px] text-danger-text mt-0.5">
+            <p v-else-if="effortUnrecognized" class="text-ui-sm text-danger-text mt-0.5">
               Stored value "{{ effortValue }}" is not one of the known levels — pick one or clear it.
             </p>
           </div>
@@ -590,7 +595,7 @@ async function handleSetDefault(id: string) {
 
         <!-- Adapter-specific config keys (dynamic) -->
         <div v-if="genericConfigKeys.length > 0">
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-2">
+          <label class="field-label mb-2">
             Adapter Config
           </label>
           <div class="flex flex-col gap-2">
@@ -607,7 +612,7 @@ async function handleSetDefault(id: string) {
                 :placeholder="k.note || ''"
                 :required="k.required"
               >
-              <p v-if="k.note" class="text-[10px] text-fg-mute mt-0.5">
+              <p v-if="k.note" class="field-help mt-0.5">
                 {{ k.note }}
               </p>
             </div>
@@ -617,7 +622,7 @@ async function handleSetDefault(id: string) {
         <!-- Env key/value table — only for adapters that spawn subprocesses -->
         <div v-if="showCommandFields">
           <div class="flex items-center justify-between mb-2">
-            <label class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Environment Variables</label>
+            <label class="text-label font-semibold uppercase tracking-wider text-fg-mute">Environment Variables</label>
             <button type="button" class="text-[11px] px-2 py-0.5 rounded border border-line-strong text-fg-mute hover:bg-slate-50 dark:hover:bg-slate-800" @click="addEnvRow">
               + Add
             </button>

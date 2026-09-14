@@ -89,7 +89,7 @@ async function save() {
 <template>
   <div class="flex flex-col gap-4">
     <div>
-      <h3 class="text-[17px] font-bold text-fg mb-1">
+      <h3 class="settings-heading mb-1">
         GitHub
       </h3>
       <p class="text-xs text-fg-mute">
@@ -112,7 +112,7 @@ async function save() {
 
       <div class="grid grid-cols-1 gap-3 max-w-md">
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="github-token">Token</label>
+          <label class="field-label mb-1" for="github-token">Token</label>
           <input
             id="github-token"
             v-model="form.token"
@@ -124,7 +124,7 @@ async function save() {
           >
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="github-repos">Repositories</label>
+          <label class="field-label mb-1" for="github-repos">Repositories</label>
           <input
             id="github-repos"
             v-model="form.repos"
@@ -135,7 +135,7 @@ async function save() {
           >
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="github-baseurl">Base URL</label>
+          <label class="field-label mb-1" for="github-baseurl">Base URL</label>
           <input
             id="github-baseurl"
             v-model="form.baseURL"

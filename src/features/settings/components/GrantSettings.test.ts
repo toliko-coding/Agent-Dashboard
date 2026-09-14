@@ -127,12 +127,12 @@ describe('grantSettings', () => {
 
     for (const id of ['g1', 'g3']) {
       const badge = wrapper.get(`[data-testid="grant-enforcement-${id}"]`)
-      expect(badge.classes()).toContain('bg-warning-soft')
-      expect(badge.classes()).not.toContain('bg-success-soft')
+      expect(badge.classes()).toContain('text-warning-text')
+      expect(badge.classes()).not.toContain('text-fg')
     }
     const enforced = wrapper.get('[data-testid="grant-enforcement-g2"]')
-    expect(enforced.classes()).toContain('bg-success-soft')
-    expect(enforced.classes()).not.toContain('bg-warning-soft')
+    expect(enforced.classes()).toContain('text-fg')
+    expect(enforced.classes()).not.toContain('text-warning-text')
   })
 
   it('keeps a live region mounted across the load, announcing by content change', async () => {

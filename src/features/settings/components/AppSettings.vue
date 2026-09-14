@@ -101,7 +101,7 @@ onMounted(refetch)
 
     <div v-if="!loading" class="space-y-6">
       <div v-for="group in groups" :key="group.category">
-        <h4 class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-2">
+        <h4 class="text-label font-semibold uppercase tracking-wider text-fg-mute mb-2">
           {{ group.category }}
         </h4>
         <ul class="border border-line rounded-lg divide-y divide-line text-xs">
@@ -114,7 +114,7 @@ onMounted(refetch)
               <p class="font-medium text-fg font-mono">
                 {{ item.key }}
               </p>
-              <p class="text-fg-faint text-[10px] mt-0.5">
+              <p class="text-fg-faint text-ui-sm mt-0.5">
                 {{ item.apply === 'restart' ? 'Restart required' : 'Applies live' }} · default {{ item.default || '—' }}
               </p>
             </div>

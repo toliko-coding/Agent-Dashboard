@@ -46,22 +46,22 @@ const adapterConfigEntries = computed(() => Object.entries(props.spawner.adapter
       </button>
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2 flex-wrap">
-          <h3 class="text-[17px] font-bold text-fg m-0 truncate">
+          <h3 class="settings-heading m-0 truncate">
             {{ spawner.name }}
           </h3>
           <span
-            class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-px rounded"
+            class="text-label font-semibold uppercase tracking-wider px-1.5 py-px rounded"
             :class="ADAPTER_TYPE_BADGE[adapterType]"
           >{{ adapterType }}</span>
           <span
-            class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-px rounded"
+            class="text-label font-semibold uppercase tracking-wider px-1.5 py-px rounded"
             :class="spawner.builtIn
               ? 'bg-raised text-fg-mute'
               : 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'"
           >{{ spawner.builtIn ? 'Built-in' : 'Custom' }}</span>
           <span
             v-if="spawner.isDefault"
-            class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-px rounded bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400"
+            class="text-label font-semibold uppercase tracking-wider px-1.5 py-px rounded bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400"
             title="Used when a task or its project names no spawner"
           >★ Default</span>
         </div>
@@ -125,7 +125,7 @@ const adapterConfigEntries = computed(() => Object.entries(props.spawner.adapter
 
       <!-- Adapter config -->
       <div v-if="adapterConfigEntries.length" class="flex flex-col gap-1.5">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Adapter config</span>
+        <span class="text-label font-semibold uppercase tracking-wider text-fg-mute">Adapter config</span>
         <div
           v-for="[k, v] in adapterConfigEntries"
           :key="k"
@@ -139,7 +139,7 @@ const adapterConfigEntries = computed(() => Object.entries(props.spawner.adapter
 
       <!-- Env vars -->
       <div v-if="showCommandFields" class="flex flex-col gap-1.5">
-        <span class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Environment variables</span>
+        <span class="text-label font-semibold uppercase tracking-wider text-fg-mute">Environment variables</span>
         <p v-if="!envEntries.length" class="text-xs text-fg-mute m-0">
           None set.
         </p>

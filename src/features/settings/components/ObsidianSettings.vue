@@ -143,7 +143,7 @@ async function runIndex() {
 <template>
   <div class="flex flex-col gap-4">
     <div>
-      <h3 class="text-[17px] font-bold text-fg mb-1">
+      <h3 class="settings-heading mb-1">
         Obsidian
       </h3>
       <p class="text-xs text-fg-mute">
@@ -166,7 +166,7 @@ async function runIndex() {
 
       <div class="grid grid-cols-1 gap-3 max-w-md">
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="obsidian-baseurl">Base URL</label>
+          <label class="field-label mb-1" for="obsidian-baseurl">Base URL</label>
           <input
             id="obsidian-baseurl"
             v-model="form.baseURL"
@@ -177,7 +177,7 @@ async function runIndex() {
           >
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="obsidian-vaultroot">Vault root</label>
+          <label class="field-label mb-1" for="obsidian-vaultroot">Vault root</label>
           <input
             id="obsidian-vaultroot"
             v-model="form.vaultRoot"
@@ -188,7 +188,7 @@ async function runIndex() {
           >
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="obsidian-apikey">API key</label>
+          <label class="field-label mb-1" for="obsidian-apikey">API key</label>
           <input
             id="obsidian-apikey"
             v-model="form.apiKey"
@@ -200,7 +200,7 @@ async function runIndex() {
           >
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="obsidian-tlsmode">TLS mode</label>
+          <label class="field-label mb-1" for="obsidian-tlsmode">TLS mode</label>
           <AppSelect
             id="obsidian-tlsmode"
             v-model="form.tlsMode"

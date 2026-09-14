@@ -166,7 +166,7 @@ function isLegacy(grantedBy: string): boolean {
   <div class="flex flex-col gap-4">
     <div class="flex items-start justify-between gap-3">
       <div>
-        <h3 class="text-[17px] font-bold text-fg mb-1">
+        <h3 class="settings-heading mb-1">
           Grants
         </h3>
         <p class="text-xs text-fg-mute">
@@ -179,7 +179,7 @@ function isLegacy(grantedBy: string): boolean {
     </div>
 
     <div class="flex items-center gap-2">
-      <label for="grant-filter" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Filter</label>
+      <label for="grant-filter" class="text-label font-semibold uppercase tracking-wider text-fg-mute">Filter</label>
       <AppSelect
         id="grant-filter"
         :model-value="capabilityFilter"
@@ -212,31 +212,31 @@ function isLegacy(grantedBy: string): boolean {
       <table class="w-full min-w-max border-collapse text-[13px]">
         <thead>
           <tr>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Capability
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Context
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Pattern
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Mode
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Enforcement
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Limit
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Expires
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Provenance
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Actions
             </th>
           </tr>
@@ -256,20 +256,20 @@ function isLegacy(grantedBy: string): boolean {
               {{ g.mode }}
               <span
                 v-if="g.revokedAt"
-                class="inline-block rounded px-1.5 py-0.5 ml-1 text-[10px] font-semibold uppercase tracking-wide bg-raised text-fg-mute"
+                class="inline-block rounded px-1.5 py-0.5 ml-1 text-label font-semibold uppercase tracking-wide bg-raised text-fg-mute"
                 :data-testid="`grant-mode-revoked-${g.id}`"
               >Revoked</span>
             </td>
             <td class="px-3 py-2.5 border-b border-line">
               <span
                 v-if="enforcementOf(g.capabilityName) === 'server'"
-                class="inline-block rounded px-2 py-0.5 text-[11px] font-semibold bg-success-soft text-success-text"
+                class="inline-flex items-center gap-1 rounded-control border border-line bg-card px-2 py-0.5 text-label font-semibold text-fg"
                 :data-testid="`grant-enforcement-${g.id}`"
                 title="Enforced server-side by internal/memory.Authorize"
               >server</span>
               <span
                 v-else
-                class="inline-block rounded px-2 py-0.5 text-[11px] font-semibold bg-warning-soft text-warning-text"
+                class="inline-flex items-center gap-1 rounded-control border border-warning-line bg-card px-2 py-0.5 text-label font-semibold text-warning-text"
                 :data-testid="`grant-enforcement-${g.id}`"
                 :title="enforcementOf(g.capabilityName) === 'none'
                   ? 'No enforcement point reads stored grants for this capability today — the grant is recorded and will apply once a reader exists'
@@ -284,7 +284,7 @@ function isLegacy(grantedBy: string): boolean {
             </td>
             <td class="px-3 py-2.5 border-b border-line text-fg-mute">
               <div>
-                <span v-if="isLegacy(g.grantedBy)" class="inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-raised text-fg-mute" title="Written by the legacy grant migration, not a person">
+                <span v-if="isLegacy(g.grantedBy)" class="inline-block rounded px-1.5 py-0.5 text-label font-semibold uppercase tracking-wide bg-raised text-fg-mute" title="Written by the legacy grant migration, not a person">
                   Legacy migration
                 </span>
                 <span v-else>{{ g.grantedBy }}</span>
@@ -332,7 +332,7 @@ function isLegacy(grantedBy: string): boolean {
 
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="grant-capability">Capability</label>
+          <label class="field-label mb-1" for="grant-capability">Capability</label>
           <AppSelect
             id="grant-capability"
             v-model="form.capabilityName"
@@ -342,7 +342,7 @@ function isLegacy(grantedBy: string): boolean {
           />
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="grant-mode">Mode</label>
+          <label class="field-label mb-1" for="grant-mode">Mode</label>
           <AppSelect
             id="grant-mode"
             v-model="form.mode"
@@ -352,7 +352,7 @@ function isLegacy(grantedBy: string): boolean {
           />
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="grant-context-kind">Context kind</label>
+          <label class="field-label mb-1" for="grant-context-kind">Context kind</label>
           <AppSelect
             id="grant-context-kind"
             :model-value="form.contextKind"
@@ -363,7 +363,7 @@ function isLegacy(grantedBy: string): boolean {
           />
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="grant-context-ref">Context ref</label>
+          <label class="field-label mb-1" for="grant-context-ref">Context ref</label>
           <input
             id="grant-context-ref"
             v-model="form.contextRef"
@@ -375,7 +375,7 @@ function isLegacy(grantedBy: string): boolean {
           >
         </div>
         <div class="col-span-2">
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="grant-pattern">Pattern</label>
+          <label class="field-label mb-1" for="grant-pattern">Pattern</label>
           <input
             id="grant-pattern"
             v-model="form.pattern"
@@ -386,7 +386,7 @@ function isLegacy(grantedBy: string): boolean {
           >
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="grant-limit-count">Limit count (0 = unlimited)</label>
+          <label class="field-label mb-1" for="grant-limit-count">Limit count (0 = unlimited)</label>
           <input
             id="grant-limit-count"
             v-model.number="form.limitCount"
@@ -397,7 +397,7 @@ function isLegacy(grantedBy: string): boolean {
           >
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="grant-limit-window">Limit window (seconds)</label>
+          <label class="field-label mb-1" for="grant-limit-window">Limit window (seconds)</label>
           <input
             id="grant-limit-window"
             v-model.number="form.limitWindowSeconds"
@@ -409,7 +409,7 @@ function isLegacy(grantedBy: string): boolean {
           >
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="grant-expires">Expires in (seconds, optional)</label>
+          <label class="field-label mb-1" for="grant-expires">Expires in (seconds, optional)</label>
           <input
             id="grant-expires"
             v-model.number="form.expiresInSeconds"
@@ -421,7 +421,7 @@ function isLegacy(grantedBy: string): boolean {
           >
         </div>
         <div class="col-span-2">
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="grant-reason">Reason (optional)</label>
+          <label class="field-label mb-1" for="grant-reason">Reason (optional)</label>
           <input
             id="grant-reason"
             v-model="form.reason"

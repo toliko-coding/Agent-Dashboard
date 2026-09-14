@@ -322,7 +322,7 @@ function setDefault(targetRow: FolderRow) {
     <!-- Header -->
     <div class="flex items-start justify-between gap-3">
       <div v-if="!hideTitle">
-        <h3 class="text-[17px] font-bold text-fg mb-1">
+        <h3 class="settings-heading mb-1">
           Projects
         </h3>
         <p class="text-xs text-fg-mute">
@@ -348,16 +348,16 @@ function setDefault(targetRow: FolderRow) {
     <table v-else-if="!formVisible" class="w-full border-collapse text-[13px]">
       <thead>
         <tr>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Name
           </th>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Slug
           </th>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Folders
           </th>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Actions
           </th>
         </tr>
@@ -428,7 +428,7 @@ function setDefault(targetRow: FolderRow) {
 
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="proj-name">Name</label>
+          <label class="field-label mb-1" for="proj-name">Name</label>
           <input
             id="proj-name"
             v-model="form.name"
@@ -441,7 +441,7 @@ function setDefault(targetRow: FolderRow) {
           >
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="proj-slug">Slug</label>
+          <label class="field-label mb-1" for="proj-slug">Slug</label>
           <input
             id="proj-slug"
             v-model="form.slug"
@@ -458,7 +458,7 @@ function setDefault(targetRow: FolderRow) {
           </p>
         </div>
         <div class="col-span-2">
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="proj-desc">Description (optional)</label>
+          <label class="field-label mb-1" for="proj-desc">Description (optional)</label>
           <input
             id="proj-desc"
             v-model="form.description"
@@ -469,7 +469,7 @@ function setDefault(targetRow: FolderRow) {
           >
         </div>
         <div class="col-span-2">
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="proj-setup">Setup command (optional)</label>
+          <label class="field-label mb-1" for="proj-setup">Setup command (optional)</label>
           <input
             id="proj-setup"
             v-model="form.setupCommand"
@@ -482,7 +482,7 @@ function setDefault(targetRow: FolderRow) {
           </p>
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="proj-color">Color</label>
+          <label class="field-label mb-1" for="proj-color">Color</label>
           <div class="flex items-center gap-2">
             <input
               id="proj-color"
@@ -494,7 +494,7 @@ function setDefault(targetRow: FolderRow) {
           </div>
         </div>
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="proj-spawner">Default Spawner (optional)</label>
+          <label class="field-label mb-1" for="proj-spawner">Default Spawner (optional)</label>
           <AppSelect
             id="proj-spawner"
             v-model="form.defaultSpawnerId"
@@ -533,7 +533,7 @@ function setDefault(targetRow: FolderRow) {
             <div v-for="stage in PIPELINE_STAGES" :key="stage" class="grid grid-cols-2 gap-3 items-end">
               <div>
                 <label
-                  class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1"
+                  class="field-label mb-1"
                   :for="`pp-spawner-${stage}-${editingProject.id}`"
                 >
                   {{ STAGE_LABELS[stage] }} — Spawner
@@ -547,7 +547,7 @@ function setDefault(targetRow: FolderRow) {
               </div>
               <div>
                 <label
-                  class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1"
+                  class="field-label mb-1"
                   :for="`pp-model-${stage}-${editingProject.id}`"
                 >
                   {{ STAGE_LABELS[stage] }} — Model
@@ -591,16 +591,16 @@ function setDefault(targetRow: FolderRow) {
           <table v-else class="w-full border-collapse text-[12px]">
             <thead>
               <tr>
-                <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-2 py-1.5 border-b border-line">
+                <th class="table-head px-2 py-1.5 border-b border-line">
                   Path
                 </th>
-                <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-2 py-1.5 border-b border-line">
+                <th class="table-head px-2 py-1.5 border-b border-line">
                   Label
                 </th>
-                <th class="text-center text-[10px] uppercase tracking-wide text-fg-mute px-2 py-1.5 border-b border-line">
+                <th class="text-center text-label uppercase tracking-wide text-fg-mute px-2 py-1.5 border-b border-line">
                   Default
                 </th>
-                <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-2 py-1.5 border-b border-line">
+                <th class="table-head px-2 py-1.5 border-b border-line">
                   Actions
                 </th>
               </tr>
@@ -654,7 +654,7 @@ function setDefault(targetRow: FolderRow) {
                       Remove
                     </button>
                   </div>
-                  <p v-if="row.saveError" class="text-[10px] text-danger-text mt-0.5">
+                  <p v-if="row.saveError" class="text-ui-sm text-danger-text mt-0.5">
                     {{ row.saveError }}
                   </p>
                 </td>

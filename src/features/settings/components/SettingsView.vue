@@ -445,7 +445,7 @@ const { isImporting, importStatus, start: startImport } = useHistoryImport()
       </h2>
       <!-- Appearance -->
       <section v-if="activeSection === 'appearance'">
-        <h3 class="text-[17px] font-bold text-fg mb-1">
+        <h3 class="settings-heading mb-1">
           Themes
         </h3>
         <p class="text-xs text-fg-mute mb-5">
@@ -529,7 +529,7 @@ const { isImporting, importStatus, start: startImport } = useHistoryImport()
         </div>
 
         <div class="mt-8 pt-6 border-t border-line">
-          <h3 class="text-[17px] font-bold text-fg mb-1">
+          <h3 class="settings-heading mb-1">
             First-run setup
           </h3>
           <p class="text-xs text-fg-mute mb-3">
@@ -545,7 +545,7 @@ const { isImporting, importStatus, start: startImport } = useHistoryImport()
       <section v-else-if="activeSection === 'apiKeys'">
         <div class="flex items-start justify-between gap-3 mb-4">
           <div class="flex-1">
-            <h3 class="text-[17px] font-bold text-fg mb-1">
+            <h3 class="settings-heading mb-1">
               API Keys
             </h3>
             <p class="text-xs text-fg-mute">
@@ -565,22 +565,22 @@ const { isImporting, importStatus, start: startImport } = useHistoryImport()
         <table v-else class="w-full border-collapse text-[13px]">
           <thead>
             <tr>
-              <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+              <th class="table-head px-3 py-2 border-b border-line">
                 Name
               </th>
-              <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+              <th class="table-head px-3 py-2 border-b border-line">
                 Scopes
               </th>
-              <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+              <th class="table-head px-3 py-2 border-b border-line">
                 Created
               </th>
-              <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+              <th class="table-head px-3 py-2 border-b border-line">
                 Last Used
               </th>
-              <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+              <th class="table-head px-3 py-2 border-b border-line">
                 Status
               </th>
-              <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+              <th class="table-head px-3 py-2 border-b border-line">
                 Actions
               </th>
             </tr>
@@ -592,7 +592,7 @@ const { isImporting, importStatus, start: startImport } = useHistoryImport()
               </td>
               <td class="px-3 py-2.5 border-b border-line">
                 <div class="flex flex-wrap gap-1">
-                  <span v-for="scope in key.scopes" :key="scope" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute bg-raised px-1.5 py-px rounded font-mono">{{ scope }}</span>
+                  <span v-for="scope in key.scopes" :key="scope" class="text-label font-semibold uppercase tracking-wider text-fg-mute bg-raised px-1.5 py-px rounded font-mono">{{ scope }}</span>
                 </div>
               </td>
               <td class="px-3 py-2.5 border-b border-line text-fg-mute font-mono text-xs">
@@ -689,7 +689,7 @@ const { isImporting, importStatus, start: startImport } = useHistoryImport()
 
       <!-- Permission presets -->
       <section v-else-if="activeSection === 'permissionPresets'">
-        <h3 class="text-[17px] font-bold text-fg mb-1">
+        <h3 class="settings-heading mb-1">
           Permissions
         </h3>
         <p class="text-xs text-fg-mute mb-5">
@@ -704,13 +704,13 @@ const { isImporting, importStatus, start: startImport } = useHistoryImport()
         <table v-else class="w-full border-collapse text-[13px]">
           <thead>
             <tr>
-              <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+              <th class="table-head px-3 py-2 border-b border-line">
                 Project
               </th>
-              <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+              <th class="table-head px-3 py-2 border-b border-line">
                 Count
               </th>
-              <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+              <th class="table-head px-3 py-2 border-b border-line">
                 Actions
               </th>
             </tr>
@@ -788,7 +788,7 @@ const { isImporting, importStatus, start: startImport } = useHistoryImport()
 
       <!-- Analytics -->
       <section v-else-if="activeSection === 'analytics'">
-        <h3 class="text-[17px] font-bold text-fg mb-1">
+        <h3 class="settings-heading mb-1">
           Workflow Patterns
         </h3>
         <p class="text-xs text-fg-mute mb-5">
@@ -817,7 +817,7 @@ const { isImporting, importStatus, start: startImport } = useHistoryImport()
         </button>
 
         <div class="mt-8 pt-6 border-t border-line">
-          <h3 class="text-[17px] font-bold text-fg mb-1">
+          <h3 class="settings-heading mb-1">
             Audit Log
           </h3>
           <p class="text-xs text-fg-mute mb-4">
@@ -841,7 +841,7 @@ const { isImporting, importStatus, start: startImport } = useHistoryImport()
         </header>
         <form class="p-5" @submit.prevent="handleCreate">
           <div class="flex flex-col gap-1 mb-3.5">
-            <label for="key-name" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Name</label>
+            <label for="key-name" class="text-label font-semibold uppercase tracking-wider text-fg-mute">Name</label>
             <input
               id="key-name"
               v-model="newKeyName"
@@ -853,7 +853,7 @@ const { isImporting, importStatus, start: startImport } = useHistoryImport()
             >
           </div>
           <div class="flex flex-col gap-1 mb-3.5">
-            <label for="key-group" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Role / Scope Group</label>
+            <label for="key-group" class="text-label font-semibold uppercase tracking-wider text-fg-mute">Role / Scope Group</label>
             <AppSelect
               id="key-group"
               v-model="newKeyGroup"
@@ -917,7 +917,7 @@ const { isImporting, importStatus, start: startImport } = useHistoryImport()
             </p>
 
             <template v-for="b in mcpBlocks" :key="b.key">
-              <span :id="b.labelId" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">{{ b.label }}</span>
+              <span :id="b.labelId" class="text-label font-semibold uppercase tracking-wider text-fg-mute">{{ b.label }}</span>
               <div
                 role="region"
                 :aria-labelledby="b.labelId"

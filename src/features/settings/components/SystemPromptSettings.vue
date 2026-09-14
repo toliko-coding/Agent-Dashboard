@@ -142,7 +142,7 @@ onMounted(fetchPrompts)
   <div>
     <div class="flex items-start justify-between gap-3 mb-4">
       <div class="flex-1">
-        <h3 class="text-[17px] font-bold text-fg mb-1">
+        <h3 class="settings-heading mb-1">
           Custom System Prompts
         </h3>
         <p class="text-xs text-fg-mute">
@@ -165,16 +165,16 @@ onMounted(fetchPrompts)
     <table v-else class="w-full border-collapse text-[13px]">
       <thead>
         <tr>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Stage
           </th>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Priority
           </th>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Preview
           </th>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Actions
           </th>
         </tr>
@@ -235,7 +235,7 @@ onMounted(fetchPrompts)
       </header>
       <form class="flex-1 min-h-0 overflow-y-auto p-5 flex flex-col gap-4" @submit.prevent="save">
         <div class="flex flex-col gap-1">
-          <label for="sp-stage" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">
+          <label for="sp-stage" class="text-label font-semibold uppercase tracking-wider text-fg-mute">
             Stage (blank = all stages)
           </label>
           <AppSelect
@@ -246,7 +246,7 @@ onMounted(fetchPrompts)
           />
         </div>
         <div class="flex flex-col gap-1">
-          <label for="sp-priority" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">
+          <label for="sp-priority" class="text-label font-semibold uppercase tracking-wider text-fg-mute">
             Priority (higher = applied first)
           </label>
           <input
@@ -257,7 +257,7 @@ onMounted(fetchPrompts)
           >
         </div>
         <div class="flex flex-col gap-1">
-          <label for="sp-content" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">
+          <label for="sp-content" class="text-label font-semibold uppercase tracking-wider text-fg-mute">
             Content
           </label>
           <textarea

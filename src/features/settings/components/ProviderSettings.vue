@@ -37,18 +37,19 @@ async function handleToggle(id: string, next: boolean) {
       {{ loading ? 'Loading…' : '' }}
     </div>
 
-    <ul v-if="!loading" class="border border-line rounded-lg divide-y divide-line text-xs">
+    <ul v-if="!loading" class="border border-line rounded-panel divide-y divide-line text-xs">
       <li
         v-for="p in providers"
         :key="p.id"
         class="flex items-center justify-between gap-3 px-3 py-2.5"
-        :class="{ 'opacity-50': !p.enabled }"
+        :data-enabled="p.enabled"
       >
+        <!-- A disabled provider is muted by colour, not opacity: faded text failed contrast. -->
         <div>
-          <p class="font-medium text-fg">
+          <p class="font-medium" :class="p.enabled ? 'text-fg' : 'text-fg-mute'">
             {{ p.displayName }}
           </p>
-          <p v-if="!p.configDirPresent" class="text-fg-faint text-[10px] mt-0.5">
+          <p v-if="!p.configDirPresent" class="text-fg-mute text-ui-sm mt-0.5">
             Config dir not found — start the agent once.
           </p>
         </div>

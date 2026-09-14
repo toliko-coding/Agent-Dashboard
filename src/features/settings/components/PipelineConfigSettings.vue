@@ -65,7 +65,7 @@ const stageModelOptions = AVAILABLE_MODELS.map(model => ({ value: model, label: 
 <template>
   <div class="flex flex-col gap-6">
     <div>
-      <h3 class="text-[17px] font-bold text-fg mb-1">
+      <h3 class="settings-heading mb-1">
         Pipeline Configuration
       </h3>
       <p class="text-xs text-fg-mute">
@@ -87,7 +87,7 @@ const stageModelOptions = AVAILABLE_MODELS.map(model => ({ value: model, label: 
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label
-              class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1"
+              class="field-label mb-1"
               for="pc-parallel"
             >
               Max Parallel Orchestrators
@@ -107,7 +107,7 @@ const stageModelOptions = AVAILABLE_MODELS.map(model => ({ value: model, label: 
 
           <div>
             <label
-              class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1"
+              class="field-label mb-1"
               for="pc-timeout"
             >
               Stage Timeout (seconds)
@@ -141,7 +141,7 @@ const stageModelOptions = AVAILABLE_MODELS.map(model => ({ value: model, label: 
           <div v-for="stage in STAGES" :key="stage" class="grid grid-cols-2 gap-3 items-end">
             <div>
               <label
-                class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1"
+                class="field-label mb-1"
                 :for="`pc-spawner-${stage}`"
               >
                 {{ STAGE_LABELS[stage] }} — Spawner
@@ -155,7 +155,7 @@ const stageModelOptions = AVAILABLE_MODELS.map(model => ({ value: model, label: 
             </div>
             <div>
               <label
-                class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1"
+                class="field-label mb-1"
                 :for="`pc-model-${stage}`"
               >
                 {{ STAGE_LABELS[stage] }} — Model

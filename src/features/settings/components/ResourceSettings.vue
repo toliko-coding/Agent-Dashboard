@@ -66,7 +66,7 @@ const announcing = computed(() => panelState.value === 'loading' || panelState.v
 <template>
   <div class="flex flex-col gap-4">
     <div>
-      <h3 class="text-[17px] font-bold text-fg mb-1">
+      <h3 class="settings-heading mb-1">
         Registry
       </h3>
       <p class="text-xs text-fg-mute">
@@ -90,7 +90,7 @@ const announcing = computed(() => panelState.value === 'loading' || panelState.v
     </div>
 
     <div class="flex flex-wrap items-center gap-2">
-      <span class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Scope</span>
+      <span class="text-label font-semibold uppercase tracking-wider text-fg-mute">Scope</span>
       <button
         v-for="s in RESOURCE_SCOPE_KINDS"
         :key="s"
@@ -104,7 +104,7 @@ const announcing = computed(() => panelState.value === 'loading' || panelState.v
         {{ s }}
       </button>
       <template v-if="query.scopeKind !== 'global'">
-        <label for="resource-scope-ref" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Scope ref</label>
+        <label for="resource-scope-ref" class="text-label font-semibold uppercase tracking-wider text-fg-mute">Scope ref</label>
         <input
           id="resource-scope-ref"
           :value="query.scopeRef"
@@ -154,25 +154,25 @@ const announcing = computed(() => panelState.value === 'loading' || panelState.v
     <table v-else-if="panelState === 'rows'" class="w-full border-collapse text-[13px]">
       <thead>
         <tr>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Slug
           </th>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Name
           </th>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Scope
           </th>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             State
           </th>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Version
           </th>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Origin
           </th>
-          <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+          <th class="table-head px-3 py-2 border-b border-line">
             Updated
           </th>
         </tr>

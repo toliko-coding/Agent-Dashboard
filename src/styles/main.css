@@ -292,6 +292,8 @@
   --fg-mute: var(--color-slate-300);
   --fg-faint: var(--color-slate-400);
   --accent: var(--color-indigo-400);
+  /* White on indigo-400 is 3.1:1; dark text on it passes AA (3L). */
+  --accent-contrast: var(--color-slate-950);
   --accent-soft: rgba(129, 140, 248, 0.14);
   --accent-soft: color-mix(in oklch, var(--color-indigo-400) 14%, transparent);
   /* Status tokens — dark values reproduce existing hardcoded dark: steps */
@@ -539,4 +541,26 @@ html, body {
   .motion-waiting {
     box-shadow: 0 0 0 2px color-mix(in oklch, var(--state-waiting) 40%, transparent) !important;
   }
+}
+
+/*
+ * Form vocabulary (3L).
+ *
+ * The Settings sections repeated the same raw class strings — a 10px uppercase
+ * label, a 10px help line, a 17px heading, a 10px table header — dozens of times
+ * each. These name them once, on the approved scale (11px labels, 12px help,
+ * 18px section titles), so a form reads the same in every section and the next
+ * change to the scale is one edit.
+ */
+@utility field-label {
+  @apply block text-label font-semibold uppercase tracking-wider text-fg-mute;
+}
+@utility field-help {
+  @apply text-ui-sm text-fg-mute;
+}
+@utility settings-heading {
+  @apply text-title font-semibold text-fg;
+}
+@utility table-head {
+  @apply text-left text-label font-semibold uppercase tracking-wide text-fg-mute;
 }

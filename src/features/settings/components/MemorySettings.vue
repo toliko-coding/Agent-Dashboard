@@ -268,7 +268,7 @@ async function handleExpire(id: string) {
 <template>
   <div ref="panelRef" class="flex flex-col gap-4">
     <div>
-      <h3 class="text-[17px] font-bold text-fg mb-1">
+      <h3 class="settings-heading mb-1">
         Memory
       </h3>
       <p class="text-xs text-fg-mute">
@@ -283,7 +283,7 @@ async function handleExpire(id: string) {
     </div>
 
     <div class="flex flex-wrap items-center gap-2">
-      <span class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Scope</span>
+      <span class="text-label font-semibold uppercase tracking-wider text-fg-mute">Scope</span>
       <button
         v-for="s in RESOURCE_SCOPE_KINDS"
         :key="s"
@@ -326,7 +326,7 @@ async function handleExpire(id: string) {
     </div>
     <div v-if="spaceFormVisible" id="memory-space-form" class="grid grid-cols-2 gap-3">
       <div class="flex flex-col gap-1">
-        <label for="memory-space-slug" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Slug</label>
+        <label for="memory-space-slug" class="text-label font-semibold uppercase tracking-wider text-fg-mute">Slug</label>
         <input
           id="memory-space-slug"
           v-model="spaceForm.slug"
@@ -337,7 +337,7 @@ async function handleExpire(id: string) {
         >
       </div>
       <div class="flex flex-col gap-1">
-        <label for="memory-space-name" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Display name</label>
+        <label for="memory-space-name" class="text-label font-semibold uppercase tracking-wider text-fg-mute">Display name</label>
         <input
           id="memory-space-name"
           v-model="spaceForm.name"
@@ -385,16 +385,16 @@ async function handleExpire(id: string) {
       <table v-else class="w-full border-collapse text-[13px]">
         <thead>
           <tr>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Space
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Name
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               Scope
             </th>
-            <th class="text-left text-[10px] uppercase tracking-wide text-fg-mute px-3 py-2 border-b border-line">
+            <th class="table-head px-3 py-2 border-b border-line">
               State
             </th>
           </tr>
@@ -441,7 +441,7 @@ async function handleExpire(id: string) {
     </div>
     <div v-if="entryFormVisible" id="memory-entry-form" class="grid grid-cols-2 gap-3">
       <div class="flex flex-col gap-1">
-        <label for="memory-entry-space" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Space slug</label>
+        <label for="memory-entry-space" class="text-label font-semibold uppercase tracking-wider text-fg-mute">Space slug</label>
         <input
           id="memory-entry-space"
           v-model="entryForm.spaceSlug"
@@ -460,7 +460,7 @@ async function handleExpire(id: string) {
         </datalist>
       </div>
       <div class="flex flex-col gap-1">
-        <label for="memory-entry-summary" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Summary</label>
+        <label for="memory-entry-summary" class="text-label font-semibold uppercase tracking-wider text-fg-mute">Summary</label>
         <input
           id="memory-entry-summary"
           v-model="entryForm.summary"
@@ -471,7 +471,7 @@ async function handleExpire(id: string) {
         >
       </div>
       <div class="col-span-2 flex flex-col gap-1">
-        <label for="memory-entry-content" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Content</label>
+        <label for="memory-entry-content" class="text-label font-semibold uppercase tracking-wider text-fg-mute">Content</label>
         <textarea
           id="memory-entry-content"
           v-model="entryForm.content"
@@ -482,7 +482,7 @@ async function handleExpire(id: string) {
         />
       </div>
       <div class="flex flex-col gap-1">
-        <label for="memory-entry-kind" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Kind</label>
+        <label for="memory-entry-kind" class="text-label font-semibold uppercase tracking-wider text-fg-mute">Kind</label>
         <AppSelect
           id="memory-entry-kind"
           v-model="entryForm.kind"
@@ -492,7 +492,7 @@ async function handleExpire(id: string) {
         />
       </div>
       <div class="flex flex-col gap-1">
-        <label for="memory-entry-source-kind" class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute">Source kind</label>
+        <label for="memory-entry-source-kind" class="text-label font-semibold uppercase tracking-wider text-fg-mute">Source kind</label>
         <AppSelect
           id="memory-entry-source-kind"
           v-model="entryForm.sourceKind"
