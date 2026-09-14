@@ -70,7 +70,8 @@ function conceptTask() {
     worktreePath: null,
     sourceBranch: null,
     targetBranch: null,
-    currentStage: 'concept',
+    // Refinement runs in 'backlog' since the concept → backlog stage rename.
+    currentStage: 'backlog',
     parentTaskId: null,
     maxIterations: 10,
     tokenBudget: null,

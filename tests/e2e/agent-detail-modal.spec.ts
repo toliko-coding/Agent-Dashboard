@@ -59,7 +59,8 @@ test.describe('agent detail modal', () => {
 
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
-    await expect(dialog.getByText('agent-dashboard')).toBeVisible()
+    // The details panel names its working folder in one place (3I); the diagram and the path repeat it.
+    await expect(dialog.getByTestId('intelligence-working-folder')).toContainText('agent-dashboard')
 
     // The transcript is the modal's only view: the bottom drawer is gone, the
     // terminal moved to the agent card, and with the waterfall removed there is

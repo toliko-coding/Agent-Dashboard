@@ -48,7 +48,8 @@ test.describe('dashboard view', () => {
   // Default view
   // -------------------------------------------------------------------------
   test('the dashboard view still renders under its own heading', async ({ page }) => {
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Dashboard')
+    // The 'dashboard' view is presented as Agents since 3F.
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Agents')
   })
 
   // -------------------------------------------------------------------------
@@ -145,7 +146,8 @@ test.describe('landing view', () => {
   test('cockpit is the default view on a first visit', async ({ page }) => {
     await stubAuthDisabled(page)
     await page.goto('/')
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Cockpit')
+    // The 'cockpit' view is presented as Command since 3E.
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Command')
     await expect(page.getByTestId('cockpit')).toBeVisible()
   })
 })
