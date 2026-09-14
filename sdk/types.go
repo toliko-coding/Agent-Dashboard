@@ -347,6 +347,18 @@ type DetectedFolderTrust struct {
 	Selected string `json:"selected"`
 }
 
+// PendingFolderTrust is a Claude process the dashboard started that is waiting
+// at Claude Code's folder trust question, before any session exists. Derived by
+// the server on each scan — not stored by any browser — so every client sees
+// the same pending question, after a reload and after a server restart.
+type PendingFolderTrust struct {
+	PID int `json:"pid"`
+	// Path is the folder Claude names in its question.
+	Path string `json:"path"`
+	// Since is when the server first saw this question (RFC 3339).
+	Since string `json:"since"`
+}
+
 // PendingScreen is whichever interactive AskUserQuestion screen is currently
 // open on a session's terminal. At most one field is non-nil; both are nil when
 // no such screen is open. Probing for both in one round-trip keeps the scan hot

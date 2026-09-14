@@ -27,29 +27,40 @@ var emptyTrend = []any{}
 // (F-PERF-014)
 var emptyCapabilityDecisions = []sdk.PendingCapabilityDecision{}
 
+// emptyFolderTrust is substituted when there is no pending folder trust, so
+// the frame always marshals "[]".
+var emptyFolderTrust = []sdk.PendingFolderTrust{}
+
 // broadcastFrame is the JSON envelope expected by the SSE client.
 // Typed struct avoids reflection-based marshaling of map[string]any.
 type broadcastFrame struct {
 	Agents                     []sdk.Agent                     `json:"agents"`
 	Trend                      []any                           `json:"trend"`
 	PendingCapabilityDecisions []sdk.PendingCapabilityDecision `json:"pendingCapabilityDecisions"`
+	// PendingFolderTrust is server-owned: which dashboard-started Claude
+	// processes are waiting at Claude Code's folder trust question.
+	PendingFolderTrust []sdk.PendingFolderTrust `json:"pendingFolderTrust"`
 }
 
 // MarshalFrame renders one SSE envelope. Exported because the scan loop is not
 // the only producer — a hook event or a new capability ask pushes a frame
 // between ticks — and a second producer building the envelope by hand drops
 // whichever field it was written before.
-func MarshalFrame(agents []sdk.Agent, decisions []sdk.PendingCapabilityDecision) ([]byte, error) {
+func MarshalFrame(agents []sdk.Agent, decisions []sdk.PendingCapabilityDecision, folderTrust []sdk.PendingFolderTrust) ([]byte, error) {
 	if agents == nil {
 		agents = []sdk.Agent{}
 	}
 	if decisions == nil {
 		decisions = emptyCapabilityDecisions
 	}
+	if folderTrust == nil {
+		folderTrust = emptyFolderTrust
+	}
 	return json.Marshal(broadcastFrame{
 		Agents:                     agents,
 		Trend:                      emptyTrend,
 		PendingCapabilityDecisions: decisions,
+		PendingFolderTrust:         folderTrust,
 	})
 }
 
@@ -143,7 +154,7 @@ func Run(ctx context.Context, opts RunOptions) {
 				continue
 			}
 
-			data, err := MarshalFrame(agents, capabilityDecisionsOrEmpty(ctx, opts.CapabilityDecisions))
+			data, err := MarshalFrame(agents, capabilityDecisionsOrEmpty(ctx, opts.CapabilityDecisions), opts.Merger.PendingFolderTrust())
 			if err != nil {
 				slog.Error("agent marshal failed", "err", err)
 				continue

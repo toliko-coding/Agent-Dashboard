@@ -323,3 +323,54 @@ func TestFolderTrust_DeclineSelectsExit(t *testing.T) {
 	te.manager.markExited(te.pid, "")
 	assert.Equal(t, http.StatusConflict, te.answer(t, fmt.Sprint(te.pid), "trust").Code, "a stopped agent cannot be answered")
 }
+
+type fakePendingTrust map[int]string
+
+func (f fakePendingTrust) PendingFolderTrustCwd(pid int) (string, bool) {
+	cwd, ok := f[pid]
+	return cwd, ok
+}
+
+// 3M.1 (server restart): a pending question the server rediscovered by scanning —
+// with no in-memory spawn record — can be answered, against the process's own cwd.
+func TestFolderTrust_AnswersARediscoveredSpawn(t *testing.T) {
+	te := newTrustEnv(t)
+	te.manager.mu.Lock()
+	delete(te.manager.spawnStore, te.pid)
+	te.manager.mu.Unlock()
+	pid := fmt.Sprint(te.pid)
+	te.screen = &sdk.PendingScreen{FolderTrust: &sdk.DetectedFolderTrust{Path: te.cwd, Selected: "exit"}}
+
+	assert.Equal(t, http.StatusNotFound, te.answer(t, pid, "trust").Code, "unknown to both the spawn store and the scan")
+
+	te.handler.SetPendingFolderTrustSource(fakePendingTrust{te.pid: filepath.Join(te.home, "elsewhere")})
+	assert.Equal(t, http.StatusConflict, te.answer(t, pid, "trust").Code, "the process works in another folder than Claude names")
+	assert.Empty(t, *te.keys)
+
+	te.handler.SetPendingFolderTrustSource(fakePendingTrust{te.pid: te.cwd})
+	rec := te.answer(t, pid, "trust")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, []string{keyDown, keyEnter}, *te.keys)
+}
+
+// J: two browsers answering the same question — only the first is delivered.
+func TestFolderTrust_OnlyOneAnswerWins(t *testing.T) {
+	te := newTrustEnv(t)
+	pid := fmt.Sprint(te.pid)
+	te.screen = &sdk.PendingScreen{FolderTrust: &sdk.DetectedFolderTrust{Path: te.cwd, Selected: "exit"}}
+
+	require.Equal(t, http.StatusOK, te.answer(t, pid, "trust").Code)
+	second := te.answer(t, pid, "exit")
+	assert.Equal(t, http.StatusConflict, second.Code)
+	assert.Contains(t, second.Body.String(), "already answered")
+	assert.Equal(t, []string{keyDown, keyEnter}, *te.keys, "the second decision sent nothing")
+}
+
+// A refused attempt does not use up the answer.
+func TestFolderTrust_RefusedAttemptDoesNotConsumeTheAnswer(t *testing.T) {
+	te := newTrustEnv(t)
+	pid := fmt.Sprint(te.pid)
+	assert.Equal(t, http.StatusConflict, te.answer(t, pid, "trust").Code, "no question on screen yet")
+	te.screen = &sdk.PendingScreen{FolderTrust: &sdk.DetectedFolderTrust{Path: te.cwd, Selected: "exit"}}
+	assert.Equal(t, http.StatusOK, te.answer(t, pid, "trust").Code)
+}

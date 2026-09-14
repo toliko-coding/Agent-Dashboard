@@ -263,6 +263,13 @@ type Merger struct {
 	// workspaces resolves an agent's cwd to the checkout it runs in. Cached,
 	// because this rebuilds every agent on every SSE tick; see the resolver.
 	workspaces *identity.Resolver
+
+	// Pending folder trust: Claude processes with no session yet that show
+	// Claude Code's trust question (3M.1). Rebuilt on every scan.
+	trustMu   sync.Mutex
+	trust     []sdk.PendingFolderTrust
+	trustSeen map[int]time.Time
+	trustCwd  map[int]string
 }
 
 // ScreenProbeFn resolves whichever AskUserQuestion screen is currently open on
@@ -384,6 +391,9 @@ func (m *Merger) GetAgents(ctx context.Context, opts GetAgentsOpts) ([]sdk.Agent
 		}()
 	}
 	wg.Wait()
+	// Before the filter below reuses the slice: which session-less processes are
+	// stopped at Claude's folder trust question.
+	m.recordFolderTrust(processes, agents)
 	// Filter out zero-value entries (processes with no matching session) and
 	// record each live controllable agent's snapshot. Only channel-available
 	// agents are recorded, so only they can later surface as a finished card.
@@ -588,4 +598,78 @@ func buildSubagents(session *parser.SessionData) []sdk.SubAgent {
 		return lastActivity[ai.ID].After(lastActivity[aj.ID])
 	})
 	return out
+}
+
+/*
+ * recordFolderTrust derives which Claude processes are waiting at Claude Code's
+ * folder trust question.
+ *
+ * Such a process has no session yet — Claude asks before it writes one — so it
+ * is not an agent and is filtered out above. The screen probe is the same one
+ * that reads AskUserQuestion screens: it only reaches processes the dashboard
+ * started (it needs their discovery file) and fails soft, so an unrelated
+ * Claude process is never probed over the network and never reported.
+ *
+ * Server-derived on every scan rather than kept by the browser that started the
+ * spawn, so a reload, a second browser and a restarted server all see the same
+ * question; a process that exits or answers simply stops appearing.
+ */
+func (m *Merger) recordFolderTrust(processes []scanner.ProcessInfo, agents []sdk.Agent) {
+	if m.screenProbe == nil {
+		return
+	}
+	m.trustMu.Lock()
+	previous := m.trustSeen
+	m.trustMu.Unlock()
+
+	now := time.Now()
+	pending := []sdk.PendingFolderTrust{}
+	seen := make(map[int]time.Time)
+	cwds := make(map[int]string)
+	for i, proc := range processes {
+		if agents[i].SessionID != "" || proc.InternalProcess {
+			continue
+		}
+		screen := m.screenProbe(proc.PID)
+		if screen == nil || screen.FolderTrust == nil {
+			continue
+		}
+		since, ok := previous[proc.PID]
+		if !ok {
+			since = now
+		}
+		seen[proc.PID] = since
+		cwds[proc.PID] = proc.CWD
+		pending = append(pending, sdk.PendingFolderTrust{
+			PID:   proc.PID,
+			Path:  screen.FolderTrust.Path,
+			Since: since.UTC().Format(time.RFC3339),
+		})
+	}
+	sort.Slice(pending, func(a, b int) bool { return pending[a].PID < pending[b].PID })
+
+	m.trustMu.Lock()
+	m.trust = pending
+	m.trustSeen = seen
+	m.trustCwd = cwds
+	m.trustMu.Unlock()
+}
+
+// PendingFolderTrust returns the folder trust questions seen on the last scan.
+func (m *Merger) PendingFolderTrust() []sdk.PendingFolderTrust {
+	m.trustMu.Lock()
+	defer m.trustMu.Unlock()
+	out := make([]sdk.PendingFolderTrust, len(m.trust))
+	copy(out, m.trust)
+	return out
+}
+
+// PendingFolderTrustCwd reports the working directory of a process the last
+// scan saw at the trust question — read from the process itself, not from any
+// client — so an answer can be checked against the folder Claude names.
+func (m *Merger) PendingFolderTrustCwd(pid int) (string, bool) {
+	m.trustMu.Lock()
+	defer m.trustMu.Unlock()
+	cwd, ok := m.trustCwd[pid]
+	return cwd, ok
 }

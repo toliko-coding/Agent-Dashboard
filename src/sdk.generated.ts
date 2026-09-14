@@ -376,6 +376,23 @@ export interface DetectedFolderTrust {
   selected: string
 }
 /**
+ * PendingFolderTrust is a Claude process the dashboard started that is waiting
+ * at Claude Code's folder trust question, before any session exists. Derived by
+ * the server on each scan — not stored by any browser — so every client sees
+ * the same pending question, after a reload and after a server restart.
+ */
+export interface PendingFolderTrust {
+  pid: number
+  /**
+   * Path is the folder Claude names in its question.
+   */
+  path: string
+  /**
+   * Since is when the server first saw this question (RFC 3339).
+   */
+  since: string
+}
+/**
  * PendingScreen is whichever interactive AskUserQuestion screen is currently
  * open on a session's terminal. At most one field is non-nil; both are nil when
  * no such screen is open. Probing for both in one round-trip keeps the scan hot

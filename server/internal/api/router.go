@@ -289,7 +289,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 	if debounceMs <= 0 {
 		debounceMs = 100
 	}
-	rescan := newDebouncedRescan(serverCtx, deps.AgentBroadcaster, debounceMs, getAgents, deps.CapabilityDecisions)
+	var folderTrust func() []sdk.PendingFolderTrust
+	if deps.Merger != nil {
+		folderTrust = deps.Merger.PendingFolderTrust
+	}
+	rescan := newDebouncedRescan(serverCtx, deps.AgentBroadcaster, debounceMs, getAgents, deps.CapabilityDecisions, folderTrust)
 	hookEnforcer := deps.HookEnforcer
 	if hookEnforcer == nil {
 		hookEnforcer = hooks.NewHookEnforcer(nil)
@@ -578,6 +582,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 		}
 		if deps.Merger != nil {
 			spawnHandler.SetAgentDismisser(deps.Merger)
+			// Folder trust questions the server's own scan found, so an answer
+			// can reach a spawn this instance did not start (after a restart).
+			spawnHandler.SetPendingFolderTrustSource(deps.Merger)
 		}
 		r.Post("/api/agents/spawn", spawnHandler.Spawn)
 		r.Get("/api/agents/spawn/{pid}/status", spawnHandler.Status)
@@ -815,7 +822,7 @@ func newSessionCWDLookup(getAgents func(context.Context) ([]sdk.Agent, error)) h
 	}
 }
 
-func newDebouncedRescan(ctx context.Context, broadcaster *sse.Broadcaster, debounceMs int, getAgents func(context.Context) ([]sdk.Agent, error), decisions agentbroadcast.CapabilityDecisionProvider) hooks.OnEventFn {
+func newDebouncedRescan(ctx context.Context, broadcaster *sse.Broadcaster, debounceMs int, getAgents func(context.Context) ([]sdk.Agent, error), decisions agentbroadcast.CapabilityDecisionProvider, folderTrust func() []sdk.PendingFolderTrust) hooks.OnEventFn {
 	var mu sync.Mutex
 	var timer *time.Timer
 	delay := time.Duration(debounceMs) * time.Millisecond
@@ -840,7 +847,11 @@ func newDebouncedRescan(ctx context.Context, broadcaster *sse.Broadcaster, debou
 			if decisions != nil {
 				pending = decisions(ctx)
 			}
-			data, err := agentbroadcast.MarshalFrame(agents, pending)
+			var trust []sdk.PendingFolderTrust
+			if folderTrust != nil {
+				trust = folderTrust()
+			}
+			data, err := agentbroadcast.MarshalFrame(agents, pending, trust)
 			if err != nil {
 				slog.Warn("hooks: marshal failed", "err", err)
 				return

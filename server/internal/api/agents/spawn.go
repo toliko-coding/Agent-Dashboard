@@ -85,6 +85,10 @@ type SpawnManager struct {
 	// folder-trust detection.
 	screenProbe func(pid int) *sdk.PendingScreen
 
+	// trustAnswered records a delivered folder trust answer per pid (see claimFolderTrustAnswer).
+	trustAnswerMu sync.Mutex
+	trustAnswered map[int]time.Time
+
 	spawnLimiter  *slidingWindowLimiter
 	injectLimiter *slidingWindowLimiter
 
@@ -852,6 +856,8 @@ type SpawnHandler struct {
 	dismisser AgentDismisser      // may be nil
 	// workingFolders enables the working-folder routes; nil leaves them answering 404.
 	workingFolders services.WorkingFolderSettings
+	// pendingTrust is the server's scan-derived pending folder trust state.
+	pendingTrust PendingFolderTrustSource
 }
 
 // NewSpawnHandler creates a SpawnHandler backed by the given manager.

@@ -195,6 +195,45 @@ func (h *SpawnHandler) RemoveWorkingFolder(w http.ResponseWriter, r *http.Reques
 	writeFolderJSON(w, http.StatusOK, map[string]any{"folders": folders})
 }
 
+// PendingFolderTrustSource reports processes the last server scan saw waiting
+// at Claude's trust question, with the working directory read from the process.
+// It lets an answer reach an agent this server instance did not start (for
+// example after a restart), without trusting anything a client sends.
+type PendingFolderTrustSource interface {
+	PendingFolderTrustCwd(pid int) (string, bool)
+}
+
+// SetPendingFolderTrustSource installs the server-side pending trust state.
+func (h *SpawnHandler) SetPendingFolderTrustSource(s PendingFolderTrustSource) {
+	h.pendingTrust = s
+}
+
+// folderTrustAnswerHold is how long an answered question refuses another
+// answer: long enough for Claude to leave the screen and the next scan to drop
+// the pending item, so a second browser's click cannot land on what comes next.
+var folderTrustAnswerHold = 30 * time.Second
+
+// claimFolderTrustAnswer reserves the single answer for pid, or reports that
+// one was already given.
+func (m *SpawnManager) claimFolderTrustAnswer(pid int) bool {
+	m.trustAnswerMu.Lock()
+	defer m.trustAnswerMu.Unlock()
+	if at, ok := m.trustAnswered[pid]; ok && time.Since(at) < folderTrustAnswerHold {
+		return false
+	}
+	if m.trustAnswered == nil {
+		m.trustAnswered = make(map[int]time.Time)
+	}
+	m.trustAnswered[pid] = time.Now()
+	return true
+}
+
+func (m *SpawnManager) releaseFolderTrustAnswer(pid int) {
+	m.trustAnswerMu.Lock()
+	defer m.trustAnswerMu.Unlock()
+	delete(m.trustAnswered, pid)
+}
+
 // Terminal key sequences for Claude's two-option trust selector.
 const (
 	keyUp    = "\x1b[A"
@@ -250,8 +289,19 @@ func (h *SpawnHandler) FolderTrust(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "invalid pid")
 		return
 	}
+	// The folder the answer must match: the one this server started the agent in,
+	// or — for a spawn it no longer remembers — the process's own working
+	// directory from the last scan. Never a path from the request.
 	status := h.manager.GetStatus(pid)
-	if status == nil {
+	cwd := ""
+	if status != nil && status.Status == "running" {
+		cwd = status.Cwd
+	} else if h.pendingTrust != nil {
+		if scanned, ok := h.pendingTrust.PendingFolderTrustCwd(pid); ok {
+			cwd = scanned
+		}
+	}
+	if status == nil && cwd == "" {
 		writeJSONError(w, http.StatusNotFound, "unknown spawn PID")
 		return
 	}
@@ -266,16 +316,28 @@ func (h *SpawnHandler) FolderTrust(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if status.Status != "running" {
+	if cwd == "" {
 		writeJSONError(w, http.StatusConflict, "this agent is no longer running")
 		return
 	}
+	// One answer per question: a second browser's click is refused rather than
+	// sent to whatever Claude shows next.
+	if !h.manager.claimFolderTrustAnswer(pid) {
+		writeJSONError(w, http.StatusConflict, "This folder trust question was already answered")
+		return
+	}
+	delivered := false
+	defer func() {
+		if !delivered {
+			h.manager.releaseFolderTrustAnswer(pid)
+		}
+	}()
 	screen := h.manager.probeScreen(pid)
 	if screen == nil || screen.FolderTrust == nil {
 		writeJSONError(w, http.StatusConflict, "Claude is not asking to trust a folder right now")
 		return
 	}
-	if !sameFolder(screen.FolderTrust.Path, status.Cwd) {
+	if !sameFolder(screen.FolderTrust.Path, cwd) {
 		writeJSONError(w, http.StatusConflict, "Claude is asking about a different folder than this agent was started in")
 		return
 	}
@@ -295,6 +357,7 @@ func (h *SpawnHandler) FolderTrust(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	h.recordAudit(r.Context(), requestSub(r), "folder_trust", status.Cwd, map[string]any{"decision": body.Decision, "transport": transport})
+	delivered = true
+	h.recordAudit(r.Context(), requestSub(r), "folder_trust", cwd, map[string]any{"decision": body.Decision, "transport": transport})
 	writeFolderJSON(w, http.StatusOK, map[string]any{"ok": true, "decision": body.Decision})
 }
