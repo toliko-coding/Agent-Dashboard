@@ -43,7 +43,13 @@ Allowing a folder is the dashboard's own permission to start an agent there. It 
 
 The first time Claude Code starts in a folder it has not trusted, it asks *"Quick safety check: Is this a project you created or one you trust?"* before its session begins — so the agent is not yet in the roster, and no hook reports it. The dashboard reads that question from the agent's terminal and shows it, with the exact folder, in the New Agent dialog; if you close the dialog, it stays in **Needs you** as a blocking item until you answer. **Trust this folder** lets Claude continue; **Don't trust — stop the agent** answers Claude's own *No, exit*, and the agent stops.
 
-The dashboard never answers the question for you, never writes Claude's trust settings, and never passes a flag that skips the question. An answer is delivered only while the question is on screen and names the folder the agent was started in.
+Whether an agent is waiting at this question is determined by the server on every scan, not by the browser that started it: **Needs you** shows it after a reload, in every open tab, and again after the dashboard server restarts (the waiting Claude process keeps running). Only the first answer is delivered; another answer to the same question is refused.
+
+The dashboard never answers the question for you, never writes Claude's trust settings, and never passes a flag that skips the question. An answer is delivered only while the question is on screen and names the folder the agent is working in.
+
+### When the dashboard runs inside Claude Code
+
+If you start the dashboard server from a terminal inside Claude Code, its environment carries Claude Code's `CLAUDE_CODE_CHILD_SESSION` marker. Agents the dashboard starts do not inherit that marker — they are top-level sessions, not children of the Claude session the server happened to be launched from — so they save transcripts and appear in the roster as usual.
 
 ## Slash commands
 

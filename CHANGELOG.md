@@ -12,6 +12,10 @@ from [Conventional Commits](https://www.conventionalcommits.org/) by GoReleaser.
 
 Preparing the first public release.
 
+### Fixed
+- **Agents started from a dashboard that was itself launched inside Claude Code now appear.** The dashboard passed Claude Code's `CLAUDE_CODE_CHILD_SESSION` marker on to every agent it started, so Claude turned transcript saving off and the agent never reached the roster. New agents, pipeline stage agents and refinement turns no longer inherit that one marker; every other variable is passed on as before.
+- **A folder trust question no longer disappears on reload.** Whether a new agent is waiting at Claude Code's folder trust question is now worked out by the server and sent to every browser, so **Needs you** keeps it after a reload, shows it in a second tab, and finds it again after the dashboard server restarts. Only one answer is accepted; a second one is refused. It clears when Claude moves on or the process exits.
+
 ### Changed
 - **New Agent no longer needs a Project.**
   - **Working folder first:** the dialog starts with the folder Claude runs in — any local folder, including a plain folder with no Git repository or a local repository with no GitHub remote — and shows what it resolves to (repository, branch and checkout kind, or a plain folder with no repository).
