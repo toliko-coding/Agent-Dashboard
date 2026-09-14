@@ -19,6 +19,7 @@ Preparing the first public release.
   - **Agents list:** each row now has the card's hierarchy — state badge, a Needs you / Failed chip from the canonical attention queue, name, repository and workspace (or "Workspace unknown"), what the agent is doing by tool name, last activity and cost. The expanded row no longer shows the last output or the PID; those are in the details panel.
   - **Projects:** listed as compact rows naming each project's folders by folder name; full paths stay in Settings → Projects.
   - **Terminal view:** kept for saved links; each listed agent opens its details, where its terminal action is.
+  - **Empty Agents roster:** a short statement of what is absent and how to start an agent, instead of a large illustrated panel.
   - **Status bar:** spend reads "UTC DAY", because it is the current UTC calendar day, not your local today; a missing total is shown as unknown rather than $0.
   - **Visual clean-up:**
     - Pipeline project filters, epics and refinement status, the Workflows tabs, Eval's scan button and alert count, and the Schedules list now use the shared colour tokens and radii instead of raw blue and green, and refinement's indicator moves only while refining.
