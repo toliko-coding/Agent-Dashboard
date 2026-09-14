@@ -184,6 +184,9 @@ func (m *SpawnManager) SpawnedAndRunning(pid int) bool {
 type spawnProvenance struct {
 	workspaceCreated bool
 	allowedFolder    string
+	// resumeWithoutPrompt lets a resume start with no first message (resume
+	// under Dashboard control); a fresh spawn still needs a prompt.
+	resumeWithoutPrompt bool
 }
 
 // SetScreenProbe installs the probe used to see Claude Code's folder trust
@@ -257,8 +260,15 @@ type spawnRequest struct {
 // enforceSpawnPolicy validates the request body fields and applies the spawn
 // policy gate. Rate-limit recordAttempt must be called before this method.
 func (m *SpawnManager) enforceSpawnPolicy(body map[string]any) (*spawnRequest, error) {
+	return m.enforceSpawnPolicyFor(body, false)
+}
+
+// enforceSpawnPolicyFor is enforceSpawnPolicy; allowResumeWithoutPrompt admits
+// an empty prompt only for a resume (a server-side flag, never the body).
+func (m *SpawnManager) enforceSpawnPolicyFor(body map[string]any, allowResumeWithoutPrompt bool) (*spawnRequest, error) {
 	prompt, _ := body["prompt"].(string)
-	if prompt == "" {
+	resuming, _ := body["resumeSessionId"].(string)
+	if prompt == "" && (!allowResumeWithoutPrompt || resuming == "") {
 		return nil, fmt.Errorf("missing or invalid prompt")
 	}
 	cwd, _ := body["cwd"].(string)
@@ -475,7 +485,7 @@ func (m *SpawnManager) SpawnWithOutcome(sub string, body map[string]any) (SpawnO
 func (m *SpawnManager) spawn(sub string, body map[string]any, prov spawnProvenance) (SpawnOutcome, error) {
 	m.recordAttempt(sub)
 
-	req, err := m.enforceSpawnPolicy(body)
+	req, err := m.enforceSpawnPolicyFor(body, prov.resumeWithoutPrompt)
 	if err != nil {
 		return SpawnOutcome{}, err
 	}
@@ -986,9 +996,15 @@ type SpawnHandler struct {
 	agentLookup    AgentLookup
 	forgetter      AgentForgetter
 	profileDeleter ProfileDeleter
+	profileSaver   ProfileSaver
 	managed        ManagedAgents
-	terminate      func(pid int) error
-	alive          func(pid int) bool
+	// Resume under Dashboard control (3N.2.2); tests swap these seams.
+	resumeSpawn func(sub string, body map[string]any) (SpawnOutcome, error)
+	hosted      func(pid int) bool
+	requestExit func(ctx context.Context, pid int) error
+	exitWait    time.Duration
+	terminate   func(pid int) error
+	alive       func(pid int) bool
 }
 
 // NewSpawnHandler creates a SpawnHandler backed by the given manager.

@@ -19,11 +19,13 @@ import { EDITOR_SCHEMES, editorHref, loadEditorScheme } from '../utils/worktree'
  * the server refuses it too, so hiding the buttons is not the safeguard.
  */
 
-export type LifecycleAction = 'stop' | 'delete'
+export type LifecycleAction = 'stop' | 'delete' | 'resume'
 
 export interface PendingLifecycle {
   action: LifecycleAction
   agent: Agent
+  /** Resume only: the running session is asked to /exit first. */
+  endsRunningSession?: boolean
 }
 
 const pending = ref<PendingLifecycle | null>(null)
@@ -33,7 +35,19 @@ export function useAgentLifecycle() {
     pending,
     requestStop: (agent: Agent) => { pending.value = { action: 'stop', agent } },
     requestDelete: (agent: Agent) => { pending.value = { action: 'delete', agent } },
+    requestResume: (agent: Agent, resume: ResumeAvailability) => { pending.value = { action: 'resume', agent, endsRunningSession: resume.endsRunningSession } },
     cancel: () => { pending.value = null },
+  }
+}
+
+// Edit agent (3N.2.2): one shared dialog, like the lifecycle confirmation.
+const editing = ref<Agent | null>(null)
+
+export function useAgentProfileEditor() {
+  return {
+    editing,
+    requestEdit: (agent: Agent) => { editing.value = agent },
+    cancelEdit: () => { editing.value = null },
   }
 }
 
@@ -93,6 +107,64 @@ export async function removeAgentProfile(pid: number): Promise<void> {
   const res = await fetch(`/api/agents/${pid}/profile`, { method: 'DELETE', credentials: 'same-origin' })
   if (!res.ok)
     throw await errorFrom(res, 'Could not remove the name and icon')
+}
+
+export interface AgentProfileInput {
+  displayName: string
+  category: string
+}
+
+/** Saves an agent's name and icon — presentation metadata only. Empty clears. */
+export async function updateAgentProfile(pid: number, input: AgentProfileInput): Promise<AgentProfileInput> {
+  const res = await fetch(`/api/agents/${pid}/profile`, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok)
+    throw await errorFrom(res, 'Could not save the name and icon')
+  return await res.json() as AgentProfileInput
+}
+
+/*
+ * Resume under Dashboard control (3N.2.2): the only way a session the dashboard
+ * did not launch — such as an agent started before ownership was recorded —
+ * becomes one it manages. The server resumes the conversation as a new process
+ * it launches; a running session is first asked to /exit, and only when this
+ * dashboard's own pty broker hosts it. Nothing is signalled.
+ */
+export interface ResumeAvailability {
+  available: boolean
+  endsRunningSession: boolean
+  reason?: string
+}
+
+export interface AgentControl {
+  owned: boolean
+  managedBy?: string
+  resume: ResumeAvailability
+}
+
+/** Asked once when the workspace opens or the agent's state changes — never polled. */
+export async function getAgentControl(pid: number): Promise<AgentControl> {
+  const res = await fetch(`/api/agents/${pid}/control`, { credentials: 'same-origin' })
+  if (!res.ok)
+    throw await errorFrom(res, 'Could not read what can be done with this agent')
+  return await res.json() as AgentControl
+}
+
+export interface ResumeResult {
+  pid: number
+  previousPid: number
+  endedRunningSession: boolean
+}
+
+export async function resumeUnderDashboard(pid: number): Promise<ResumeResult> {
+  const res = await fetch(`/api/agents/${pid}/resume-under-dashboard`, { method: 'POST', credentials: 'same-origin' })
+  if (!res.ok)
+    throw await errorFrom(res, 'Could not resume the session under Agent Dashboard')
+  return await res.json() as ResumeResult
 }
 
 /** The editor the user picked for worktrees, or VS Code. */

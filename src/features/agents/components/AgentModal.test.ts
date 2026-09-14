@@ -180,14 +180,49 @@ describe('agentModal — workspace', () => {
     expect(w.find('[data-testid="agent-modal-remove-profile"]').exists()).toBe(false)
   })
 
-  it('lets the name and icon of an external session be removed without touching its process', async () => {
-    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ profileRemoved: true }) }))
+  // 3N.2.2 F/G: the name and icon are edited in the shared Edit agent dialog, for any session.
+  it('opens Edit agent from the header', async () => {
+    const { useAgentProfileEditor } = await import('@/composables/useAgentLifecycle')
+    const w = workspace({ ...baseAgent, status: 'active' } as Agent)
+    const edit = w.get('[data-testid="agent-modal-edit"]')
+    expect(edit.attributes('aria-label')).toBe('Edit name and icon')
+    await edit.trigger('click')
+    expect(useAgentProfileEditor().editing.value?.pid).toBe(1234)
+    useAgentProfileEditor().cancelEdit()
+  })
+
+  // 3N.2.2 D: a legacy or observed session is offered Resume under Dashboard only
+  // when the server says so, and an owned agent never asks.
+  it('offers Resume under Dashboard only when the server says the session can be resumed', async () => {
+    const { flushPromises } = await import('@vue/test-utils')
+    const { useAgentLifecycle } = await import('@/composables/useAgentLifecycle')
+    let available = true
+    const fetchSpy = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => url.endsWith('/control') ? { owned: false, resume: { available, endsRunningSession: true, reason: available ? undefined : 'External session' } } : {},
+    }))
     vi.stubGlobal('fetch', fetchSpy)
-    const w = workspace({ ...baseAgent, status: 'active', displayName: 'Portfolio', category: 'web' } as Agent)
-    await w.get('[data-testid="agent-modal-remove-profile"]').trigger('click')
-    const lifecycleCalls = (fetchSpy.mock.calls as unknown as [string, RequestInit?][]).filter(([url]) => url.startsWith('/api/agents/1234'))
-    // Only the profile: never stop, delete or dismiss.
-    expect(lifecycleCalls).toEqual([['/api/agents/1234/profile', expect.objectContaining({ method: 'DELETE' })]])
+
+    const hosted = workspace({ ...baseAgent, status: 'active', liveInjectable: true, displayName: 'Timer' } as Agent)
+    await flushPromises()
+    expect(fetchSpy.mock.calls.filter(([u]) => String(u).endsWith('/control'))).toHaveLength(1)
+    await hosted.get('[data-testid="agent-modal-resume"]').trigger('click')
+    expect(useAgentLifecycle().pending.value).toMatchObject({ action: 'resume', endsRunningSession: true, agent: { pid: 1234 } })
+    useAgentLifecycle().cancel()
+    hosted.unmount()
+
+    available = false
+    const refused = workspace({ ...baseAgent, status: 'active' } as Agent)
+    await flushPromises()
+    expect(refused.find('[data-testid="agent-modal-resume"]').exists()).toBe(false)
+    expect(refused.get('[data-testid="agent-modal-observe-only"]').text()).toContain('External session')
+    refused.unmount()
+
+    fetchSpy.mockClear()
+    const owned = workspace({ ...baseAgent, status: 'active', dashboardOwned: true } as Agent)
+    await flushPromises()
+    expect(fetchSpy.mock.calls.filter(([u]) => String(u).endsWith('/control'))).toHaveLength(0)
+    expect(owned.find('[data-testid="agent-modal-resume"]').exists()).toBe(false)
     vi.unstubAllGlobals()
   })
 

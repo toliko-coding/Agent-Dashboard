@@ -190,6 +190,20 @@ describe('rich agent card — actions', () => {
     }
   })
 
+  // 3N.2.2 F/G: any session's name and icon can be edited from its card.
+  it('opens Edit agent from the card without opening the workspace', async () => {
+    const { useAgentProfileEditor } = await import('@/composables/useAgentLifecycle')
+    const w = await render({ displayName: 'Timer' })
+    const edit = w.get('[data-testid="agent-card-edit"]')
+    expect(edit.attributes('aria-label')).toBe('Edit name and icon of Timer')
+    await edit.trigger('click')
+    expect(useAgentProfileEditor().editing.value?.displayName).toBe('Timer')
+    expect(w.emitted('select')).toBeFalsy()
+    useAgentProfileEditor().cancelEdit()
+    const internal = await render({ internalProcess: true })
+    expect(internal.find('[data-testid="agent-card-edit"]').exists()).toBe(false)
+  })
+
   it('points a pipeline agent at its task instead of offering Stop', async () => {
     const w = await render({ dashboardOwned: true, pipelineTaskId: 'task-1' })
     expect(w.find('[data-testid="agent-card-stop"]').exists()).toBe(false)

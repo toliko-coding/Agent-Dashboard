@@ -591,6 +591,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 		spawnHandler := agents.NewSpawnHandler(spawnMgr)
 		if deps.AgentProfiles != nil {
 			spawnHandler.SetProfileDeleter(deps.AgentProfiles)
+			spawnHandler.SetProfileSaver(deps.AgentProfiles)
 		}
 		if deps.ManagedAgents != nil {
 			spawnHandler.SetManagedAgents(deps.ManagedAgents)
@@ -626,6 +627,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Put("/api/agents/projectless", spawnHandler.SetProjectlessRoot)
 		r.Post("/api/agents/projectless/preview", spawnHandler.PreviewProjectlessWorkspace)
 		r.Delete("/api/agents/{pid}/profile", spawnHandler.RemoveAgentProfile)
+		r.Put("/api/agents/{pid}/profile", spawnHandler.UpdateAgentProfile)
+		r.Get("/api/agents/{pid}/control", spawnHandler.GetAgentControl)
+		r.Post("/api/agents/{pid}/resume-under-dashboard", spawnHandler.ResumeUnderDashboard)
 		uploadImageHandler := agents.NewUploadImageHandler()
 		r.Post("/api/agents/{pid}/upload-image", uploadImageHandler.UploadImage)
 		// WebSocket proxy — registered raw specifically because the upgrade

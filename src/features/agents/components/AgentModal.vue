@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AgentControl } from '@/composables/useAgentLifecycle'
 import type { Agent, OutputMessage, SubAgent } from '@/types'
 import { computed, nextTick, ref, watch } from 'vue'
 import CrossLinkBanner from '@/components/CrossLinkBanner.vue'
@@ -11,7 +12,7 @@ import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
-import { agentIsDashboardOwned, agentIsRunning, editorLabel, lifecycleNote, openInEditor, removeAgentProfile, useAgentLifecycle } from '@/composables/useAgentLifecycle'
+import { agentIsDashboardOwned, agentIsRunning, editorLabel, getAgentControl, lifecycleNote, openInEditor, useAgentLifecycle, useAgentProfileEditor } from '@/composables/useAgentLifecycle'
 import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { toast } from '@/composables/useToast'
@@ -37,7 +38,8 @@ const metricsOpen = metrics.open
 
 // Workspace header (3N.2): who, what and the everyday and destructive actions.
 const { nowMs } = useNow()
-const { requestStop, requestDelete } = useAgentLifecycle()
+const { requestStop, requestDelete, requestResume } = useAgentLifecycle()
+const { requestEdit } = useAgentProfileEditor()
 const editor = editorLabel()
 const technical = computed(() => props.agent ? agentTechnical(props.agent) : null)
 const topic = computed(() => props.agent ? agentTopic(props.agent) : null)
@@ -48,20 +50,28 @@ const canAct = computed(() => !!props.agent && !props.agent.machine && !props.ag
 const owned = computed(() => !!props.agent && agentIsDashboardOwned(props.agent))
 const running = computed(() => owned.value && agentIsRunning(props.agent!))
 const observeNote = computed(() => props.agent ? lifecycleNote(props.agent) : null)
-// The name and icon are the dashboard's own metadata: removable for any session.
-const hasProfile = computed(() => !!props.agent && (!!props.agent.displayName || !!props.agent.category))
-const profileError = ref('')
-async function removeProfile() {
-  if (!props.agent)
-    return
-  profileError.value = ''
-  try {
-    await removeAgentProfile(props.agent.pid)
-  }
-  catch (err: unknown) {
-    profileError.value = err instanceof Error ? err.message : 'Could not remove the name and icon'
-  }
-}
+// Whether an observed session can be resumed under Dashboard control (3N.2.2):
+// asked once per agent and state change, never polled. Owned and pipeline
+// agents are never asked.
+const control = ref<AgentControl | null>(null)
+watch(
+  () => [props.agent?.pid, owned.value, props.agent ? agentIsRunning(props.agent) : false, props.agent?.pipelineTaskId] as const,
+  async ([pid, isOwned, , pipelineTaskId]) => {
+    control.value = null
+    if (!pid || isOwned || pipelineTaskId || !canAct.value)
+      return
+    try {
+      const answer = await getAgentControl(pid)
+      if (props.agent?.pid === pid)
+        control.value = answer
+    }
+    catch {
+      // Unknown stays unknown: no resume offer.
+    }
+  },
+  { immediate: true },
+)
+const resumable = computed(() => !owned.value && control.value?.resume.available === true)
 
 /*
  * The workspace supersedes the Overview/Transcript tabs of the previous drawer.
@@ -186,6 +196,17 @@ watch(() => props.agent?.sessionId, (sessionId) => {
                 {{ agentTitle(agent) }}
               </h2>
               <span v-if="technical" class="shrink-0 rounded-md border border-line bg-raised/60 px-1.5 py-0.5 font-mono text-label text-fg-mute" data-testid="agent-modal-technical">{{ technical }}</span>
+              <button
+                v-if="canAct && agent.sessionId"
+                type="button"
+                class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-line text-fg-mute hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+                aria-label="Edit name and icon"
+                title="Edit name and icon"
+                data-testid="agent-modal-edit"
+                @click="requestEdit(agent)"
+              >
+                <svg viewBox="0 0 16 16" class="size-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.5 3.5l2 2L6 12H4v-2z" /><path d="M9.25 4.75l2 2" /></svg>
+              </button>
             </div>
             <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-ui-sm text-fg-mute">
               <AppBadge :variant="agentDisplayStatus(agent)" />
@@ -238,16 +259,15 @@ watch(() => props.agent?.sessionId, (sessionId) => {
               <svg viewBox="0 0 16 16" class="size-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z" /><circle cx="8" cy="8" r="1.8" /></svg><span>{{ observeNote }}</span>
             </p>
             <button
-              v-if="observeNote && hasProfile"
+              v-if="resumable && control"
               type="button"
-              class="inline-flex h-8 cursor-pointer items-center rounded-lg border border-line px-3 text-ui-sm text-fg-mute hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
-              data-testid="agent-modal-remove-profile"
-              title="Removes only the name and icon shown here — the session keeps running"
-              @click="removeProfile"
+              class="inline-flex h-8 cursor-pointer items-center rounded-lg border border-accent/50 px-3 text-ui-sm font-medium text-accent hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+              data-testid="agent-modal-resume"
+              title="Resume this conversation as a process Agent Dashboard manages, so it can be stopped and deleted here"
+              @click="requestResume(agent, control.resume)"
             >
-              Remove name &amp; icon
+              Resume under Dashboard
             </button>
-            <span v-if="profileError" role="alert" class="text-ui-sm text-danger-text" data-testid="agent-modal-profile-error">{{ profileError }}</span>
             <button
               v-if="running"
               type="button"

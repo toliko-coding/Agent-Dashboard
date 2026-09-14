@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppModal from '@/components/ui/AppModal.vue'
-import { agentIsRunning, deleteAgent, stopAgent, useAgentLifecycle } from '@/composables/useAgentLifecycle'
+import { agentIsRunning, deleteAgent, resumeUnderDashboard, stopAgent, useAgentLifecycle } from '@/composables/useAgentLifecycle'
 import { useAgents } from '@/features/agents/composables/useAgents'
 import { agentTitle } from '@/utils/agentLabels'
 
@@ -16,7 +16,7 @@ import { agentTitle } from '@/utils/agentLabels'
  * the server refuses to stop it otherwise.
  */
 const { pending, cancel } = useAgentLifecycle()
-const { selectedAgent, selectAgent, dismissAgent } = useAgents({ autoStart: false })
+const { selectedAgent, selectAgent, dismissAgent, selectAgentWhenAvailable } = useAgents({ autoStart: false })
 
 const busy = ref(false)
 const error = ref('')
@@ -25,6 +25,10 @@ const agent = computed(() => pending.value?.agent ?? null)
 const action = computed(() => pending.value?.action ?? 'delete')
 const name = computed(() => agent.value ? agentTitle(agent.value) : '')
 const running = computed(() => agent.value ? agentIsRunning(agent.value) : false)
+const endsRunningSession = computed(() => pending.value?.endsRunningSession === true)
+
+const TITLES = { stop: 'Stop', delete: 'Delete', resume: 'Resume' } as const
+const CONFIRM = { stop: ['Stop Agent', 'Stopping…'], delete: ['Delete Agent', 'Deleting…'], resume: ['Resume under Dashboard', 'Resuming…'] } as const
 
 watch(pending, () => {
   busy.value = false
@@ -45,6 +49,13 @@ async function confirm() {
   try {
     if (action.value === 'stop') {
       await stopAgent(a.pid)
+    }
+    else if (action.value === 'resume') {
+      const resumed = await resumeUnderDashboard(a.pid)
+      const wasOpen = selectedAgent.value?.pid === a.pid
+      dismissAgent(a.pid)
+      if (wasOpen)
+        selectAgentWhenAvailable?.(resumed.pid)
     }
     else {
       await deleteAgent(a.pid, running.value)
@@ -68,12 +79,26 @@ async function confirm() {
       <div class="flex items-center gap-3">
         <AgentGlyph :agent="agent" />
         <h2 id="agent-lifecycle-title" class="m-0 text-title font-semibold text-fg">
-          {{ action === 'stop' ? `Stop “${name}”?` : `Delete “${name}”?` }}
+          {{ action === 'resume' ? `Resume “${name}” under Agent Dashboard?` : `${TITLES[action]} “${name}”?` }}
         </h2>
       </div>
 
       <div class="flex flex-col gap-2 text-ui text-fg-soft" data-testid="agent-lifecycle-explanation">
-        <template v-if="action === 'stop'">
+        <template v-if="action === 'resume'">
+          <p v-if="endsRunningSession" class="m-0">
+            Agent Dashboard will type <code class="font-mono">/exit</code> into this session, wait for it to end, then resume the same conversation as a new process it manages.
+          </p>
+          <p v-else class="m-0">
+            Agent Dashboard will resume this conversation as a new process it manages.
+          </p>
+          <p v-if="endsRunningSession" class="m-0 font-medium text-warning-text" data-testid="agent-lifecycle-interrupts">
+            Anything the agent is doing right now is interrupted.
+          </p>
+          <p class="m-0">
+            It runs in the same folder with the default permission mode. The conversation history, name, icon and your files are kept, and Stop and Delete become available.
+          </p>
+        </template>
+        <template v-else-if="action === 'stop'">
           <p class="m-0">
             Its running Claude process will end.
           </p>
@@ -102,8 +127,8 @@ async function confirm() {
         <AppButton variant="outline" :disabled="busy" data-testid="agent-lifecycle-cancel" @click="close">
           Cancel
         </AppButton>
-        <AppButton variant="danger" :disabled="busy" data-testid="agent-lifecycle-confirm" @click="confirm">
-          {{ busy ? (action === 'stop' ? 'Stopping…' : 'Deleting…') : (action === 'stop' ? 'Stop Agent' : 'Delete Agent') }}
+        <AppButton :variant="action === 'resume' ? 'primary' : 'danger'" :disabled="busy" data-testid="agent-lifecycle-confirm" @click="confirm">
+          {{ CONFIRM[action][busy ? 1 : 0] }}
         </AppButton>
       </footer>
     </div>

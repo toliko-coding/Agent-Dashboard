@@ -14,12 +14,12 @@ import { useSpawnWatch, watchSpawn } from '../composables/useSpawnWatch'
 import { toast } from '../composables/useToast'
 import { useAgents } from '../features/agents'
 import { workspaceDisplay } from '../utils/agentGroup'
-import { AGENT_PURPOSES, DEFAULT_AGENT_PURPOSE } from '../utils/agentPurpose'
+import { DEFAULT_AGENT_PURPOSE } from '../utils/agentPurpose'
 import { errorMessage } from '../utils/errorMessage'
 import { SPAWN_AUTOCLOSE_MS } from '../utils/timing'
 import FolderTrustDecision from './FolderTrustDecision.vue'
 import QuickCreateProjectPanel from './QuickCreateProjectPanel.vue'
-import AgentGlyph from './ui/AgentGlyph.vue'
+import AgentPurposeField from './ui/AgentPurposeField.vue'
 import AppButton from './ui/AppButton.vue'
 import AppFieldLabel from './ui/AppFieldLabel.vue'
 import AppInput from './ui/AppInput.vue'
@@ -115,7 +115,6 @@ watch(workspaceMode, (mode) => {
 })
 const newWorkspaceReady = computed(() => !!displayName.value.trim() && !!newWorkspace.value && !newWorkspace.value.exists)
 
-const purposeOptions = AGENT_PURPOSES.map(p => ({ value: p.value, label: p.value === DEFAULT_AGENT_PURPOSE ? `${p.label} (default)` : p.label }))
 type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'auto' | 'bypassPermissions' | 'dontAsk'
 const permissionMode = ref<PermissionMode>('default')
 const bypassConfirmed = ref(false)
@@ -496,17 +495,7 @@ onUnmounted(() => {
             <AppFieldLabel for="spawn-category">
               Icon
             </AppFieldLabel>
-            <div class="flex items-center gap-2">
-              <AgentGlyph :purpose="category" />
-              <AppSelect
-                id="spawn-category"
-                :model-value="category"
-                :options="purposeOptions"
-                data-testid="spawn-category"
-                class="min-w-0 flex-1"
-                @update:model-value="category = $event"
-              />
-            </div>
+            <AgentPurposeField id="spawn-category" v-model="category" testid="spawn-category" />
           </div>
         </div>
         <p v-if="nameTooLong" class="m-0 text-ui-sm text-danger-text" role="alert" data-testid="spawn-name-too-long">

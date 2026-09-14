@@ -2,6 +2,7 @@
 import type { Agent, PipelineTask } from './types'
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import AgentLifecycleDialog from '@/features/agents/components/AgentLifecycleDialog.vue'
+import AgentProfileDialog from '@/features/agents/components/AgentProfileDialog.vue'
 import { useAgents } from '@/features/agents/composables/useAgents'
 import { useAttentionQueue } from '@/features/attention/useAttentionQueue'
 import { activeWorkAgents } from '@/features/cockpit/commandModel'
@@ -412,6 +413,7 @@ onMounted(() => usageComposable.start())
 
     <AgentModal :agent="selectedAgent" @close="selectAgent(null)" @navigate="(taskId: string) => navigateTo({ taskId })" />
     <AgentLifecycleDialog />
+    <AgentProfileDialog />
     <TaskModal
       :task="selectedTask"
       @close="selectTask(null)"

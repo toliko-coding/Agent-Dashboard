@@ -173,6 +173,17 @@ export function useAgents(options?: { autoStart?: boolean }) {
     agents.value = agents.value.filter(a => a.pid !== pid)
   }
 
+  // A saved name and icon (Edit agent) apply at once on every surface that reads
+  // agent state; the next stream frame carries the same server-side profile.
+  function applyAgentProfile(sessionId: string, profile: { displayName: string, category: string }) {
+    const patch = (a: Agent): Agent => a.sessionId === sessionId
+      ? { ...a, displayName: profile.displayName || undefined, category: profile.category || undefined }
+      : a
+    agents.value = agents.value.map(patch)
+    if (selectedAgent.value?.sessionId === sessionId)
+      selectedAgent.value = patch(selectedAgent.value)
+  }
+
   // After a spawn we have the new process pid but the scanner/SSE takes a few
   // seconds to surface the agent. Open its modal as soon as it appears, giving
   // up silently after timeoutMs so a never-appearing pid leaks no watcher/timer.
@@ -220,6 +231,7 @@ export function useAgents(options?: { autoStart?: boolean }) {
     searchQuery,
     selectAgent,
     dismissAgent,
+    applyAgentProfile,
     selectAgentWhenAvailable,
     startStream: sse.startStream,
   }

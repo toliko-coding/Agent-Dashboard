@@ -8,7 +8,7 @@ import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
-import { agentIsDashboardOwned, agentIsRunning, editorLabel, lifecycleNote, openInEditor, useAgentLifecycle } from '@/composables/useAgentLifecycle'
+import { agentIsDashboardOwned, agentIsRunning, editorLabel, lifecycleNote, openInEditor, useAgentLifecycle, useAgentProfileEditor } from '@/composables/useAgentLifecycle'
 import { useNow } from '@/composables/useNow'
 import { toast } from '@/composables/useToast'
 import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vue'
@@ -62,6 +62,7 @@ const emit = defineEmits<{ select: [agent: Agent] }>()
 
 const { nowMs } = useNow()
 const { requestStop, requestDelete } = useAgentLifecycle()
+const { requestEdit } = useAgentProfileEditor()
 
 const isFinished = computed(() => props.agent.status === 'finished')
 // Stop and Delete only for an agent this dashboard launched (3N.2.1).
@@ -456,6 +457,18 @@ const ICON_BUTTON = 'inline-flex size-8 shrink-0 items-center justify-center rou
         @click="toggleArmed"
       >
         {{ agent.permissionBridgeArmed ? '🔒' : '🔓' }}
+      </button>
+
+      <button
+        v-if="!agent.machine && !agent.internalProcess && agent.sessionId"
+        type="button"
+        :class="ICON_BUTTON"
+        :aria-label="`Edit name and icon of ${title}`"
+        title="Edit name and icon"
+        data-testid="agent-card-edit"
+        @click="requestEdit(agent)"
+      >
+        <svg viewBox="0 0 16 16" class="size-4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.5 3.5l2 2L6 12H4v-2z" /><path d="M9.25 4.75l2 2" /></svg>
       </button>
 
       <span class="ml-auto flex items-center gap-1.5">

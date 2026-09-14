@@ -26,6 +26,7 @@ GET /api/agents/projectless
 GET /api/agents/spawn/{pid}/status
 GET /api/agents/stream
 GET /api/agents/working-folders
+GET /api/agents/{pid}/control
 GET /api/agents/{pid}/terminal
 GET /api/agents/{sessionId}/output
 GET /api/analytics/cost-forecast
@@ -122,6 +123,7 @@ POST /api/agents/spawn/{pid}/folder-trust
 POST /api/agents/working-folders
 POST /api/agents/{pid}/answer-question
 POST /api/agents/{pid}/message
+POST /api/agents/{pid}/resume-under-dashboard
 POST /api/agents/{pid}/stop
 POST /api/agents/{pid}/upload-image
 POST /api/analytics/patterns/refresh
@@ -178,6 +180,7 @@ POST /api/tasks/{id}/run
 POST /api/tasks/{id}/worktree
 PUT /*
 PUT /api/agents/projectless
+PUT /api/agents/{pid}/profile
 PUT /api/config/file
 PUT /api/notifications/config
 PUT /api/notifications/preferences/{eventType}

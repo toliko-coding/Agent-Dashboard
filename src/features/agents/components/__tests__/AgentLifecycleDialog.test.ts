@@ -136,3 +136,32 @@ describe('agentLifecycleDialog — landmarks', () => {
     w.unmount()
   })
 })
+
+// 3N.2.2: resuming a legacy session under Dashboard control is explicit and says what it does.
+describe('agentLifecycleDialog — resume under Dashboard', () => {
+  it('explains the /exit, asks for confirmation and calls only the resume route', async () => {
+    fetchMock.mockImplementation(async () => ({ ok: true, json: async () => ({ ok: true, pid: 88, previousPid: 77, endedRunningSession: true }) }))
+    useAgentLifecycle().requestResume(agent({ displayName: 'Timer', liveInjectable: true }), { available: true, endsRunningSession: true })
+    const w = await mountDialog()
+    expect(q('agent-lifecycle-dialog')!.textContent).toContain('Resume “Timer” under Agent Dashboard?')
+    expect(q('agent-lifecycle-explanation')!.textContent).toContain('/exit')
+    expect(q('agent-lifecycle-interrupts')).not.toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(q('agent-lifecycle-confirm')!.textContent).toContain('Resume under Dashboard')
+    q('agent-lifecycle-confirm')!.click()
+    await flushPromises()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/agents/77/resume-under-dashboard')
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'POST' })
+    expect(dismissAgent).toHaveBeenCalledWith(77)
+    w.unmount()
+  })
+
+  it('for a finished session, says nothing is interrupted', async () => {
+    useAgentLifecycle().requestResume(agent({ status: 'finished' }), { available: true, endsRunningSession: false })
+    const w = await mountDialog()
+    expect(q('agent-lifecycle-explanation')!.textContent).not.toContain('/exit')
+    expect(q('agent-lifecycle-interrupts')).toBeNull()
+    w.unmount()
+  })
+})
