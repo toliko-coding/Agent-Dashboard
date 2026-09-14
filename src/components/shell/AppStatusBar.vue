@@ -5,6 +5,7 @@ import { computed } from 'vue'
 import { useBuildVersion } from '../../composables/useBuildVersion'
 import { useStatusBar } from '../../composables/useStatusBar'
 import { useSystemResources } from '../../composables/useSystemResources'
+import { RESOURCE_LEVEL_BAR, resourceLevel } from '../../utils/resourceLevel'
 
 const props = defineProps<{
   costDelta: number | null
@@ -55,13 +56,6 @@ const usageConsumptionText = computed<string>(() => {
   return `5h ${formatM(w5h.tokens)} · 7d ${formatM(w7d.tokens)}`
 })
 
-// Usage-budget thresholds in percent. The CPU/MEM/DISK pressure colouring that
-// used to live here moved to MachineCard with this same 75/90 pair; the old
-// second copy of these thresholds (85/60, used only by the removed CPU strip)
-// went with it, so there is now one definition per surface and no drift.
-const WARN_PCT = 75
-const DANGER_PCT = 90
-
 function formatUptime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds <= 0)
     return '—'
@@ -78,8 +72,8 @@ function formatUptime(seconds: number): string {
 function usageBarColor(): string {
   if (!worst.value || worst.value.pct === null)
     return 'bg-raised'
-  const p = worst.value.pct * 100
-  return p >= DANGER_PCT ? 'bg-danger' : p >= WARN_PCT ? 'bg-warning' : 'bg-success'
+  // Budget levels share utils/resourceLevel; a normal share is neutral, not green.
+  return RESOURCE_LEVEL_BAR[resourceLevel(worst.value.pct * 100)]
 }
 
 function formatDelta(d: number | null): string {

@@ -3,6 +3,7 @@ import type { Agent } from '@/types'
 import type { AgentGrouping } from '@/utils/agentGroup'
 import { computed } from 'vue'
 import { groupAgents, workspaceDisplay } from '@/utils/agentGroup'
+import { workActivity } from '@/utils/agentLabels'
 import ActiveWorkRow from './ActiveWorkRow.vue'
 
 /*
@@ -33,6 +34,8 @@ const props = defineProps<{
 const emit = defineEmits<{ select: [agent: Agent] }>()
 
 const groups = computed(() => groupAgents(props.agents, 'workspace'))
+// Of the working agents, those with an open tool call — named by tool on their rows.
+const usingTools = computed(() => props.agents.filter(a => workActivity(a).state === 'tool').length)
 
 const emptyText = computed(() => {
   if (props.totalAgents === 0)
@@ -75,6 +78,9 @@ function workspaceTitle(group: AgentGrouping): { title: string, kind: string, di
       <span v-if="status === 'ready' && agents.length > 0" class="text-ui font-semibold tabular-nums text-fg-soft" data-testid="active-work-count">
         {{ agents.length }} working
       </span>
+      <span v-if="status === 'ready' && usingTools > 0" class="text-ui-sm text-fg-mute tabular-nums" data-testid="active-work-tools">
+        · {{ usingTools }} using tools
+      </span>
       <span v-if="stale" class="sm:ml-auto text-ui-sm text-fg-mute" data-testid="active-work-stale">
         Last known state · agent updates reconnecting
       </span>
@@ -97,7 +103,7 @@ function workspaceTitle(group: AgentGrouping): { title: string, kind: string, di
         :data-kind="group.kind"
         :data-group-key="group.key"
       >
-        <p class="m-0 flex flex-wrap items-baseline gap-x-2 px-3 pt-2 pb-1 min-w-0">
+        <p class="m-0 flex flex-wrap items-baseline gap-x-2 rounded-t-panel border-b border-line bg-raised/40 px-3 py-1.5 min-w-0">
           <span class="text-label uppercase tracking-wider text-fg-faint shrink-0">{{ GROUP_WORD[group.kind ?? ''] }}</span>
           <span
             v-if="group.kind === 'repository'"
@@ -105,20 +111,21 @@ function workspaceTitle(group: AgentGrouping): { title: string, kind: string, di
             data-testid="active-work-repository"
           >{{ group.label }}</span>
           <span v-else-if="group.kind === 'local'" class="text-ui-sm text-fg-mute">not in a Git repository</span>
+          <span class="ml-auto shrink-0 text-ui-sm text-fg-mute tabular-nums" data-testid="active-work-group-count">{{ group.agents.length }} working</span>
         </p>
 
         <!-- Unresolved agents have no workspace to nest under. -->
-        <ul v-if="group.kind === 'unknown'" class="m-0 list-none flex flex-col px-1 pb-1.5" aria-label="Working agents with no resolved workspace">
+        <ul v-if="group.kind === 'unknown'" class="m-0 list-none flex flex-col px-1 py-1.5" aria-label="Working agents with no resolved workspace">
           <li v-for="a in group.agents" :key="`${a.sessionId}-${a.pid}`">
             <ActiveWorkRow :agent="a" :stale="stale" @select="emit('select', $event)" />
           </li>
         </ul>
 
-        <ul v-else class="m-0 list-none flex flex-col gap-1.5 px-2 pb-2 min-w-0" :aria-label="`Workspaces in ${GROUP_WORD[group.kind ?? '']} ${group.kind === 'repository' ? group.label : ''}`.trim()">
+        <ul v-else class="m-0 list-none flex flex-col gap-1.5 px-2 py-2 min-w-0" :aria-label="`Workspaces in ${GROUP_WORD[group.kind ?? '']} ${group.kind === 'repository' ? group.label : ''}`.trim()">
           <li
             v-for="child in group.children"
             :key="child.key"
-            class="ml-1 pl-2.5 border-l-2 border-line min-w-0"
+            class="ml-1 pl-2.5 border-l-2 border-line-strong min-w-0"
             data-testid="active-work-workspace"
             :data-workspace-id="child.workspace?.id"
             :data-workspace-kind="child.workspace?.kind"

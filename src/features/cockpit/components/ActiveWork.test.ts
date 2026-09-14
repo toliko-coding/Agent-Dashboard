@@ -130,3 +130,25 @@ describe('activeWork — states', () => {
     expect(await axe(w.element as Element)).toHaveNoViolations()
   })
 })
+
+describe('activeWork — presentation (3N)', () => {
+  it('counts the working agents that are using a tool', () => {
+    const tool = { id: 't', tool: 'Edit', pattern: '', patternDisplay: '' }
+    const w = render([agent({ workspace: repoWs('w1', 'r1'), pendingToolUse: tool }), agent({ workspace: repoWs('w1', 'r1') })])
+    expect(w.get('[data-testid="active-work-count"]').text()).toBe('2 working')
+    expect(w.get('[data-testid="active-work-tools"]').text()).toBe('· 1 using tools')
+    expect(w.get('[data-testid="active-work-group-count"]').text()).toBe('2 working')
+  })
+
+  it('marks each row with its category and the process uptime, never a turn duration', () => {
+    const w = render([agent({ workspace: repoWs('w1', 'r1'), uptime: 7260, liveInjectable: true })])
+    expect(w.get('[data-testid="active-work-agent"] [data-testid="agent-glyph"]').attributes('aria-label')).toBe('Terminal session')
+    expect(w.get('[data-testid="active-work-facts"]').text()).toContain('up 2h 1m')
+  })
+
+  it('names an agent by its session title, with the session handle beside it', () => {
+    const w = render([agent({ workspace: repoWs('w1', 'r1'), title: 'Fix login redirect' })])
+    expect(w.get('[data-testid="active-work-title"]').text()).toBe('Fix login redirect')
+    expect(w.get('[data-testid="active-work-handle"]').text()).toMatch(/^Claude session [0-9a-f]{8}$/)
+  })
+})

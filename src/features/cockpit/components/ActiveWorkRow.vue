@@ -1,19 +1,24 @@
 <script setup lang="ts">
 import type { Agent } from '@/types'
 import { computed } from 'vue'
+import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import { useNow } from '@/composables/useNow'
-import { agentTitle, workActivity } from '@/utils/agentLabels'
-import { formatRelativeActivity, secondsSince, shortModel } from '@/utils/format'
+import { agentSessionLabel, agentTitle, workActivity } from '@/utils/agentLabels'
+import { formatRelativeActivity, formatUptime, secondsSince, shortModel } from '@/utils/format'
 
 /*
- * One working agent as an operational row: state, name, what it is doing, the
- * few facts that identify it, and how recently it moved.
+ * One working agent as an operational row: state, category and name, what it
+ * is doing, the few facts that identify it, and how recently it moved.
  *
  * Deliberately absent: PID, cwd or any path, the transcript, and a tool call's
  * arguments. The row opens the agent's details, where those live.
  *
- * The state dot moves only while the evidence is live. A last-known row (agent
+ * The state dot moves only while the evidence is live: a slow breath while the
+ * agent works, a blip while a tool call is open. A last-known row (agent
  * updates reconnecting) is still, because nothing currently says it is working.
+ *
+ * "up" is how long the agent's process has been running — a measured fact, not
+ * how long the current turn has taken, which the payload does not carry.
  */
 const props = defineProps<{ agent: Agent, stale?: boolean }>()
 const emit = defineEmits<{ select: [agent: Agent] }>()
@@ -23,6 +28,10 @@ const { nowMs } = useNow()
 
 const activity = computed(() => workActivity(props.agent))
 const title = computed(() => agentTitle(props.agent))
+const handle = computed(() => {
+  const label = agentSessionLabel(props.agent)
+  return label === title.value ? null : label
+})
 const since = computed(() => formatRelativeActivity(secondsSince(props.agent.lastActivity, nowMs.value)))
 
 const facts = computed(() => {
@@ -34,6 +43,8 @@ const facts = computed(() => {
   const subagents = (props.agent.subagents ?? []).filter(s => s.status === 'active').length
   if (subagents > 0)
     list.push(`${subagents} ${subagents === 1 ? 'subagent' : 'subagents'}`)
+  if (Number.isFinite(props.agent.uptime) && props.agent.uptime > 0)
+    list.push(`up ${formatUptime(props.agent.uptime)}`)
   return list
 })
 
@@ -65,12 +76,18 @@ const accessibleName = computed(() =>
       />
       <span class="text-ui-sm font-medium" :class="state.text">{{ state.word }}</span>
     </span>
-    <span class="min-w-0 flex flex-col gap-0.5">
-      <span class="flex flex-wrap items-baseline gap-x-2 min-w-0">
-        <span class="text-ui font-semibold text-fg truncate max-w-full" data-testid="active-work-title">{{ title }}</span>
-        <span v-if="activity.state === 'tool'" class="text-ui text-fg-soft truncate max-w-full" data-testid="active-work-activity">{{ activity.label }}</span>
+    <span class="flex min-w-0 items-center gap-2.5">
+      <AgentGlyph :agent="agent" size="sm" />
+      <span class="min-w-0 flex flex-col gap-0.5">
+        <span class="flex flex-wrap items-baseline gap-x-2 min-w-0">
+          <span class="text-ui font-semibold text-fg truncate max-w-full" data-testid="active-work-title">{{ title }}</span>
+          <span v-if="activity.state === 'tool'" class="text-ui font-medium text-state-tool truncate max-w-full" data-testid="active-work-activity">{{ activity.label }}</span>
+        </span>
+        <span v-if="facts.length || handle" class="flex min-w-0 items-baseline gap-2 text-ui-sm text-fg-mute">
+          <span v-if="facts.length" class="truncate" data-testid="active-work-facts">{{ facts.join(' · ') }}</span>
+          <span v-if="handle" class="shrink-0 truncate font-mono text-label text-fg-faint" data-testid="active-work-handle">{{ handle }}</span>
+        </span>
       </span>
-      <span v-if="facts.length" class="text-ui-sm text-fg-mute truncate" data-testid="active-work-facts">{{ facts.join(' · ') }}</span>
     </span>
     <span class="text-ui-sm text-fg-mute tabular-nums whitespace-nowrap" data-testid="active-work-since">{{ since }}</span>
   </button>

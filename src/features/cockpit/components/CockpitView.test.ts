@@ -21,7 +21,7 @@ vi.mock('@/composables/useViewState', () => ({
   useViewState: () => ({ activeView }),
 }))
 // Panels with their own fetches and their own tests; here only their place matters.
-for (const panel of ['ActivityFeedPanel', 'GitHubPanel', 'MemoryPanel', 'PipelinePanel', 'ProjectsSummaryPanel', 'RoutinesPanel', 'RuntimeSection', 'CommandStatusStrip'])
+for (const panel of ['ActivityFeedPanel', 'ClaudeUsagePanel', 'GitHubPanel', 'MachineResourcesPanel', 'MemoryPanel', 'PipelinePanel', 'ProjectsSummaryPanel', 'RoutinesPanel', 'RuntimeSection', 'CommandStatusStrip'])
   vi.doMock(`./${panel}.vue`, () => ({ default: { name: panel, template: `<section data-testid="stub-${panel}" />` } }))
 
 function item(subject: AttentionItem['subject'], id: string): AttentionItem {
@@ -57,7 +57,20 @@ describe('command page — layout', () => {
 
   it('answers in order: status, what needs me, what is working, the runtime, then the rest', async () => {
     const w = await render()
-    expect(order(w)).toEqual(['stub-CommandStatusStrip', 'needs-you', 'active-work', 'stub-RuntimeSection', 'command-secondary', 'command-integrations'])
+    expect(order(w)).toEqual(['stub-CommandStatusStrip', 'needs-you', 'command-main', 'command-secondary', 'command-integrations'])
+    const children = (id: string) => [...w.get(`[data-testid="${id}"]`).element.children].map(c => c.getAttribute('data-testid'))
+    expect(children('command-main')).toEqual(['command-primary', 'command-rail'])
+    expect(children('command-primary')).toEqual(['active-work', 'stub-RuntimeSection'])
+    w.unmount()
+  })
+
+  // 3N: usage, the machine and recent activity sit beside the work, after it in reading order.
+  it('puts Claude usage, this machine and recent activity in a labelled rail after the work', async () => {
+    const w = await render()
+    const rail = w.get('[data-testid="command-rail"]')
+    expect(rail.element.tagName).toBe('ASIDE')
+    expect(rail.attributes('aria-label')).toBe('Usage, this machine and recent activity')
+    expect([...rail.element.children].map(c => c.getAttribute('data-testid'))).toEqual(['stub-ClaudeUsagePanel', 'stub-MachineResourcesPanel', 'stub-ActivityFeedPanel'])
     w.unmount()
   })
 

@@ -81,3 +81,36 @@ describe('commandStatusStrip', () => {
     w.unmount()
   })
 })
+
+describe('commandStatusStrip — readings (3N)', () => {
+  const mountWith = (o: Record<string, unknown>) => mount(CommandStatusStrip, {
+    props: { attention: queue(0), working: 2, footprint: null, live: true, ...o },
+    attachTo: document.body,
+  })
+
+  it('reads running sessions and how many working agents are using tools', () => {
+    const w = mountWith({ running: 5, usingTools: 1 })
+    expect(w.get('[data-testid="status-running"] dd').text().replace(/\s+/g, ' ')).toBe('5 sessions')
+    expect(w.get('[data-testid="status-using-tools"]').text()).toBe('1 using tools')
+    w.unmount()
+  })
+
+  it('does not claim running sessions before agents are observed', () => {
+    const w = mountWith({ running: null, working: null })
+    expect(w.get('[data-testid="status-running"] dd').text()).toBe('…')
+    expect(w.find('[data-testid="status-using-tools"]').exists()).toBe(false)
+    w.unmount()
+  })
+
+  it('breathes the working dot only while agents work and updates are live', () => {
+    const live = mountWith({ working: 2 })
+    expect(live.get('[data-testid="status-working-dot"]').classes()).toContain('motion-working')
+    live.unmount()
+    const down = mountWith({ working: 2, live: false })
+    expect(down.get('[data-testid="status-working-dot"]').classes()).not.toContain('motion-working')
+    down.unmount()
+    const idle = mountWith({ working: 0 })
+    expect(idle.find('[data-testid="status-working-dot"]').exists()).toBe(false)
+    idle.unmount()
+  })
+})

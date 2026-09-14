@@ -7,6 +7,7 @@ import { useSystemResources } from '@/composables/useSystemResources'
 import { useAgents } from '@/features/agents'
 import { agentFootprint, liveAgents } from '@/features/cockpit'
 import { DataFreshnessIndicator, useLocalMachine } from '@/features/localscope'
+import { RESOURCE_LEVEL_BAR, RESOURCE_LEVEL_TEXT, RESOURCE_LEVEL_WORD, resourceLevel } from '@/utils/resourceLevel'
 import { durationLabel, gibLabel, plural } from '../format'
 
 /*
@@ -83,19 +84,12 @@ const resources = useSystemResources()
 const info = computed<SystemInfo | null>(() => resources.info.value)
 const { version } = useBuildVersion()
 
-const HIGH_PCT = 75
-const CRITICAL_PCT = 90
-
-type Level = 'normal' | 'high' | 'critical'
-function level(pct: number): Level {
-  if (pct >= CRITICAL_PCT)
-    return 'critical'
-  return pct >= HIGH_PCT ? 'high' : 'normal'
-}
-const LEVEL_TEXT: Record<Level, string> = { normal: 'text-fg', high: 'text-warning-text', critical: 'text-danger-text' }
+// Levels are shared with Command's This machine and the sidebar (utils/resourceLevel).
 // A usage bar at a normal level is neutral: green would claim the machine is healthy.
-const LEVEL_BAR: Record<Level, string> = { normal: 'bg-fg-mute', high: 'bg-warning', critical: 'bg-danger' }
-const LEVEL_WORD: Record<Level, string> = { normal: '', high: 'High', critical: 'Critical' }
+const level = resourceLevel
+const LEVEL_TEXT = RESOURCE_LEVEL_TEXT
+const LEVEL_BAR = RESOURCE_LEVEL_BAR
+const LEVEL_WORD = RESOURCE_LEVEL_WORD
 
 const gauges = computed(() => {
   const i = info.value

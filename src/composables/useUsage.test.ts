@@ -94,3 +94,51 @@ describe('useUsage', () => {
     w.unmount()
   })
 })
+
+describe('useUsage — shared (3N)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(mockNobudget) }))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    vi.resetModules()
+  })
+
+  it('lets a second reader see the starter\'s response without a request of its own', async () => {
+    const { useUsage } = await import('./useUsage')
+    const Starter = defineComponent({ setup: () => {
+      const u = useUsage()
+      u.start()
+      return u
+    }, template: '<div />' })
+    const Reader = defineComponent({ setup: () => useUsage(), template: '<div />' })
+    const a = mount(Starter)
+    const b = mount(Reader)
+    await flushPromises()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect((b.vm as any).data.windows).toHaveLength(2)
+    b.unmount()
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    a.unmount()
+  })
+
+  it('reports a failed read and keeps the previous reading', async () => {
+    const { useUsage } = await import('./useUsage')
+    const Host = defineComponent({ setup: () => {
+      const u = useUsage()
+      u.start()
+      return u
+    }, template: '<div />' })
+    const w = mount(Host)
+    await flushPromises()
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: false, status: 503, json: () => Promise.resolve({}) } as Response)
+    await (w.vm as any).refresh()
+    expect((w.vm as any).error).toBe('Usage could not be read (503)')
+    expect((w.vm as any).data.windows).toHaveLength(2)
+    w.unmount()
+  })
+})

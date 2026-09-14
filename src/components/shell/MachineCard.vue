@@ -2,6 +2,7 @@
 import type { SystemInfo } from '../../composables/useSystemResources'
 import { computed } from 'vue'
 import { useSystemResources } from '../../composables/useSystemResources'
+import { RESOURCE_LEVEL_BAR, resourceLevel } from '../../utils/resourceLevel'
 
 defineProps<{ expanded: boolean }>()
 
@@ -11,27 +12,20 @@ const resources = useSystemResources()
 const info = computed<SystemInfo | null>(() => resources.info.value)
 
 /*
- * Thresholds shared with AppStatusBar's numeric readout. Kept at the same
- * 75/90 pair so the sidebar and the status bar can never disagree about what
- * counts as pressure.
+ * Levels come from utils/resourceLevel, shared with Command's This machine, the
+ * Runtime Overview and the status bar, so no two surfaces disagree about what
+ * counts as pressure. A normal reading is neutral: a green bar would claim the
+ * machine is healthy when it is only measured.
  */
-const WARN_PCT = 75
-const DANGER_PCT = 90
-
 function toneClass(pct: number): string {
-  if (pct >= DANGER_PCT)
+  const level = resourceLevel(pct)
+  if (level === 'critical')
     return 'text-danger-text'
-  if (pct >= WARN_PCT)
-    return 'text-warning-text'
-  return 'text-fg-soft'
+  return level === 'high' ? 'text-warning-text' : 'text-fg-soft'
 }
 
 function barClass(pct: number): string {
-  if (pct >= DANGER_PCT)
-    return 'bg-danger'
-  if (pct >= WARN_PCT)
-    return 'bg-warning'
-  return 'bg-success'
+  return RESOURCE_LEVEL_BAR[resourceLevel(pct)]
 }
 
 /*
