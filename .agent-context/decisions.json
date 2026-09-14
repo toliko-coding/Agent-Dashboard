@@ -118,5 +118,14 @@
     "context": "Phase 3N.2.2: a dashboard-created agent (Timer) showed Observe only because it predates managed_agents. Discovery files and tokens are shared with `agent-dashboard live`, and there is no spawn audit with a PID, so no reliable provenance exists to migrate it.",
     "decision": "No automatic reconciliation. Ownership remains session id + launched PID. GET /api/agents/{pid}/control reports owned/resume availability on demand. POST /api/agents/{pid}/resume-under-dashboard, after confirmation, resumes the conversation with --resume as a new dashboard launch (recorded as owned). A finished session needs nothing else. A running session is offered this only when its parent process is `<server binary> pty-host` and it is live-injectable; the dashboard types /exit, waits up to 20s (504 otherwise) and never signals. The resumed agent runs in the same cwd with the default permission mode and workspace_created=false. Name and icon edits go through PUT /api/agents/{pid}/profile (presentation only, any session).",
     "consequences": "Recovering a running dashboard-hosted session interrupts it and drops its original model, system prompt and permission mode. tmux-hosted legacy spawns and sessions whose pty-host binary path changed can only be resumed after they end. A user who manually runs the hidden `pty-host` subcommand could be offered the same confirmed resume; it still never grants ownership of the existing process."
+  },
+  {
+    "id": "AD-2026-09-15-command-network-and-lifecycle-presentation",
+    "title": "Command hero is a fixed semantic network; lifecycle wording derives from existing state; one port link component",
+    "status": "accepted",
+    "date": "2026-09-15",
+    "context": "Phase 3N.2.3: the hero's random polyline read as fake graph data; 'Finished + Observe only + Resume' was confusing for an ended unmanaged session; Runtime Workspaces port pills were not links while Services ports were.",
+    "decision": "CommandHero draws five fixed nodes (Dashboard, Agents, Runtime, Workspaces, Needs you) whose states come only from props CockpitView already has (agent stream live, working count, attention queue, LocalScope snapshot source); motion is stroke-dashoffset/opacity CSS, paused on visibilitychange, not rendered under prefers-reduced-motion, hidden below xl. lifecyclePresentation(agent) maps dashboardOwned + running + pipelineTaskId to owned/observed/ended-unmanaged/pipeline presentation with no new backend state. LocalServicePort is the single port pill for Runtime surfaces, built on localServiceUrl; process port lists stay plain because they carry no protocol/bind data.",
+    "consequences": "No new polling or endpoints. The network intentionally shows categories, not per-item telemetry; if it ever needs more meaning, it should gain it from real state, not more nodes."
   }
 ]
