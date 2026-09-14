@@ -269,3 +269,32 @@ describe('runtime topology — agent names (3I)', () => {
     expect(w.html()).not.toMatch(/secret[- ]folder/i)
   })
 })
+
+describe('runtimeTopologyTree — visualization (3N)', () => {
+  it('summarises what the tree holds, by identity', () => {
+    const w = mountTree(scenario())
+    expect(w.get('[data-testid="topology-summary"]').text()).toBe('2 repositories · 4 workspaces · 3 agents · 6 processes · 6 services')
+  })
+
+  it('never sums an unreported list as zero', () => {
+    const agents = scenario()
+    servicesState = list(null)
+    processesState = list(null)
+    const text = mountTree(agents).get('[data-testid="topology-summary"]').text()
+    expect(text).toBe('2 repositories · 2 workspaces · 3 agents')
+    expect(text).not.toMatch(/process|service/)
+  })
+
+  it('marks agents with their category glyph, and draws node types with their own marks', () => {
+    const w = mountTree(scenario())
+    const node = workspaceNode(w, 'ws_main')
+    expect(node.get('[data-testid="topology-agent"] [data-testid="agent-glyph"]').attributes('aria-label')).toBe('Command-line session')
+    expect(node.get('[data-testid="topology-processes"] svg').attributes('aria-hidden')).toBe('true')
+    expect(node.get('[data-testid="topology-services"] svg').attributes('aria-hidden')).toBe('true')
+  })
+
+  it('is structure: nothing in the tree moves', () => {
+    const agents = scenario().map(a => ({ ...a, working: true }) as Agent)
+    expect(mountTree(agents).html()).not.toMatch(/motion-|animate-/)
+  })
+})

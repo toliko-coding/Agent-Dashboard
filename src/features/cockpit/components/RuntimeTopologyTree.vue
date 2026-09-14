@@ -14,7 +14,12 @@ import TopologyWorkspaceNode from './TopologyWorkspaceNode.vue'
  * Structural, not an activity signal: no motion, no state colour on the
  * hierarchy itself. Node types are stated in words — Repository, Workspace,
  * Agent, Processes, Services — so the structure survives without colour and
- * without seeing the indentation.
+ * without seeing the indentation. Connector lines draw the branches; they are
+ * pseudo-elements, decoration only.
+ *
+ * The summary line counts what the tree holds. Processes and services are
+ * counted only when LocalScope reported those lists — an unreported list is
+ * already stated as unknown above the tree, never summed as zero.
  */
 const props = defineProps<{ agents: Agent[] }>()
 
@@ -46,6 +51,24 @@ const hasUnresolved = computed(() =>
 const isEmpty = computed(() =>
   topology.value.repositories.length === 0 && topology.value.local.length === 0 && !hasUnresolved.value)
 
+const summary = computed(() => {
+  const t = topology.value
+  const nodes = [...t.repositories.flatMap(r => r.workspaces), ...t.local]
+  const parts = [
+    plural(t.repositories.length, 'repository', 'repositories'),
+    plural(nodes.length, 'workspace', 'workspaces'),
+    plural(nodes.reduce((n, w) => n + w.agents.length, 0) + t.unresolved.agents.length, 'agent', 'agents'),
+  ]
+  if (processItems.value !== null)
+    parts.push(plural(processItems.value.length, 'process', 'processes'))
+  if (serviceItems.value !== null)
+    parts.push(plural(serviceItems.value.length, 'service', 'services'))
+  return parts.join(' · ')
+})
+
+// One branch tick per workspace, drawn from the repository's rail.
+const BRANCH = 'relative before:absolute before:-left-3 before:top-4 before:h-px before:w-3 before:bg-line-strong'
+
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`
 }
@@ -55,6 +78,9 @@ function plural(n: number, one: string, many: string): string {
   <div class="flex flex-col gap-2 min-w-0" data-testid="runtime-topology-tree">
     <!-- Source honesty first: an unreported list is unknown, not empty. -->
     <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-sm text-fg-mute">
+      <p v-if="!isEmpty" class="text-fg-soft tabular-nums" data-testid="topology-summary">
+        {{ summary }}
+      </p>
       <p v-if="serviceItems === null" data-testid="topology-services-unavailable">
         Services not reported by LocalScope — service attribution unknown.
       </p>
@@ -88,8 +114,8 @@ function plural(n: number, one: string, many: string): string {
             data-testid="topology-workspace-count"
           >{{ repo.workspaces.length }} workspaces</span>
         </p>
-        <ul class="flex flex-col gap-2 mt-2 min-w-0" :aria-label="`Workspaces in repository ${repo.label}`">
-          <li v-for="node in repo.workspaces" :key="node.key">
+        <ul class="ml-1 mt-2 flex flex-col gap-2 border-l border-line-strong pl-3 min-w-0" :aria-label="`Workspaces in repository ${repo.label}`">
+          <li v-for="node in repo.workspaces" :key="node.key" :class="BRANCH">
             <TopologyWorkspaceNode
               :node="node"
               :services-known="serviceItems !== null"
@@ -108,8 +134,8 @@ function plural(n: number, one: string, many: string): string {
           <span class="text-label uppercase tracking-wider text-fg-faint">Local workspaces</span>
           <span class="text-ui-sm text-fg-faint">not in a Git repository</span>
         </p>
-        <ul class="flex flex-col gap-2 mt-2 min-w-0" aria-label="Local workspaces, not in a Git repository">
-          <li v-for="node in topology.local" :key="node.key">
+        <ul class="ml-1 mt-2 flex flex-col gap-2 border-l border-line-strong pl-3 min-w-0" aria-label="Local workspaces, not in a Git repository">
+          <li v-for="node in topology.local" :key="node.key" :class="BRANCH">
             <TopologyWorkspaceNode
               :node="node"
               :services-known="serviceItems !== null"
