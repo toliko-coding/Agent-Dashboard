@@ -210,3 +210,12 @@ describe('agentCardGrid collapsible groups', () => {
     expect(grids[1].isVisible()).toBe(true)
   })
 })
+
+describe('agentCardGrid — responsive tiles (3N)', () => {
+  it('fills as many compact columns as fit instead of fixed breakpoints', () => {
+    const w = mount(AgentCardGrid, { props: { agents: [] } })
+    const grid = w.get('.grid')
+    expect(grid.classes().join(' ')).toContain('grid-cols-[repeat(auto-fill,minmax(min(100%,19rem),1fr))]')
+    expect(grid.classes().join(' ')).not.toMatch(/\b(md|xl):grid-cols-/)
+  })
+})

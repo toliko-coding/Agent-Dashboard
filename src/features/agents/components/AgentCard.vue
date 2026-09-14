@@ -15,31 +15,47 @@ import { toast } from '@/composables/useToast'
 import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vue'
 import MetricsPopover from '@/features/agents/components/MetricsPopover.vue'
 import { useMetricsDisclosure } from '@/features/agents/composables/useMetricsDisclosure'
-import { agentActivity, agentTitle } from '@/utils/agentLabels'
+import { agentActivity, agentSessionLabel, agentTitle, workActivity } from '@/utils/agentLabels'
 import { formatCost, formatRelativeActivity, isAwaitingInput, secondsSince, shortModel } from '@/utils/format'
 import { agentDisplayStatus } from '@/utils/statusColors'
 
 /*
- * An agent as a worker, not a miniature chat window: three compact rows.
+ * An agent as a worker in a grid: a compact tile, not a miniature chat window.
  *
- *   state, attention, name, provider, model
- *   repository and workspace (or "Workspace unknown")
- *   what it is doing, role, subagents, last activity · cost and actions
+ *   category · name · state, and the session handle when the name is a title
+ *   repository and workspace (or "Workspace unknown") · observed services
+ *   what it is doing · role, subagents, last activity
+ *   model, provider · cost and actions
  *
  * The transcript, subagent output, token and health figures, PID and paths are
- * not on the card. The agent's details (the modal) carry the transcript,
- * subagents and replies; the ⓘ popover carries uptime, tokens, health, burn
- * rate and cache cost. The card has no fixed height, so nothing it does show is
- * clipped.
+ * not on the card. The details panel carries the transcript, subagents and
+ * replies; the ⓘ popover carries uptime, tokens, health, burn rate and cache
+ * cost. The card has no fixed height, so nothing it does show is clipped.
+ *
+ * Motion (ANIMATION = INFORMATION). The card never moves as a whole. Its top
+ * edge is the one place that may, and only while the evidence is live:
+ *
+ *   working    the edge breathes             (open turn or recent output)
+ *   tool       a short segment sweeps along   (an open tool call, by name)
+ *   needs you  amber edge; the chip rings once as the item arrives, then rests
+ *   failed     red edge, still                (a fault is not activity)
+ *   otherwise  no edge
+ *
+ * While agent updates reconnect (`stale`) nothing moves: the card shows the
+ * last-known state, and nothing currently says the agent is doing anything.
+ * There is no success flourish — the payload has no event that says a turn
+ * succeeded, only that it ended.
  *
  * Attention is the canonical queue's item for this agent, passed in — the card
  * never decides it. A blocked agent is shown loudly once, in the triage band
- * above the roster, and quietly here, as a small chip.
+ * above the roster, and quietly here.
  */
 const props = defineProps<{
   agent: Agent
   /** This agent's canonical attention item, when it has one. */
   attention?: AttentionItem | null
+  /** Last-known state while agent updates reconnect: shown, but still. */
+  stale?: boolean
 }>()
 const emit = defineEmits<{ select: [agent: Agent], dismiss: [pid: number] }>()
 
@@ -67,6 +83,11 @@ async function dismiss() {
 const { nowMs } = useNow()
 
 const title = computed(() => agentTitle(props.agent))
+// The stable handle, beside a human name only: two sessions can share a title.
+const handle = computed(() => {
+  const label = agentSessionLabel(props.agent)
+  return label === title.value ? null : label
+})
 const awaitingInput = computed(() => isAwaitingInput(props.agent))
 
 /*
@@ -90,9 +111,30 @@ const attentionChip = computed(() => {
   if (!props.attention)
     return null
   return props.attention.level === 'failed'
-    ? { word: 'Failed', tone: 'text-danger-text border-danger-line' }
-    : { word: 'Needs you', tone: 'text-warning-text border-warning-line' }
+    ? { word: 'Failed', tone: 'text-danger-text border-danger-line', motion: '' }
+    : { word: 'Needs you', tone: 'text-warning-text border-warning-line', motion: props.stale ? '' : 'motion-arrive-attention' }
 })
+
+type Signal = 'working' | 'tool' | 'attention' | 'failed' | 'rest'
+
+const signal = computed<Signal>(() => {
+  if (props.attention?.level === 'failed')
+    return 'failed'
+  if (props.attention)
+    return 'attention'
+  if (props.agent.working && !isFinished.value)
+    return workActivity(props.agent).state
+  return 'rest'
+})
+
+const EDGE: Record<Signal, { bar: string, motion: string, sweep: boolean }> = {
+  working: { bar: 'bg-state-working', motion: 'motion-working', sweep: false },
+  tool: { bar: 'bg-state-tool/35', motion: '', sweep: true },
+  attention: { bar: 'bg-state-waiting', motion: '', sweep: false },
+  failed: { bar: 'bg-state-error', motion: '', sweep: false },
+  rest: { bar: '', motion: '', sweep: false },
+}
+const edge = computed(() => EDGE[signal.value])
 
 const metrics = useMetricsDisclosure()
 const metricsOpen = metrics.open
@@ -133,24 +175,43 @@ const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
     class="group relative flex flex-col min-w-0 cursor-pointer"
     data-testid="agent-card"
     :data-attention="attention?.level"
+    :data-signal="signal"
     @click="emit('select', agent)"
   >
-    <div class="flex flex-col gap-1.5 px-3 py-2.5 min-w-0">
-      <!-- State, attention, name. -->
-      <div class="flex items-center gap-2 min-w-0">
+    <!-- The edge: the one part of a card that may move. Inset from the rounded corners. -->
+    <span
+      v-if="signal !== 'rest'"
+      class="pointer-events-none absolute inset-x-3 top-0 h-0.5 overflow-hidden rounded-b-full"
+      :class="[edge.bar, stale ? '' : edge.motion]"
+      data-testid="agent-card-edge"
+      aria-hidden="true"
+    >
+      <span v-if="edge.sweep && !stale" class="motion-sweep block h-full w-1/3 bg-state-tool" data-testid="agent-card-sweep" />
+    </span>
+
+    <div class="flex flex-col gap-1.5 px-3 pt-2.5 pb-2 min-w-0">
+      <!-- Who: category, name and state. -->
+      <div class="flex items-start gap-2.5 min-w-0">
+        <AgentGlyph :agent="agent" class="mt-0.5" />
         <button
           type="button"
           data-testid="agent-card-open"
           :aria-label="`Open details for ${title}`"
-          class="flex items-center gap-2 min-w-0 flex-1 bg-transparent border-none p-0 text-left cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+          class="flex min-w-0 flex-1 flex-col items-start gap-0.5 bg-transparent border-none p-0 text-left cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
           @click.stop="emit('select', agent)"
         >
-          <AppBadge :variant="displayStatus" :title="statusBadgeTitle" />
+          <span class="w-full min-w-0 truncate text-ui font-semibold text-fg" data-testid="agent-card-title" :title="title">{{ title }}</span>
+          <span class="flex max-w-full min-w-0 items-center gap-2">
+            <AppBadge :variant="displayStatus" :title="statusBadgeTitle" :still="stale" />
+            <span v-if="handle" class="min-w-0 truncate font-mono text-label text-fg-faint" data-testid="agent-card-handle">{{ handle }}</span>
+          </span>
+        </button>
+        <span class="flex shrink-0 flex-col items-end gap-1">
           <span
             v-if="attentionChip"
             data-testid="agent-card-attention"
-            class="shrink-0 rounded-control border bg-card px-1.5 py-px text-label font-semibold uppercase tracking-wide whitespace-nowrap"
-            :class="attentionChip.tone"
+            class="rounded-control border bg-card px-1.5 py-px text-label font-semibold uppercase tracking-wide whitespace-nowrap"
+            :class="[attentionChip.tone, attentionChip.motion]"
             :title="attention?.reason"
           >{{ attentionChip.word }}<span class="sr-only">: {{ attention?.reason }}</span></span>
           <AppBadge
@@ -163,18 +224,10 @@ const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
           <span
             v-if="awaitingInput"
             data-testid="agent-awaiting-input"
-            class="shrink-0 rounded-control bg-neutral-soft px-1 py-px text-label font-medium text-neutral-text whitespace-nowrap"
+            class="rounded-control bg-neutral-soft px-1 py-px text-label font-medium text-neutral-text whitespace-nowrap"
             title="The agent finished its turn — it will not do anything else until you send it something"
           >your turn</span>
-          <AgentGlyph :agent="agent" size="sm" />
-          <span class="min-w-0 truncate text-ui font-semibold text-fg" data-testid="agent-card-title" :title="title">{{ title }}</span>
-        </button>
-        <ProviderBadge :provider="agent.provider" />
-        <span
-          class="shrink-0 whitespace-nowrap font-mono text-label text-fg-mute"
-          :title="agent.model ? `Model: ${agent.model}` : 'Model unknown'"
-        >{{ shortModel(agent.model ?? null) }}</span>
-        <MachineBadge v-if="agent.machine" :machine="agent.machine" />
+        </span>
       </div>
 
       <!-- Where: repository and workspace, by identity. Never a folder path. -->
@@ -198,10 +251,24 @@ const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
         </span>
       </div>
 
-      <!-- Doing, and the actions. -->
-      <div class="flex items-center gap-2 min-w-0 text-ui-sm text-fg-mute" data-testid="agent-card-body">
-        <span class="min-w-0 truncate text-fg-soft" data-testid="agent-card-activity">{{ activity }}</span>
+      <!-- Doing, and the facts about it. -->
+      <div class="flex items-baseline gap-1.5 min-w-0 text-ui-sm text-fg-mute" data-testid="agent-card-body">
+        <span
+          class="min-w-0 truncate"
+          :class="signal === 'working' || signal === 'tool' ? 'text-state-working font-medium' : 'text-fg-soft'"
+          data-testid="agent-card-activity"
+        >{{ activity }}</span>
         <span class="min-w-0 truncate" data-testid="agent-card-facts">· {{ facts.join(' · ') }}</span>
+      </div>
+
+      <!-- Model and provider · cost and the actions. -->
+      <div class="flex items-center gap-1.5 min-w-0 border-t border-line pt-1.5 text-ui-sm text-fg-mute" data-testid="agent-card-footer">
+        <span
+          class="shrink-0 whitespace-nowrap font-mono text-label text-fg-mute"
+          :title="agent.model ? `Model: ${agent.model}` : 'Model unknown'"
+        >{{ shortModel(agent.model ?? null) }}</span>
+        <ProviderBadge :provider="agent.provider" />
+        <MachineBadge v-if="agent.machine" :machine="agent.machine" />
 
         <span class="ml-auto flex shrink-0 items-center gap-1">
           <span class="font-mono tabular-nums text-fg-soft" data-testid="agent-card-cost" title="Estimated session cost">

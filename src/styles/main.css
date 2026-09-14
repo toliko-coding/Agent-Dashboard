@@ -478,6 +478,17 @@ html, body {
   to { stroke-dashoffset: 0; }
 }
 
+/*
+ * Tool execution along an edge: a short segment travels the length of a card's
+ * edge. The dot's blip (state-activity) scales, which reads as a glitch on a
+ * long thin bar; a traveller keeps the "a discrete step is running" meaning.
+ * It ends past the far end, so a reduced-motion freeze leaves the edge at rest.
+ */
+@keyframes state-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
 /* Completion: one brief settle, then nothing. Success is an event, not a state. */
 @keyframes state-settle {
   0% { opacity: 0.4; transform: scale(0.86); }
@@ -496,6 +507,7 @@ html, body {
   --motion-attention: 1800ms;
   --motion-flow: 900ms;
   --motion-settle: 420ms;
+  --motion-sweep: 1600ms;
 }
 
 /*
@@ -510,6 +522,7 @@ html, body {
 .motion-tool { animation: state-activity var(--motion-activity) var(--ease-standard) infinite; }
 .motion-waiting { animation: state-attention var(--motion-attention) var(--ease-standard) infinite; }
 .motion-flow { animation: state-flow var(--motion-flow) linear infinite; }
+.motion-sweep { animation: state-sweep var(--motion-sweep) var(--ease-standard) infinite; }
 .motion-success { animation: state-settle var(--motion-settle) var(--ease-standard) 1; }
 /*
  * Something newly needs the user: the attention ring, once, as the item

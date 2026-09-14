@@ -13,6 +13,8 @@ const props = defineProps<{
   groups?: AgentGrouping[]
   /** The canonical attention queue's items; each row shows only its own. */
   attentionItems?: AttentionItem[]
+  /** Last-known agents while updates reconnect: every row holds still. */
+  stale?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -57,6 +59,7 @@ const useGroups = computed(() =>
               :key="agent.pid"
               :agent="agent"
               :attention="attentionBySession.get(agent.sessionId) ?? null"
+              :stale="stale"
               @select="emit('select', agent)"
             />
           </template>
@@ -67,6 +70,7 @@ const useGroups = computed(() =>
             :key="agent.pid"
             :agent="agent"
             :attention="attentionBySession.get(agent.sessionId) ?? null"
+            :stale="stale"
             @select="emit('select', agent)"
           />
         </template>
@@ -80,6 +84,7 @@ const useGroups = computed(() =>
         :key="agent.pid"
         :agent="agent"
         :attention="attentionBySession.get(agent.sessionId) ?? null"
+        :stale="stale"
         @select="emit('select', agent)"
       />
       <p v-if="agents.length === 0" class="text-center py-12 text-fg-mute text-sm">

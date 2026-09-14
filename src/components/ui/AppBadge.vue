@@ -4,7 +4,12 @@ import { statusLabel } from '../../utils/statusColors'
 
 type Variant = 'active' | 'working' | 'waiting' | 'idle' | 'finished' | 'completed' | 'error' | 'info'
 
-const props = defineProps<{ variant: Variant, label?: string }>()
+const props = defineProps<{
+  variant: Variant
+  label?: string
+  /** Last-known state (agent updates reconnecting): the state is shown, but nothing moves. */
+  still?: boolean
+}>()
 
 /*
  * Presentation for one agent state, in one table.
@@ -49,7 +54,9 @@ const PRESENTATION: Record<Variant, { dot: string, label: string, motion: string
   info: { dot: 'bg-state-working', label: 'text-state-working', motion: '' },
 }
 
-const presentation = computed(() => PRESENTATION[props.variant])
+const presentation = computed(() => props.still
+  ? { ...PRESENTATION[props.variant], motion: '' }
+  : PRESENTATION[props.variant])
 const displayLabel = computed(() => props.label ?? statusLabel(props.variant))
 </script>
 

@@ -27,7 +27,7 @@ const emit = defineEmits<{
 
 // autoStart: false, exactly as App.vue calls it — useAgents holds module-level
 // state, so this is the same stream App.vue already started, not a second one.
-const { agents, filteredAgents, pendingCapabilityDecisions, searchQuery, selectAgent, dismissAgent } = useAgents({ autoStart: false })
+const { agents, filteredAgents, pendingCapabilityDecisions, searchQuery, selectAgent, dismissAgent, live } = useAgents({ autoStart: false })
 const { dashboardLayout, dashboardSort, dashboardGroup, setDashboardGroup, dashboardProject, dashboardSpawner, dashboardStatus } = useViewState()
 const { spawners } = useSpawners()
 const { nowMs } = useNow()
@@ -112,11 +112,11 @@ defineExpose({ rosterAgents })
   />
   <template v-if="dashboardLayout === 'list'">
     <EmptyAgentState v-if="rosterAgents.length === 0" :search-query="searchQuery" />
-    <AgentTable v-else :agents="rosterAgents" :groups="rosterGroups" :attention-items="attention.items" @select="selectAgent" />
+    <AgentTable v-else :agents="rosterAgents" :groups="rosterGroups" :attention-items="attention.items" :stale="!live" @select="selectAgent" />
   </template>
   <template v-else>
     <EmptyAgentState v-if="rosterAgents.length === 0" :search-query="searchQuery" />
-    <AgentCardGrid v-else :agents="rosterAgents" :groups="rosterGroups" :group-by="dashboardGroup" :attention-items="attention.items" @select="selectAgent" @dismiss="dismissAgent" />
+    <AgentCardGrid v-else :agents="rosterAgents" :groups="rosterGroups" :group-by="dashboardGroup" :attention-items="attention.items" :stale="!live" @select="selectAgent" @dismiss="dismissAgent" />
   </template>
   <ChannelScriptCallout />
 </template>

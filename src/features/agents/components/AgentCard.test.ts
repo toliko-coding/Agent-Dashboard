@@ -321,3 +321,69 @@ describe('agentCard — metrics popover (3I)', () => {
     expect(isOpen(w)).toBe(false)
   })
 })
+
+describe('agentCard — semantic motion (3N)', () => {
+  const edge = (w: ReturnType<typeof render>) => w.find('[data-testid="agent-card-edge"]')
+
+  it('keeps an agent at rest completely still, with no edge', () => {
+    const w = render({ working: false, status: 'idle' })
+    expect(edge(w).exists()).toBe(false)
+    expect(w.html()).not.toMatch(/motion-|animate-/)
+  })
+
+  it('breathes the edge while the agent is working', () => {
+    const w = render({ working: true })
+    expect(w.get('[data-testid="agent-card"]').attributes('data-signal')).toBe('working')
+    expect(edge(w).classes()).toContain('motion-working')
+    expect(w.find('[data-testid="agent-card-sweep"]').exists()).toBe(false)
+  })
+
+  it('sweeps the edge while a tool call is open, and names only the tool', () => {
+    const w = render({ working: true, pendingToolUse: { id: 't', tool: 'Bash', pattern: 'rm -rf /tmp', patternDisplay: 'rm -rf /tmp' } })
+    expect(w.get('[data-testid="agent-card"]').attributes('data-signal')).toBe('tool')
+    expect(w.get('[data-testid="agent-card-sweep"]').classes()).toContain('motion-sweep')
+    expect(w.html()).not.toContain('rm -rf')
+  })
+
+  it('holds everything still on a last-known card while updates reconnect', () => {
+    const w = mount(AgentCard, { props: { agent: { ...baseAgent, working: true, pendingToolUse: { id: 't', tool: 'Bash', pattern: '', patternDisplay: '' } } as Agent, attention: item('blocking', 'Permission request waiting'), stale: true }, global: { stubs } })
+    expect(w.html()).not.toMatch(/motion-|animate-/)
+  })
+
+  it('rings the Needs you chip once as it arrives, and leaves the edge amber and still', () => {
+    const w = render({ working: true }, item('blocking', 'Question waiting for your answer'))
+    expect(w.get('[data-testid="agent-card-attention"]').classes()).toContain('motion-arrive-attention')
+    expect(edge(w).classes()).toContain('bg-state-waiting')
+    expect(edge(w).classes().join(' ')).not.toMatch(/motion-(working|tool|sweep|waiting)\b/)
+  })
+
+  it('shows a failure as a still red edge, never as activity', () => {
+    const w = render({ working: true }, item('failed', 'API error reported: Rate limited'))
+    expect(edge(w).classes()).toContain('bg-state-error')
+    expect(edge(w).classes().join(' ')).not.toMatch(/motion-/)
+    expect(w.find('[data-testid="agent-card-sweep"]').exists()).toBe(false)
+    expect(w.get('[data-testid="agent-card-attention"]').classes().join(' ')).not.toMatch(/motion-/)
+  })
+
+  it('does not animate a finished agent that still reports an open turn', () => {
+    const w = render({ working: true, status: 'finished' })
+    expect(w.find('[data-testid="agent-card-edge"]').exists()).toBe(false)
+  })
+})
+
+describe('agentCard — human name (3N)', () => {
+  it('shows the session title with the stable session handle beside it', () => {
+    const w = render({ title: 'Fix login redirect', titleSource: 'ai' })
+    expect(w.get('[data-testid="agent-card-title"]').text()).toBe('Fix login redirect')
+    expect(w.get('[data-testid="agent-card-handle"]').text()).toBe('Claude session 3f2a1b9c')
+    expect(w.get('[data-testid="agent-card-open"]').attributes('aria-label')).toBe('Open details for Fix login redirect')
+  })
+
+  it('shows no second handle when the name already is the handle', () => {
+    expect(render().find('[data-testid="agent-card-handle"]').exists()).toBe(false)
+  })
+
+  it('marks the category with its glyph', () => {
+    expect(render({ liveInjectable: true }).get('[data-testid="agent-glyph"]').attributes('aria-label')).toBe('Terminal session')
+  })
+})

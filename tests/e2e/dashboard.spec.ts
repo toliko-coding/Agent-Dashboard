@@ -55,26 +55,25 @@ test.describe('dashboard view', () => {
   // -------------------------------------------------------------------------
   // Cards / List layout toggle
   // -------------------------------------------------------------------------
-  // Density moved into the toolbar's ⋮ overflow when the toolbar was split into
-  // narrow-the-set controls (search, filters) and arrange-what-is-left controls.
-  test('cards/list layout toggle switches aria-pressed', async ({ page }) => {
-    const overflow = page.getByRole('button', { name: 'More view options' })
-    const cards = page.getByTestId('layout-cards')
-    const list = page.getByTestId('layout-list')
+  // Grid / List is a visible toggle in the toolbar (3N), no longer a density
+  // option inside the ⋮ overflow menu.
+  test('grid/list layout toggle switches aria-pressed', async ({ page }) => {
+    const toggle = page.getByRole('group', { name: 'Layout' })
+    const cards = toggle.getByRole('button', { name: 'Grid' })
+    const list = toggle.getByRole('button', { name: 'List' })
 
-    await overflow.click()
+    // The toolbar renders once the first agent frame has loaded, which on a cold
+    // server takes longer than the default assertion timeout.
+    await expect(toggle).toBeVisible({ timeout: 20_000 })
     await expect(cards).toHaveAttribute('aria-pressed', 'true')
     await list.click()
-
-    // Selecting a density closes the menu, so reopen it to read the new state.
-    await overflow.click()
     await expect(list).toHaveAttribute('aria-pressed', 'true')
     await expect(cards).toHaveAttribute('aria-pressed', 'false')
 
     await cards.click()
-    await overflow.click()
     await expect(cards).toHaveAttribute('aria-pressed', 'true')
     await expect(list).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.getByRole('button', { name: 'More view options' })).toHaveCount(0)
   })
 
   // -------------------------------------------------------------------------

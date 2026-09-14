@@ -14,6 +14,8 @@ const props = defineProps<{
   groupBy?: AgentGroup
   /** The canonical attention queue's items; each card shows only its own. */
   attentionItems?: AttentionItem[]
+  /** Last-known agents while updates reconnect: every card holds still. */
+  stale?: boolean
 }>()
 
 defineEmits<{ select: [agent: Agent], dismiss: [pid: number] }>()
@@ -135,12 +137,13 @@ watch(() => props.groups, (groups) => {
         >
           <div v-for="child in group.children" :key="child.key" class="flex flex-col gap-1.5">
             <WorkspaceGroupRow :workspace="child.workspace!" :agents="child.agents" />
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="group-card-grid">
+            <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,19rem),1fr))]" data-testid="group-card-grid">
               <AgentCard
                 v-for="agent in child.agents"
                 :key="agent.pid"
                 :agent="agent"
                 :attention="attentionBySession.get(agent.sessionId) ?? null"
+                :stale="stale"
                 @select="$emit('select', agent)"
                 @dismiss="$emit('dismiss', $event)"
               />
@@ -150,7 +153,7 @@ watch(() => props.groups, (groups) => {
         <div
           v-else
           v-show="!isCollapsed(group.key)"
-          class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-2"
+          class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,19rem),1fr))] mt-2"
           data-testid="group-card-grid"
         >
           <AgentCard
@@ -158,6 +161,7 @@ watch(() => props.groups, (groups) => {
             :key="agent.pid"
             :agent="agent"
             :attention="attentionBySession.get(agent.sessionId) ?? null"
+            :stale="stale"
             @select="$emit('select', agent)"
             @dismiss="$emit('dismiss', $event)"
           />
@@ -166,12 +170,13 @@ watch(() => props.groups, (groups) => {
     </div>
   </template>
   <template v-else>
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+    <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,19rem),1fr))]">
       <AgentCard
         v-for="agent in agents"
         :key="agent.pid"
         :agent="agent"
         :attention="attentionBySession.get(agent.sessionId) ?? null"
+        :stale="stale"
         @select="$emit('select', agent)"
         @dismiss="$emit('dismiss', $event)"
       />

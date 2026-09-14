@@ -29,6 +29,8 @@ const props = defineProps<{
   agent: Agent
   /** This agent's canonical attention item, when it has one. */
   attention?: AttentionItem | null
+  /** Last-known state while agent updates reconnect: shown, but still. */
+  stale?: boolean
 }>()
 const emit = defineEmits<{
   select: [agent: Agent]
@@ -89,7 +91,7 @@ async function handleResolve(outcome: 'granted' | 'denied') {
         :aria-label="`${agentName} — ${statusLabel(displayStatus)}${attentionChip ? `, ${attentionChip.word}` : ''}`"
         @click="expanded = !expanded"
       >
-        <AppBadge :variant="displayStatus" class="w-[76px] shrink-0" />
+        <AppBadge :variant="displayStatus" :still="stale" class="w-[76px] shrink-0" />
         <span
           v-if="attentionChip"
           class="shrink-0 rounded-control border bg-card px-1.5 py-px text-label font-semibold uppercase tracking-wide whitespace-nowrap"

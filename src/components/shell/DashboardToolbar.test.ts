@@ -125,16 +125,28 @@ describe('dashboardToolbar', () => {
     expect(w.get('[data-testid="select-group"]').text()).toContain('No grouping')
   })
 
-  it('moves the density toggle into the view overflow menu', async () => {
+  // 3N: the layout changes the whole roster, so it is a visible control.
+  it('shows Grid and List as a visible pressed-state toggle', async () => {
     const w = mountToolbar()
-    expect(w.find('[data-testid="layout-list"]').isVisible()).toBe(false)
-    await w.get('button[aria-label="More view options"]').trigger('click')
-    const compact = w.get('[data-testid="layout-list"]')
-    expect(compact.isVisible()).toBe(true)
-    await compact.trigger('click')
+    const group = w.get('[data-testid="layout-toggle"]')
+    expect(group.attributes('role')).toBe('group')
+    expect(group.attributes('aria-label')).toBe('Layout')
+    const grid = w.get('[data-testid="layout-cards"]')
+    const list = w.get('[data-testid="layout-list"]')
+    expect(grid.isVisible()).toBe(true)
+    expect(grid.text()).toBe('Grid')
+    expect(list.text()).toBe('List')
+    expect(grid.attributes('aria-pressed')).toBe('true')
+    expect(list.attributes('aria-pressed')).toBe('false')
+    await list.trigger('click')
     expect(w.emitted('update:layout')![0]).toEqual(['list'])
-    // Picking a density dismisses the menu, as a menu selection should.
-    expect(compact.isVisible()).toBe(false)
+    expect(w.find('button[aria-label="More view options"]').exists()).toBe(false)
+  })
+
+  it('marks List pressed when the roster is a list', () => {
+    const w = mount(DashboardToolbar, { props: { ...BASE_PROPS, layout: 'list' }, attachTo: document.body })
+    expect(w.get('[data-testid="layout-list"]').attributes('aria-pressed')).toBe('true')
+    expect(w.get('[data-testid="layout-cards"]').attributes('aria-pressed')).toBe('false')
   })
 
   it('renders no applied-filter row while nothing narrows the roster', () => {

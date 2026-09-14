@@ -30,6 +30,11 @@ const emit = defineEmits<{
 
 const groupOptions = computed(() => agentGroupOptions(props.spawner))
 
+const LAYOUTS: { value: DashboardLayout, label: string, icon: string[] }[] = [
+  { value: 'cards', label: 'Grid', icon: ['M2.5 2.5h4.5v4.5H2.5z', 'M9 2.5h4.5v4.5H9z', 'M2.5 9h4.5v4.5H2.5z', 'M9 9h4.5v4.5H9z'] },
+  { value: 'list', label: 'List', icon: ['M2.5 4h11', 'M2.5 8h11', 'M2.5 12h11'] },
+]
+
 const projectLabel = computed(() =>
   props.projectOptions.find(o => o.value === props.project)?.label ?? props.project)
 const spawnerLabel = computed(() =>
@@ -175,32 +180,27 @@ async function clearAll(): Promise<void> {
           @update:model-value="$emit('update:groupBy', $event)"
         />
       </span>
-      <ToolbarPopover
-        v-slot="{ close }"
-        label="⋮"
-        aria-label="More view options"
-        align="end"
-        :show-caret="false"
-        data-testid="view-overflow"
-      >
-        <fieldset class="flex flex-col gap-1">
-          <legend class="mb-1 text-[11px] font-semibold uppercase tracking-wider text-fg-faint">
-            Density
-          </legend>
-          <button
-            v-for="option in ([['cards', 'Comfortable'], ['list', 'Compact']] as const)"
-            :key="option[0]"
-            type="button"
-            :data-testid="option[0] === 'cards' ? 'layout-cards' : 'layout-list'"
-            class="flex items-center gap-2 rounded-md px-2 py-1 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
-            :class="layout === option[0] ? 'bg-accent-soft text-accent font-semibold' : 'text-fg-mute hover:bg-raised hover:text-fg'"
-            :aria-pressed="layout === option[0]"
-            @click="$emit('update:layout', option[0]); close(true)"
-          >
-            <span aria-hidden="true">{{ layout === option[0] ? '●' : '○' }}</span>{{ option[1] }}
-          </button>
-        </fieldset>
-      </ToolbarPopover>
+      <!--
+        Grid or list. Shown, not tucked into an overflow menu: it changes the
+        whole roster. The stored values stay 'cards' and 'list'.
+      -->
+      <div role="group" aria-label="Layout" class="flex items-center rounded-md border border-line bg-app p-0.5" data-testid="layout-toggle">
+        <button
+          v-for="option in LAYOUTS"
+          :key="option.value"
+          type="button"
+          :data-testid="`layout-${option.value}`"
+          :aria-pressed="layout === option.value"
+          class="inline-flex h-6 items-center gap-1.5 rounded px-2 text-xs transition-colors duration-[var(--duration-fast)] ease-standard focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+          :class="layout === option.value ? 'bg-accent-soft text-accent font-semibold' : 'text-fg-mute hover:text-fg'"
+          @click="$emit('update:layout', option.value)"
+        >
+          <svg viewBox="0 0 16 16" class="size-3.5" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false">
+            <path v-for="d in option.icon" :key="d" :d="d" />
+          </svg>
+          {{ option.label }}
+        </button>
+      </div>
 
       <span class="ml-auto text-xs text-fg-faint" role="status" data-testid="agent-count">
         <b class="font-semibold text-fg-mute">{{ shownCount }}</b>
