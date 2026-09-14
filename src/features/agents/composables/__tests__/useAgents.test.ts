@@ -148,6 +148,36 @@ describe('useAgents pendingCapabilityDecisions', () => {
   })
 })
 
+// 3M.1 D + E + F: pending folder trust is server state carried in every stream
+// frame, so any browser (a reloaded one, a second tab) rebuilds it from the stream.
+describe('useAgents pendingFolderTrust', () => {
+  it('takes the pending folder trust list from a stream frame', async () => {
+    const { result, wrapper } = withSetup(() => useAgents.useAgents({ autoStart: true }))
+    await flushPromises()
+    const es = MockEventSource.instances[0]
+    es.onmessage?.({ data: JSON.stringify({ agents: [], trend: [], pendingFolderTrust: [{ pid: 7, path: '/w/untrusted', since: '2026-09-14T10:00:00Z' }] }) } as MessageEvent)
+    expect(result.pendingFolderTrust.value).toEqual([{ pid: 7, path: '/w/untrusted', since: '2026-09-14T10:00:00Z' }])
+
+    // Every consumer reads the same server-owned list.
+    expect(useAgents.useAgents({ autoStart: false }).pendingFolderTrust.value).toHaveLength(1)
+
+    es.onmessage?.({ data: JSON.stringify({ agents: [], trend: [], pendingFolderTrust: [] }) } as MessageEvent)
+    expect(result.pendingFolderTrust.value).toEqual([])
+    wrapper.unmount()
+  })
+
+  it('a poll response (no such field) leaves the pending list untouched', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) }))
+    const { result, wrapper } = withSetup(() => useAgents.useAgents({ autoStart: false }))
+    result.pendingFolderTrust.value = [{ pid: 8, path: '/w', since: '' }]
+    result.startStream()
+    await flushPromises()
+    expect(result.pendingFolderTrust.value).toEqual([{ pid: 8, path: '/w', since: '' }])
+    result.pendingFolderTrust.value = []
+    wrapper.unmount()
+  })
+})
+
 /*
  * B: `live` is what the shell's status line claims, so it has to follow the
  * feed itself. Before 3B.1 it was `!error`, and `error` is only set by a failed

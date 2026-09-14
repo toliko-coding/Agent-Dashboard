@@ -3,21 +3,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { axe } from '@/utils/testA11y'
 import FolderTrustDecision from './FolderTrustDecision.vue'
 
-const spawn = {
-  pid: 7,
-  cwd: '/Users/me/scratch/plain',
-  status: 'running' as const,
-  folderTrust: { path: '/Users/me/scratch/plain', selected: 'exit' as const },
-  trustSince: null,
-  error: null,
-  answering: false,
-}
+const trust = { pid: 7, path: '/Users/me/scratch/plain' }
 
 afterEach(() => vi.unstubAllGlobals())
 
 describe('folderTrustDecision (3M)', () => {
   it('states the exact folder and what trusting it allows, on the explicit decision surface', () => {
-    const w = mount(FolderTrustDecision, { props: { spawn } })
+    const w = mount(FolderTrustDecision, { props: { trust } })
     expect(w.get('[data-testid="folder-trust-path"]').text()).toBe('/Users/me/scratch/plain')
     expect(w.text()).toContain('read, edit, and execute files')
     expect(w.text()).toContain('never answers this for you')
@@ -27,7 +19,7 @@ describe('folderTrustDecision (3M)', () => {
   it('sends nothing until a button is pressed, then only that decision', async () => {
     const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }))
     vi.stubGlobal('fetch', fetchMock)
-    const w = mount(FolderTrustDecision, { props: { spawn } })
+    const w = mount(FolderTrustDecision, { props: { trust } })
     await flushPromises()
     expect(fetchMock).not.toHaveBeenCalled()
     await w.get('[data-testid="folder-trust-exit"]').trigger('click')
@@ -37,7 +29,7 @@ describe('folderTrustDecision (3M)', () => {
   })
 
   it('has no axe violations', async () => {
-    const w = mount(FolderTrustDecision, { props: { spawn }, attachTo: document.body })
+    const w = mount(FolderTrustDecision, { props: { trust }, attachTo: document.body })
     expect(await axe(w.element as Element)).toHaveNoViolations()
     w.unmount()
   })

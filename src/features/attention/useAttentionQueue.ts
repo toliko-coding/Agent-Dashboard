@@ -2,7 +2,6 @@ import type { Ref } from 'vue'
 import type { AttentionQueue } from './queue'
 import type { PermissionItem } from '@/composables/usePendingPermissions'
 import { computed } from 'vue'
-import { useSpawnWatch } from '@/composables/useSpawnWatch'
 import { useAgents } from '@/features/agents'
 import { useTasks } from '@/features/pipeline'
 import { attentionQueueState, buildAttentionQueue } from './queue'
@@ -19,18 +18,16 @@ import { attentionQueueState, buildAttentionQueue } from './queue'
  * every consumer then counts the same queue.
  */
 export function useAttentionQueue(permissionItems: Ref<PermissionItem[]>) {
-  const { agents, pendingCapabilityDecisions, lastUpdatedAt, error, live } = useAgents({ autoStart: false })
+  const { agents, pendingCapabilityDecisions, pendingFolderTrust, lastUpdatedAt, error, live } = useAgents({ autoStart: false })
   const { tasks, isLoading: tasksLoading } = useTasks({ autoStart: false })
-
-  // Folder trust questions on agents started here: read from the spawn watch, which polls only while one is pending.
-  const { awaitingTrust } = useSpawnWatch()
 
   const items = computed(() => buildAttentionQueue({
     agents: agents.value,
     permissionItems: permissionItems.value,
     capabilityDecisions: pendingCapabilityDecisions.value,
     tasks: tasks.value,
-    spawnTrust: awaitingTrust.value.map(s => ({ pid: s.pid, cwd: s.cwd, since: s.trustSince })),
+    // Server-owned folder trust questions, from the agents stream (3M.1).
+    spawnTrust: pendingFolderTrust.value.map(t => ({ pid: t.pid, cwd: t.path, since: t.since })),
   }))
 
   return computed<AttentionQueue>(() => attentionQueueState({

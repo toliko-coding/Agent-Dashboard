@@ -201,12 +201,6 @@ describe('spawnDialog', () => {
 
   // N: Claude's trust question appears at the top of the dialog, above the form, and nothing answers it.
   it('shows Claude\'s folder trust question first, and sends no answer by itself', async () => {
-    const base = globalThis.fetch as unknown as (url: string, init?: RequestInit) => Promise<unknown>
-    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
-      if (url.startsWith('/api/agents/spawn/12345/status'))
-        return Promise.resolve({ ok: true, json: async () => ({ pid: 12345, status: 'running', awaitingFolderTrust: { path: '/Users/me/scratch/plain', selected: 'exit' } }) })
-      return base(url, init)
-    }))
     const wrapper = mount(SpawnDialog, { props: { open: true }, attachTo: document.body })
     await flushPromises()
     setInputValue(document.querySelector('[data-testid="spawn-folder-input-wrap"]') as HTMLInputElement, '/Users/me/scratch/plain')
@@ -214,6 +208,9 @@ describe('spawnDialog', () => {
     await waitForFolderCheck()
     ;(document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement).click()
     await flushPromises()
+    // 3M.1: the question arrives from the server in the agents stream, not from this dialog's own poll.
+    const { useAgents } = await import('@/features/agents')
+    useAgents({ autoStart: false }).pendingFolderTrust.value = [{ pid: 12345, path: '/Users/me/scratch/plain', since: '2026-09-14T10:00:00Z' }]
     await flushPromises()
 
     const decision = document.querySelector('[data-testid="folder-trust-decision"]')
@@ -222,6 +219,7 @@ describe('spawnDialog', () => {
     expect(decision!.compareDocumentPosition(folderSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls
     expect(calls.some(c => String(c[0]).endsWith('/folder-trust'))).toBe(false)
+    useAgents({ autoStart: false }).pendingFolderTrust.value = []
     wrapper.unmount()
   })
 

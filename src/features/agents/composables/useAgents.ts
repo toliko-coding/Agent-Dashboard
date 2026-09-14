@@ -1,4 +1,4 @@
-import type { PendingCapabilityDecision } from '@/sdk.generated'
+import type { PendingCapabilityDecision, PendingFolderTrust } from '@/sdk.generated'
 import type { Agent } from '@/types'
 import { computed, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { drainPendingMessages } from '@/composables/usePendingMessages'
@@ -19,6 +19,12 @@ const TREND_RETENTION_MS = 10 * 60 * 1000
 
 const agents = shallowRef<Agent[]>([])
 const pendingCapabilityDecisions = shallowRef<PendingCapabilityDecision[]>([])
+/**
+ * Dashboard-started Claude processes waiting at Claude Code's folder trust
+ * question (3M.1). Server-owned: every browser receives the same list in each
+ * stream frame, so a reload or a second tab sees it too.
+ */
+const pendingFolderTrust = shallowRef<PendingFolderTrust[]>([])
 const costTrend = ref<TrendPoint[]>([])
 const selectedAgent = ref<Agent | null>(null)
 const isLoading = ref(true)
@@ -48,11 +54,14 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null
 // so a future caller can't collapse "none" and "unknown" back into one `?? []`.
 const DECISIONS_UNKNOWN = 'unknown' as const
 type DecisionsUpdate = PendingCapabilityDecision[] | typeof DECISIONS_UNKNOWN
+type FolderTrustUpdate = PendingFolderTrust[] | typeof DECISIONS_UNKNOWN
 
-function handleAgentData(data: Agent[], _trend: TrendPoint[] | undefined, decisions: DecisionsUpdate) {
+function handleAgentData(data: Agent[], _trend: TrendPoint[] | undefined, decisions: DecisionsUpdate, folderTrust: FolderTrustUpdate = DECISIONS_UNKNOWN) {
   agents.value = data
   if (decisions !== DECISIONS_UNKNOWN)
     pendingCapabilityDecisions.value = decisions
+  if (folderTrust !== DECISIONS_UNKNOWN)
+    pendingFolderTrust.value = folderTrust
 
   // Build the cost trend client-side: the backend streams an empty trend, but
   // every frame carries the running agents, so we sample total cost/tokens here.
@@ -99,7 +108,7 @@ async function fetchAgents() {
 function handleSseMessage(data: string) {
   try {
     const payload = JSON.parse(data)
-    handleAgentData(payload.agents, payload.trend, payload.pendingCapabilityDecisions ?? [])
+    handleAgentData(payload.agents, payload.trend, payload.pendingCapabilityDecisions ?? [], payload.pendingFolderTrust ?? [])
   }
   catch { /* ignore parse errors */ }
 }
@@ -200,6 +209,7 @@ export function useAgents(options?: { autoStart?: boolean }) {
   return {
     agents,
     pendingCapabilityDecisions,
+    pendingFolderTrust,
     costTrend,
     filteredAgents,
     selectedAgent,

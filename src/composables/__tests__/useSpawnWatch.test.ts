@@ -1,22 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SPAWN_STATUS_POLL_MS } from '../../utils/sse'
-import { __resetSpawnWatch, answerFolderTrust, forgetSpawn, useSpawnWatch, watchSpawn } from '../useSpawnWatch'
+import { __resetSpawnWatch, answerFolderTrust, forgetSpawn, openFolderTrust, useSpawnWatch, watchSpawn } from '../useSpawnWatch'
 
 /*
- * The spawn-status watch behind New Agent (3M): the dialog's existing poll,
- * kept alive while Claude waits at its folder trust question, and the only
- * path by which a trust answer is sent — on an explicit call.
+ * 3M.1: the spawn watch no longer decides whether Claude is waiting at its
+ * folder trust question — the server does, in the agents stream. What is left
+ * is the dialog's bounded status read and the user's answer requests.
  */
 
-const TRUST = { path: '/Users/me/scratch/plain', selected: 'exit' }
 let statusBody: Record<string, unknown>
 let fetchMock: ReturnType<typeof vi.fn>
-
 const calls = (match: string) => fetchMock.mock.calls.filter(([url]) => String(url).includes(match))
-
-async function tick(ms = SPAWN_STATUS_POLL_MS) {
-  await vi.advanceTimersByTimeAsync(ms)
-}
+const tick = (ms = SPAWN_STATUS_POLL_MS) => vi.advanceTimersByTimeAsync(ms)
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -32,7 +27,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('useSpawnWatch', () => {
+describe('useSpawnWatch (3M.1)', () => {
   // P
   it('runs no timer and makes no request while nothing is watched', async () => {
     useSpawnWatch()
@@ -41,67 +36,60 @@ describe('useSpawnWatch', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('stops after the usual attempts when nothing needs the user', async () => {
-    watchSpawn(1, '/tmp/a')
-    await tick(SPAWN_STATUS_POLL_MS * 40)
+  // P: a trust question no longer extends browser polling — the server owns it.
+  it('stops after a bounded number of status reads, even if Claude is waiting at its trust question', async () => {
+    statusBody = { status: 'running', awaitingFolderTrust: { path: '/w', selected: 'exit' } }
+    watchSpawn(1, '/w')
+    await tick(SPAWN_STATUS_POLL_MS * 60)
     expect(calls('/status').length).toBe(15)
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  // N
-  it('surfaces the trust question and keeps watching while it is open', async () => {
-    statusBody = { status: 'running', awaitingFolderTrust: TRUST }
-    const { awaitingTrust } = useSpawnWatch()
-    watchSpawn(7, TRUST.path)
-    await tick(10)
-    expect(awaitingTrust.value.map(s => [s.pid, s.folderTrust?.path])).toEqual([[7, TRUST.path]])
-    expect(awaitingTrust.value[0].trustSince).not.toBeNull()
-    await tick(SPAWN_STATUS_POLL_MS * 40)
-    expect(calls('/status').length).toBeGreaterThan(15)
-    expect(awaitingTrust.value).toHaveLength(1)
-  })
-
-  // M
-  it('never answers the question on its own', async () => {
-    statusBody = { status: 'running', awaitingFolderTrust: TRUST }
-    watchSpawn(7, TRUST.path)
-    await tick(SPAWN_STATUS_POLL_MS * 30)
-    expect(calls('/folder-trust')).toHaveLength(0)
-  })
-
-  it('sends exactly the decision the user made', async () => {
-    statusBody = { status: 'running', awaitingFolderTrust: TRUST }
-    watchSpawn(7, TRUST.path)
-    await tick(10)
-    await answerFolderTrust(7, 'trust')
-    const [url, init] = calls('/folder-trust')[0]
-    expect(url).toBe('/api/agents/spawn/7/folder-trust')
-    expect(JSON.parse(init.body)).toEqual({ decision: 'trust' })
-  })
-
-  // O
-  it('declining ends in a stopped agent, with no question left and no timer running', async () => {
-    statusBody = { status: 'running', awaitingFolderTrust: TRUST }
-    const { awaitingTrust, spawns } = useSpawnWatch()
-    watchSpawn(7, TRUST.path)
-    await tick(10)
-    await answerFolderTrust(7, 'exit')
+  it('reports an exit and stops', async () => {
+    const { spawns } = useSpawnWatch()
+    watchSpawn(2, '/w')
     statusBody = { status: 'exited', exitCode: null }
     await tick()
-    expect(awaitingTrust.value).toEqual([])
     expect(spawns.value[0].status).toBe('exited')
+    expect(spawns.value[0].error).toBeNull()
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('shows a refused answer instead of pretending it was delivered', async () => {
-    statusBody = { status: 'running', awaitingFolderTrust: TRUST }
-    const { spawns } = useSpawnWatch()
-    watchSpawn(7, TRUST.path)
-    await tick(10)
-    fetchMock.mockImplementationOnce(async () => ({ ok: false, status: 409, json: async () => ({ error: 'Claude is not asking to trust a folder right now' }) }))
-    await answerFolderTrust(7, 'trust')
-    expect(spawns.value[0].error).toContain('not asking')
-    forgetSpawn(7)
-    expect(spawns.value).toEqual([])
+  // M
+  it('never sends a trust answer on its own', async () => {
+    statusBody = { status: 'running', awaitingFolderTrust: { path: '/w', selected: 'exit' } }
+    watchSpawn(3, '/w')
+    await tick(SPAWN_STATUS_POLL_MS * 20)
+    expect(calls('/folder-trust')).toHaveLength(0)
+  })
+
+  it('sends exactly the decision the user made, then reads the status again to see what Claude did', async () => {
+    watchSpawn(4, '/w')
+    await tick(SPAWN_STATUS_POLL_MS * 20)
+    const before = calls('/status').length
+    await answerFolderTrust(4, 'exit')
+    const [url, init] = calls('/folder-trust')[0]
+    expect(url).toBe('/api/agents/spawn/4/folder-trust')
+    expect(JSON.parse(init.body)).toEqual({ decision: 'exit' })
+    statusBody = { status: 'exited', exitCode: null }
+    await tick()
+    expect(calls('/status').length).toBe(before + 1)
+    expect(useSpawnWatch().spawns.value[0].status).toBe('exited')
+  })
+
+  // J (client side): a refused answer is shown, not assumed delivered.
+  it('shows the server refusing a second answer', async () => {
+    fetchMock.mockImplementationOnce(async () => ({ ok: false, status: 409, json: async () => ({ error: 'This folder trust question was already answered' }) }))
+    await answerFolderTrust(5, 'trust')
+    expect(useSpawnWatch().answerStateFor(5)).toEqual({ answering: false, error: 'This folder trust question was already answered' })
+  })
+
+  it('works for a question this browser did not start (after a reload or from another tab)', async () => {
+    openFolderTrust(99)
+    expect(useSpawnWatch().focusedTrustPid.value).toBe(99)
+    await answerFolderTrust(99, 'trust')
+    expect(calls('/folder-trust')[0][0]).toBe('/api/agents/spawn/99/folder-trust')
+    forgetSpawn(99)
+    expect(useSpawnWatch().focusedTrustPid.value).toBeNull()
   })
 })

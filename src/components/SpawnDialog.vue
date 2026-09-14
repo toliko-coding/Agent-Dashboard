@@ -8,6 +8,7 @@ import { useProjects } from '../composables/useProjects'
 import { useSpawnDialog } from '../composables/useSpawnDialog'
 import { useSpawners } from '../composables/useSpawners'
 import { useSpawnWatch, watchSpawn } from '../composables/useSpawnWatch'
+import { useAgents } from '../features/agents'
 import { workspaceDisplay } from '../utils/agentGroup'
 import { errorMessage } from '../utils/errorMessage'
 import { SPAWN_AUTOCLOSE_MS } from '../utils/timing'
@@ -45,6 +46,8 @@ const emit = defineEmits<{ close: [], spawned: [pid: number] }>()
 const { projects, isLoading: projectsLoading } = useProjects()
 const { spawners } = useSpawners()
 const { spawns } = useSpawnWatch()
+// Server-owned: whether Claude is waiting at its folder trust question (3M.1).
+const { pendingFolderTrust } = useAgents({ autoStart: false })
 
 const sortedProjects = computed(() =>
   projects.value.slice().sort((a, b) => a.name.localeCompare(b.name)),
@@ -77,10 +80,11 @@ let checkAbort: AbortController | null = null
 let autoCloseTimer: ReturnType<typeof setTimeout> | null = null
 
 const spawned = computed(() => spawnedPid.value === null ? null : spawns.value.find(s => s.pid === spawnedPid.value) ?? null)
+const pendingTrust = computed(() => spawnedPid.value === null ? null : pendingFolderTrust.value.find(t => t.pid === spawnedPid.value) ?? null)
 
 const formEl = ref<HTMLFormElement | null>(null)
 // Bring the question into view the moment Claude asks it.
-watch(() => Boolean(spawned.value?.folderTrust), (asking) => {
+watch(() => Boolean(pendingTrust.value), (asking) => {
   if (asking && formEl.value)
     formEl.value.scrollTop = 0
 })
@@ -318,7 +322,8 @@ async function handleSpawn() {
     // is waiting at its trust question or after a failure, which need the user.
     autoCloseTimer = setTimeout(() => {
       const s = spawned.value
-      if (s && !s.folderTrust && !s.error) {
+      // Closing while Claude waits is safe: the question stays in Needs you.
+      if (s && !pendingTrust.value && !s.error) {
         resetForm()
         emit('close')
       }
@@ -334,7 +339,7 @@ async function handleSpawn() {
 
 const spawnStatusText = computed(() => {
   const s = spawned.value
-  if (!s || s.folderTrust || s.error)
+  if (!s || pendingTrust.value || s.error)
     return ''
   if (s.status === 'exited')
     return 'The agent stopped.'
@@ -378,7 +383,7 @@ onUnmounted(() => {
         What happened after Start, first: Claude's trust question must not sit
         below the fold of a long form while the agent waits for it.
       -->
-      <FolderTrustDecision v-if="spawned?.folderTrust" :spawn="spawned" />
+      <FolderTrustDecision v-if="pendingTrust" :trust="pendingTrust" />
 
       <p v-if="spawnStatusText" class="m-0 text-ui-sm text-fg-mute" data-testid="spawn-status">
         {{ spawnStatusText }}
