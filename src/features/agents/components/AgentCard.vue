@@ -189,7 +189,7 @@ const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
       <span v-if="edge.sweep && !stale" class="motion-sweep block h-full w-1/3 bg-state-tool" data-testid="agent-card-sweep" />
     </span>
 
-    <div class="flex flex-col gap-1.5 px-3 pt-2.5 pb-2 min-w-0">
+    <div class="flex flex-col gap-1 px-3 pt-2 pb-1.5 min-w-0">
       <!-- Who: category, name and state. -->
       <div class="flex items-start gap-2.5 min-w-0">
         <AgentGlyph :agent="agent" class="mt-0.5" />
@@ -262,7 +262,7 @@ const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
       </div>
 
       <!-- Model and provider · cost and the actions. -->
-      <div class="flex items-center gap-1.5 min-w-0 border-t border-line pt-1.5 text-ui-sm text-fg-mute" data-testid="agent-card-footer">
+      <div class="flex items-center gap-1.5 min-w-0 border-t border-line pt-1 text-ui-sm text-fg-mute" data-testid="agent-card-footer">
         <span
           class="shrink-0 whitespace-nowrap font-mono text-label text-fg-mute"
           :title="agent.model ? `Model: ${agent.model}` : 'Model unknown'"

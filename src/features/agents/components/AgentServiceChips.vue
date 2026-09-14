@@ -51,7 +51,8 @@ function chipLabel(s: { label: string, port: number, url: string | null }): stri
     : `${s.label} on port ${s.port}`
 }
 
-const CHIP_CLASS = 'inline-flex items-center gap-1 rounded px-1 py-0.5 bg-success-soft text-success-text text-[10px] font-mono leading-none'
+// Neutral, like the topology's port pills: a listening port is an observation, not success or health.
+const CHIP_CLASS = 'inline-flex items-center gap-1 rounded border border-line px-1 py-0.5 bg-raised text-fg-soft text-[10px] font-mono leading-none'
 </script>
 
 <template>
@@ -97,7 +98,7 @@ const CHIP_CLASS = 'inline-flex items-center gap-1 rounded px-1 py-0.5 bg-succes
         @click.stop
         @keydown.enter.stop
       >
-        <span class="size-1.5 rounded-full bg-success-dot shrink-0" aria-hidden="true" />:{{ s.port }}
+        <span class="size-1.5 rounded-full bg-fg-faint shrink-0" aria-hidden="true" />:{{ s.port }}
       </a>
 
       <!-- No URL reported: a listener that is not HTTP-ish. Shown, not linked. -->
@@ -107,7 +108,7 @@ const CHIP_CLASS = 'inline-flex items-center gap-1 rounded px-1 py-0.5 bg-succes
         :class="CHIP_CLASS"
         :title="chipLabel(s)"
       >
-        <span class="size-1.5 rounded-full bg-success-dot shrink-0" aria-hidden="true" />:{{ s.port }}
+        <span class="size-1.5 rounded-full bg-fg-faint shrink-0" aria-hidden="true" />:{{ s.port }}
       </span>
     </template>
 

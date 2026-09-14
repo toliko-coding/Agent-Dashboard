@@ -3,12 +3,14 @@ import type { AttentionItem, AttentionQueue } from '@/features/attention'
 import type { Freshness } from '@/features/localscope'
 import type { Agent, WorkspaceRef } from '@/types'
 import { computed, ref } from 'vue'
+import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppChip from '@/components/ui/AppChip.vue'
 import { NeedsYouBand } from '@/features/attention'
 import { ActiveWork, agentFootprint, CommandStatusStrip } from '@/features/cockpit'
 import { DataFreshnessIndicator } from '@/features/localscope'
+import { agentKind } from '@/utils/agentCategory'
 
 /*
  * Design-system showcase. Development only.
@@ -28,7 +30,7 @@ const emit = defineEmits<{ close: [] }>()
 
 const STATES = ['active', 'working', 'waiting', 'idle', 'finished', 'completed', 'error', 'info'] as const
 
-interface MotionSample { cls: string, name: string, claim: string, color: string, flow?: boolean }
+interface MotionSample { cls: string, name: string, claim: string, color: string, flow?: boolean, sweep?: boolean }
 
 /** The semantic motion vocabulary, with the claim each one makes. */
 const MOTIONS: MotionSample[] = [
@@ -36,9 +38,23 @@ const MOTIONS: MotionSample[] = [
   { cls: 'motion-tool', name: 'tool', claim: 'A discrete step is executing right now.', color: 'bg-state-tool' },
   { cls: 'motion-waiting', name: 'waiting', claim: 'A person has to act before this moves.', color: 'bg-state-waiting' },
   { cls: 'motion-success', name: 'success', claim: 'It finished. An event, not a state.', color: 'bg-state-success' },
+  // Drawn on a card edge: a segment travels the edge while a tool call is open.
+  { cls: 'motion-sweep', name: 'tool sweep', claim: 'A tool call is open on this agent right now (card edge).', color: '', sweep: true },
   // Drawn on an edge, not a dot: live flow says data is moving through a link.
   { cls: 'motion-flow', name: 'live flow', claim: 'Data is flowing through this connection right now.', color: '', flow: true },
 ]
+
+/*
+ * Agent categories (3N): one sample per category, from the facts that decide it
+ * (utils/agentCategory). Structure, not state — the glyph never moves.
+ */
+const CATEGORY_SAMPLES = [
+  { facts: { pipelineTaskId: 'task-sample' }, rule: 'pipelineTaskId' },
+  { facts: { internalProcess: true }, rule: 'internalProcess' },
+  { facts: { entrypoint: 'desktop' }, rule: 'entrypoint \'desktop\'' },
+  { facts: { liveInjectable: true }, rule: 'liveInjectable' },
+  { facts: {}, rule: 'otherwise' },
+] as { facts: Partial<Agent>, rule: string }[]
 
 /*
  * Phase 3B foundation. Each entry names the utility the token generates, so the
@@ -276,8 +292,16 @@ const ATTENTION_SAMPLES: { label: string, queue: AttentionQueue }[] = [
             :key="m.name"
             class="flex items-center gap-3 rounded-md border border-line bg-card px-3 py-2"
           >
+            <span
+              v-if="m.sweep"
+              class="relative h-0.5 w-10 shrink-0 overflow-hidden rounded-full bg-state-tool/35"
+              aria-hidden="true"
+              data-testid="sandbox-motion-sweep"
+            >
+              <span class="block h-full w-1/3 bg-state-tool" :class="showMotion ? m.cls : ''" />
+            </span>
             <svg
-              v-if="m.flow"
+              v-else-if="m.flow"
               class="h-2.5 w-10 shrink-0"
               viewBox="0 0 40 10"
               aria-hidden="true"
@@ -297,6 +321,28 @@ const ATTENTION_SAMPLES: { label: string, queue: AttentionQueue }[] = [
             />
             <code class="w-24 shrink-0 text-[11px] text-fg-soft">{{ m.name }}</code>
             <span class="text-[12px] text-fg-mute">{{ m.claim }}</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Agent categories -->
+      <section class="flex flex-col gap-3" data-testid="sandbox-agent-categories">
+        <h2 class="text-[13px] font-semibold">
+          Agent categories
+        </h2>
+        <p class="max-w-3xl text-[12px] text-fg-mute">
+          What kind of worker an agent is, from stated facts only; first match wins. The glyph is neutral and still —
+          state stays on the state indicator beside the name.
+        </p>
+        <ul class="grid grid-cols-1 gap-2 md:grid-cols-2">
+          <li
+            v-for="c in CATEGORY_SAMPLES"
+            :key="c.rule"
+            class="flex items-center gap-3 rounded-md border border-line bg-card px-3 py-2"
+          >
+            <AgentGlyph :agent="c.facts as Agent" />
+            <span class="text-[12px] text-fg-soft">{{ agentKind(c.facts as Agent).label }}</span>
+            <code class="ml-auto text-[10px] text-fg-faint">{{ c.rule }}</code>
           </li>
         </ul>
       </section>

@@ -93,6 +93,19 @@ describe('designSandbox — 3B foundation (C)', () => {
 describe('designSandbox — never a production surface (D)', () => {
   const app = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf8')
 
+  // 3N: agent categories and the tool sweep are part of the documented vocabulary.
+  it('shows every agent category with its glyph and the rule that decides it', () => {
+    const section = w().get('[data-testid="sandbox-agent-categories"]')
+    const glyphs = section.findAll('[data-testid="agent-glyph"]').map(g => g.attributes('data-category'))
+    expect(glyphs).toEqual(['task', 'internal', 'desktop', 'terminal', 'cli'])
+    expect(section.text()).toContain('Pipeline task agent')
+  })
+
+  it('includes the tool sweep in the motion vocabulary, drawn on an edge', () => {
+    const sweep = w().get('[data-testid="sandbox-motion-sweep"]')
+    expect(sweep.find('.motion-sweep').exists()).toBe(true)
+  })
+
   it('is imported only inside a compile-time development branch', () => {
     // Vite replaces import.meta.env.DEV with a literal false in production, so
     // the dynamic import sits in dead code and no chunk is emitted.
