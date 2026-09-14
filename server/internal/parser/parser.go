@@ -24,6 +24,10 @@ import (
 
 const tailBytes = 32768 // 32KB from end
 
+// maxConversationTailBytes bounds how far back ParseSessionFile's tail window
+// may grow to reach the conversation (see tailReadConversation).
+const maxConversationTailBytes = 2 << 20 // 2 MiB
+
 var (
 	uuidRE  = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 	quotaRE = regexp.MustCompile(`(?i)quota exceeded|usage limit|monthly limit`)
@@ -203,30 +207,84 @@ func sessionMetaDir() string {
 // TailRead reads the last tailBytes bytes of a file.
 // The first line of the result may be truncated (partial JSON) and should be skipped.
 func TailRead(filePath string) (string, error) {
+	content, _, err := tailReadN(filePath, tailBytes)
+	return content, err
+}
+
+/*
+ * tailReadConversation reads the end of a session log, growing the window until
+ * it contains at least one conversation entry (user, assistant or legacy
+ * message), the whole file, or maxConversationTailBytes.
+ *
+ * A fixed 32 KB tail assumed the conversation is always near the end. Claude
+ * Code 2.1.270 writes records after it that break that: one attachment record
+ * alone was 131 KB, so the last user and assistant entries — and with them the
+ * activity time, model, tools and turn state — fell outside the window, and a
+ * session that had just replied read as 24 hours old. Doubling keeps a normal
+ * session at 32 KB and bounds the pathological one.
+ */
+func tailReadConversation(filePath string) (string, error) {
+	window := int64(tailBytes)
+	for {
+		content, size, err := tailReadN(filePath, window)
+		if err != nil {
+			return "", err
+		}
+		if window >= size || window >= maxConversationTailBytes || containsConversationEntry(content) {
+			return content, nil
+		}
+		window *= 2
+		if window > maxConversationTailBytes {
+			window = maxConversationTailBytes
+		}
+	}
+}
+
+// containsConversationEntry reports whether content has a complete user,
+// assistant or legacy message entry.
+func containsConversationEntry(content string) bool {
+	scanner := bufio.NewScanner(strings.NewReader(content))
+	scanner.Buffer(make([]byte, 0, 64*1024), maxConversationTailBytes)
+	for scanner.Scan() {
+		var entry struct {
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(scanner.Bytes(), &entry) != nil {
+			continue
+		}
+		if entry.Type == "user" || entry.Type == "assistant" || entry.Type == "message" {
+			return true
+		}
+	}
+	return false
+}
+
+// tailReadN reads the last n bytes of a file and reports the file size.
+func tailReadN(filePath string, n int64) (string, int64, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
-		return "", fmt.Errorf("open %s: %w", filePath, err)
+		return "", 0, fmt.Errorf("open %s: %w", filePath, err)
 	}
 	defer f.Close()
 
 	info, err := f.Stat()
 	if err != nil {
-		return "", fmt.Errorf("stat %s: %w", filePath, err)
+		return "", 0, fmt.Errorf("stat %s: %w", filePath, err)
 	}
 	size := info.Size()
-	readSize := int64(tailBytes)
+	readSize := n
 	if readSize > size {
 		readSize = size
 	}
 	if _, err := f.Seek(size-readSize, io.SeekStart); err != nil {
-		return "", fmt.Errorf("seek: %w", err)
+		return "", size, fmt.Errorf("seek: %w", err)
 	}
 	buf := make([]byte, readSize)
-	n, err := io.ReadFull(f, buf)
+	read, err := io.ReadFull(f, buf)
 	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
-		return "", fmt.Errorf("read: %w", err)
+		return "", size, fmt.Errorf("read: %w", err)
 	}
-	return string(buf[:n]), nil
+	return string(buf[:read]), size, nil
 }
 
 // jsonlMessage is the minimal structure of a JSONL session log entry.
@@ -732,8 +790,8 @@ func findSessionByContent(candidates []sessionFileCandidate, uptimeSeconds int64
 		if err != nil {
 			continue
 		}
-		age := time.Since(data.LastActivity)
-		if age < time.Duration(uptimeSeconds+10)*time.Second {
+		// Unknown activity cannot place a session inside the process's lifetime.
+		if !data.LastActivity.IsZero() && time.Since(data.LastActivity) < time.Duration(uptimeSeconds+10)*time.Second {
 			return data, c.path, nil
 		}
 		// Keep the first (most-recently modified) as fallback.
@@ -750,15 +808,17 @@ func findSessionByContent(candidates []sessionFileCandidate, uptimeSeconds int64
 
 // ParseSessionFile parses a single JSONL session file and returns its SessionData.
 func ParseSessionFile(path string) (*SessionData, error) {
-	content, err := TailRead(path)
+	content, err := tailReadConversation(path)
 	if err != nil {
 		return nil, err
 	}
 
+	// LastActivity stays zero — unknown — until a timestamped conversation entry
+	// is read. It used to default to now-24h, which is not unknown but a made-up
+	// time: a session whose entries were not read showed as "23h 59m ago".
 	data := &SessionData{
-		ToolCounts:   make(map[string]int),
-		Entrypoint:   sdk.EntrypointUnknown,
-		LastActivity: time.Now().Add(-24 * time.Hour), // default: old
+		ToolCounts: make(map[string]int),
+		Entrypoint: sdk.EntrypointUnknown,
 	}
 
 	// Name and raw input only: the display form costs a JSON unmarshal, a rune
@@ -794,6 +854,14 @@ func ParseSessionFile(path string) (*SessionData, error) {
 		}
 		if entry.Type == "user" || entry.Type == "assistant" || entry.Type == "message" {
 			lastEntryType = entry.Type
+			// Last activity is the newest timestamped conversation entry: the prompt
+			// that starts a turn and each tool result (user entries) as much as each
+			// assistant reply. Metadata records (attachments, cost-state, mode) are
+			// not conversation and do not count. Claude writes RFC 3339 with a zone;
+			// a zoneless value fails to parse and is ignored rather than guessed.
+			if ts, parseErr := time.Parse(time.RFC3339Nano, entry.Timestamp); parseErr == nil && ts.After(data.LastActivity) {
+				data.LastActivity = ts
+			}
 		}
 		// compact_boundary lines carry no per-message usage and no tool/model/
 		// activity data the tail parse needs — skip them. Token totals come from
@@ -835,12 +903,6 @@ func ParseSessionFile(path string) (*SessionData, error) {
 			}
 			// Token usage is NOT accumulated here. It comes exclusively from the
 			// whole-file scan below so the tail's 32 KB limit can never undercount.
-			if ts, parseErr := time.Parse(time.RFC3339Nano, entry.Timestamp); parseErr == nil {
-				if ts.After(data.LastActivity) {
-					data.LastActivity = ts
-				}
-			}
-			// If parse fails, LastActivity stays at its default (-24h old) — agent looks idle, which is correct.
 
 			var blocks []toolUseBlock
 			if err := json.Unmarshal(msg.Content, &blocks); err == nil {

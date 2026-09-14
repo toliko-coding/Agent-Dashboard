@@ -511,6 +511,10 @@ export interface Agent {
   entrypoint: Entrypoint
   status: AgentStatus
   uptime: number
+  /**
+   * LastActivity is the newest timestamped conversation entry in the session
+   * log, RFC 3339 in UTC; "" when none is known.
+   */
   lastActivity: string
   currentAction?: string
   lastTools: RecentTool[]

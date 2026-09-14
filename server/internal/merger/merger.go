@@ -147,6 +147,10 @@ func recentChannelOutput(pid int) bool {
 
 // CalculateStatus returns the agent status based on time since last activity.
 func CalculateStatus(lastActivity time.Time) sdk.AgentStatus {
+	// No known activity is not recent activity.
+	if lastActivity.IsZero() {
+		return sdk.AgentStatusIdle
+	}
 	age := time.Since(lastActivity)
 	switch {
 	case age < activeThreshold:
@@ -164,6 +168,16 @@ func CalculateStatus(lastActivity time.Time) sdk.AgentStatus {
 func channelDiscovery(pid int) (channelAvailable, liveInjectable bool) {
 	s := readAgentChannelState(pid)
 	return s.channelAvailable, s.liveInjectable
+}
+
+// formatActivity renders a last-activity time for the wire: RFC 3339 in UTC,
+// always with its zone, or "" when no activity time is known. Never a
+// placeholder time: a client must be able to tell "unknown" from "long ago".
+func formatActivity(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
 }
 
 // strPtr returns nil if s is empty, otherwise a pointer to s.
@@ -512,7 +526,7 @@ func (m *Merger) buildAgent(ctx context.Context, proc scanner.ProcessInfo, sessi
 		PendingQuestion:           pendingQuestion,
 		PendingConfirm:            pendingConfirm,
 		Uptime:                    proc.Uptime,
-		LastActivity:              session.LastActivity.Format(time.RFC3339),
+		LastActivity:              formatActivity(session.LastActivity),
 		CurrentAction:             strPtr(session.CurrentAction),
 		LastTools:                 append(make([]sdk.RecentTool, 0), session.LastTools...),
 		Tasks:                     append(make([]sdk.TaskInfo, 0), session.Tasks...),

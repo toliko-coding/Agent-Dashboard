@@ -471,10 +471,12 @@ type Agent struct {
 	// ClaudeConfigDir alone, and the difference between attributing a session
 	// to a profile and having no idea which profile it runs on. Server-side
 	// only (the client has no use for it), hence no JSON field.
-	ClaudeConfigDirKnown      bool           `json:"-"`
-	Entrypoint                Entrypoint     `json:"entrypoint"`
-	Status                    AgentStatus    `json:"status"`
-	Uptime                    int64          `json:"uptime"`
+	ClaudeConfigDirKnown bool        `json:"-"`
+	Entrypoint           Entrypoint  `json:"entrypoint"`
+	Status               AgentStatus `json:"status"`
+	Uptime               int64       `json:"uptime"`
+	// LastActivity is the newest timestamped conversation entry in the session
+	// log, RFC 3339 in UTC; "" when none is known.
 	LastActivity              string         `json:"lastActivity"`
 	CurrentAction             *string        `json:"currentAction"`
 	LastTools                 []RecentTool   `json:"lastTools"`

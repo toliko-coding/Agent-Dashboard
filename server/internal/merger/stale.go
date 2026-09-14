@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/lx-wnk/agent-dashboard/sdk"
 	"github.com/lx-wnk/agent-dashboard/server/internal/parser"
@@ -146,7 +145,7 @@ func buildFinishedAgent(pid int, snap liveSnapshot, session *parser.SessionData,
 		Working:                   false,
 		ChannelAvailable:          true,
 		LiveInjectable:            false,
-		LastActivity:              session.LastActivity.Format(time.RFC3339),
+		LastActivity:              formatActivity(session.LastActivity),
 		CurrentAction:             strPtr(session.CurrentAction),
 		LastTools:                 append(make([]sdk.RecentTool, 0), session.LastTools...),
 		Tasks:                     append(make([]sdk.TaskInfo, 0), session.Tasks...),
