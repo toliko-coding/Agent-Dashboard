@@ -583,6 +583,53 @@ html, body {
     var(--card);
   box-shadow: inset 0 1px 0 color-mix(in oklch, var(--fg) 7%, transparent);
 }
+/*
+ * Command network (3N.2.3): the hero's fixed five-node map (CommandHero.vue).
+ * Thin structure in the accent at low strength; a state colour appears only
+ * where the state is real. A signal is a 2-unit dash walked along a path of
+ * pathLength 100, fading in and out, so it never rests on screen.
+ */
+.cc-net { overflow: visible; transition: opacity var(--duration-fast) var(--ease-standard); }
+.cc-net[data-live="false"] { opacity: 0.5; }
+.cc-net[data-paused] .cc-net-signal,
+.cc-net[data-paused] .cc-net-halo { animation-play-state: paused; }
+.cc-net-line { fill: none; stroke: color-mix(in oklch, var(--accent) 32%, var(--line-strong)); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.cc-net-line[data-dim] { stroke: var(--line-strong); stroke-dasharray: 2 4; }
+.cc-net-signal {
+  fill: none;
+  stroke: var(--state-live);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 2 198;
+  stroke-dashoffset: 2;
+  opacity: 0;
+  animation-name: net-signal;
+  animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+@keyframes net-signal {
+  0% { stroke-dashoffset: 2; opacity: 0; }
+  12% { opacity: 0.9; }
+  86% { opacity: 0.9; }
+  100% { stroke-dashoffset: -100; opacity: 0; }
+}
+.cc-net-orbit { fill: none; stroke: color-mix(in oklch, var(--accent) 26%, transparent); stroke-width: 1; stroke-dasharray: 1.5 3.5; }
+.cc-net-ring { fill: var(--card); stroke: color-mix(in oklch, var(--accent) 48%, var(--line-strong)); stroke-width: 1; }
+.cc-net-core { fill: color-mix(in oklch, var(--accent) 55%, var(--fg)); opacity: 0.65; }
+.cc-net-label { fill: color-mix(in oklch, var(--fg) 45%, transparent); font-family: var(--font-mono, ui-monospace, monospace); font-size: 7.5px; letter-spacing: 0.14em; text-transform: uppercase; }
+.cc-net-node[data-state="active"] .cc-net-ring { stroke: color-mix(in oklch, var(--state-live) 70%, transparent); }
+.cc-net-node[data-state="active"] .cc-net-core { fill: var(--state-live); opacity: 1; }
+.cc-net-node[data-state="active"] .cc-net-label { fill: color-mix(in oklch, var(--state-live) 75%, var(--fg)); }
+.cc-net-node[data-state="attention"] .cc-net-ring { stroke: var(--state-waiting); }
+.cc-net-node[data-state="attention"] .cc-net-core { fill: var(--state-waiting); opacity: 1; }
+.cc-net-node[data-state="attention"] .cc-net-label { fill: color-mix(in oklch, var(--state-waiting) 80%, var(--fg)); }
+.cc-net-node[data-state="dim"] { opacity: 0.42; }
+.cc-net-halo { fill: none; stroke: var(--state-waiting); stroke-width: 1; opacity: 0.3; animation: net-halo 3600ms var(--ease-standard) infinite; }
+@keyframes net-halo {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.08; }
+}
 .cc-accent-text {
   background: linear-gradient(90deg, var(--accent), var(--live-dot));
   -webkit-background-clip: text;

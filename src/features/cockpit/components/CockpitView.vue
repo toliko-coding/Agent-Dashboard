@@ -7,6 +7,7 @@ import { openFolderTrust } from '@/composables/useSpawnWatch'
 import { useViewState } from '@/composables/useViewState'
 import { useAgents } from '@/features/agents'
 import { NeedsYouBand } from '@/features/attention'
+import { useLocalMachine } from '@/features/localscope'
 import { activeWorkAgents, agentFootprint, liveAgents, workActivity } from '../commandModel'
 import ActiveWork from './ActiveWork.vue'
 import ActivityFeedPanel from './ActivityFeedPanel.vue'
@@ -63,6 +64,9 @@ const sessions = computed(() => liveAgents(agents.value))
 // Defined once: the strip's count and the section's rows must be the same list.
 const working = computed(() => activeWorkAgents(agents.value, attentionItems.value))
 const usingTools = computed(() => working.value.filter(a => workActivity(a).state === 'tool').length)
+// The same shared snapshot poller the status strip and runtime summary read: nothing new is fetched.
+const { snapshot: machine, loaded: machineLoaded } = useLocalMachine()
+const heroNeedsYou = computed(() => props.attention.status === 'loading' || props.attention.status === 'unavailable' ? null : props.attention.items.length)
 
 function navigate(view: ActiveView): void {
   activeView.value = view
@@ -100,7 +104,12 @@ function openAgent(agent: Agent): void {
 
 <template>
   <div class="flex flex-col gap-4 min-w-0" data-testid="cockpit">
-    <CommandHero :live="live" />
+    <CommandHero
+      :live="live"
+      :working="observed ? working.length : null"
+      :needs-you="heroNeedsYou"
+      :runtime="machineLoaded ? machine.source : null"
+    />
 
     <CommandStatusStrip
       :attention="attention"
