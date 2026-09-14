@@ -47,18 +47,17 @@ describe('appSidebar', () => {
       expect(w.text()).not.toContain(retired)
   })
 
-  // Settings opens a modal, so it is not a view — it must emit rather than
-  // setting activeView, and there must be exactly one of it in the rail.
-  it('emits openSettings from the trailing Settings entry without changing the view', async () => {
+  // Settings is a page (3J): its entry navigates like any other destination.
+  it('opens the Settings page from the trailing Settings entry', async () => {
     const { AppSidebar, useViewState, useSidebar } = await load()
     useSidebar().togglePinned()
     const w = mount(AppSidebar, { props })
-    const before = useViewState().activeView.value
     const settings = w.findAll('button').filter(b => b.text().includes('Settings'))
     expect(settings).toHaveLength(1)
     await settings[0].trigger('click')
-    expect(w.emitted('openSettings')).toHaveLength(1)
-    expect(useViewState().activeView.value).toBe(before)
+    expect(useViewState().activeView.value).toBe('settings')
+    expect(w.emitted('openSettings')).toBeUndefined()
+    expect(w.get('[data-testid="nav-settings"]').attributes('aria-current')).toBe('page')
   })
 
   it('clicking a nav item sets activeView', async () => {

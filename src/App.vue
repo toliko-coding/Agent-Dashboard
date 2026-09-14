@@ -6,7 +6,6 @@ import { useAttentionQueue } from '@/features/attention/useAttentionQueue'
 import { activeWorkAgents } from '@/features/cockpit/commandModel'
 import BacklogForm from '@/features/pipeline/components/BacklogForm.vue'
 import { useTasks } from '@/features/pipeline/composables/useTasks'
-import ApiKeySettings from '@/features/settings/components/ApiKeySettings.vue'
 import LoginPage from './components/LoginPage.vue'
 import OnboardingFlow from './components/onboarding/OnboardingFlow.vue'
 import ServerReconnectOverlay from './components/ServerReconnectOverlay.vue'
@@ -54,6 +53,8 @@ const ProjectsView = defineAsyncComponent(() => import('@/features/projects/comp
 const LocalScopeView = defineAsyncComponent(() => import('@/features/localscope/components/LocalScopeView.vue'))
 const TerminalView = defineAsyncComponent(() => import('@/features/terminal/components/TerminalView.vue'))
 const SystemView = defineAsyncComponent(() => import('@/features/system/components/SystemView.vue'))
+// Settings is a page in the shell, not an overlay; lazy like every other view.
+const SettingsView = defineAsyncComponent(() => import('@/features/settings/components/SettingsView.vue'))
 /*
  * Design-system sandbox. Development only, and not a destination: no nav entry,
  * no ActiveView id, no route. Opened with the #design-sandbox hash so it cannot
@@ -193,7 +194,6 @@ const showPlanReview = ref(false)
 const activePlanTask = ref<PipelineTask | null>(null)
 const showBacklogForm = ref(false)
 const showSessions = ref(false)
-const showSettings = ref(false)
 
 function openNewTask() {
   showBacklogForm.value = true
@@ -247,7 +247,7 @@ function handleKeydown(e: KeyboardEvent) {
   }
 
   // Any open modal/dialog (incl. Spotlight) suppresses the single-key shortcuts.
-  const overlayOpen = selectedAgent.value || showSettings.value || showSpawnDialog.value
+  const overlayOpen = selectedAgent.value || showSpawnDialog.value
     || showBacklogForm.value || showSessions.value || showRefinementChat.value || activeConceptTask.value || showPlanReview.value || activePlanTask.value
     || document.querySelector('[role="dialog"], [aria-modal="true"]') !== null
   if (activeView.value !== 'dashboard' || overlayOpen || isTyping || e.ctrlKey || e.metaKey || e.altKey)
@@ -333,7 +333,6 @@ onMounted(() => usageComposable.start())
           @open-sessions="showSessions = true"
           @toggle-theme="toggleTheme"
           @install="promptInstall"
-          @open-settings="showSettings = true"
         />
       </template>
 
@@ -399,6 +398,7 @@ onMounted(() => usageComposable.start())
         <LocalScopeView v-else-if="activeView === 'localscope'" />
         <TerminalView v-else-if="activeView === 'terminal'" />
         <SystemView v-else-if="activeView === 'system'" />
+        <SettingsView v-else-if="activeView === 'settings'" />
         <WorkflowsView
           v-else-if="activeView === 'workflows'"
           @navigate="(sessionId) => { const a = agents.find(x => x.sessionId === sessionId); if (a) selectAgent(a) }"
@@ -463,7 +463,6 @@ onMounted(() => usageComposable.start())
       </div>
     </AppModal>
     <SessionList :open="showSessions" :home-dir="homedir" @close="showSessions = false" />
-    <ApiKeySettings :open="showSettings" @close="showSettings = false" />
     <OnboardingFlow :open="showOnboarding" @close="hideOnboardingFlow" @spawned="selectAgentWhenAvailable" />
     <EditGateModal />
     <ServerReconnectOverlay />

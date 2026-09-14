@@ -59,16 +59,17 @@ function resourceFixture(overrides: Partial<Record<string, unknown>> = {}) {
 
 async function openSettings(page: Page) {
   await page.goto('/')
-  await page.locator('button[aria-label="Settings"]').click()
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
+  // Settings is a page (3J): its sidebar entry navigates, and the topbar names it.
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Settings' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible()
 }
 
 /**
  * The dashboard's own left sidebar also has a "Pipeline" nav item, so
- * section buttons must be scoped to the settings modal's own <nav>.
+ * section buttons must be scoped to the Settings page's own section <nav>.
  */
 function settingsSectionNav(page: Page) {
-  return page.locator('nav').filter({ has: page.getByRole('heading', { name: 'Settings' }) })
+  return page.getByRole('navigation', { name: 'Settings sections' })
 }
 
 async function openMemoryPanel(page: Page) {

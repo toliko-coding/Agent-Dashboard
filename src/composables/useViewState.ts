@@ -13,7 +13,7 @@ import { AGENT_STATUS_FILTERS } from '../utils/agentStatusFilter'
 export type ActiveView
   = | 'cockpit' | 'dashboard' | 'projects' | 'localscope'
     | 'pipeline' | 'schedules' | 'workflows'
-    | 'terminal' | 'system'
+    | 'terminal' | 'system' | 'settings'
     | 'cost' | 'eval'
 export type DashboardLayout = 'cards' | 'list'
 
@@ -28,6 +28,8 @@ export const ACTIVE_VIEWS: ActiveView[] = [
   'workflows',
   'terminal',
   'system',
+  // Settings became a page (3J); before, it was a modal and never a stored view.
+  'settings',
   'cost',
   'eval',
 ]

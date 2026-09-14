@@ -43,8 +43,8 @@ describe('navConfig — destinations', () => {
 })
 
 describe('navConfig — saved state and retired entries', () => {
-  it('lists every view except Terminal, which left the navigation', () => {
-    expect(NAV_ITEMS.map(i => i.view).sort()).toEqual(ACTIVE_VIEWS.filter(v => v !== 'terminal').sort())
+  it('lists every view except Terminal, which left the navigation, and Settings, the trailing entry', () => {
+    expect(NAV_ITEMS.map(i => i.view).sort()).toEqual(ACTIVE_VIEWS.filter(v => v !== 'terminal' && v !== 'settings').sort())
   })
 
   // A saved view id must keep resolving: nothing a user stored is invalidated.
@@ -52,6 +52,7 @@ describe('navConfig — saved state and retired entries', () => {
     for (const view of ACTIVE_VIEWS as ActiveView[])
       expect(viewTitle(view), view).not.toBe('')
     expect(viewTitle('terminal')).toBe('Terminal')
+    expect(viewTitle('settings')).toBe('Settings')
     expect(ACTIVE_VIEWS).toContain('terminal')
   })
 

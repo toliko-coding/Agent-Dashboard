@@ -15,7 +15,7 @@ export interface UseHistoryImportOptions {
 
 /**
  * Owns the POST /api/history/import + EventSource('/api/history/import/status')
- * lifecycle shared by ApiKeySettings and CostAnalyticsView: kicks off the scan,
+ * lifecycle shared by SettingsView and CostAnalyticsView: kicks off the scan,
  * tolerates a 409 ("already running") by attaching to the live stream anyway,
  * and treats a malformed SSE frame like a stream error instead of throwing.
  */

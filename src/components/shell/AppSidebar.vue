@@ -22,7 +22,6 @@ const emit = defineEmits<{
   openSessions: []
   toggleTheme: []
   install: []
-  openSettings: []
 }>()
 
 const { expanded, pinned, togglePinned, setHovering, setFocused, collapseAfterSelect } = useSidebar()
@@ -166,9 +165,8 @@ function selectView(view: ActiveView): void {
         </div>
 
         <!--
-          Settings, the last destination. It opens a modal rather than switching
-          the active view, so it is rendered here instead of living in NAV_ITEMS
-          (which is typed to ActiveView). It is never `active` for the same reason.
+          Settings, the last destination: a page like the others, rendered here
+          as the trailing entry rather than as a NAV_ITEMS group of its own.
         -->
         <div class="flex flex-col gap-0.5" data-testid="nav-section-settings">
           <div
@@ -181,9 +179,9 @@ function selectView(view: ActiveView): void {
             icon="⚙"
             label="Settings"
             data-testid="nav-settings"
-            :active="false"
+            :active="activeView === 'settings'"
             :expanded="expanded"
-            @select="emit('openSettings')"
+            @select="selectView('settings')"
           />
         </div>
       </div>

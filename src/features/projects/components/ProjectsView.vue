@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useSettingsSection } from '@/composables/useSettingsSection'
 import AppCard from '../../../components/ui/AppCard.vue'
 import { useProjects } from '../../../composables/useProjects'
 
@@ -13,6 +14,9 @@ import { useProjects } from '../../../composables/useProjects'
 const { projects, isLoading, error } = useProjects()
 
 const sorted = computed(() => [...projects.value].sort((a, b) => a.name.localeCompare(b.name)))
+
+// The empty state's pointer to Settings is a link to that section, not an instruction.
+const { openSettings } = useSettingsSection()
 </script>
 
 <template>
@@ -26,7 +30,10 @@ const sorted = computed(() => [...projects.value].sort((a, b) => a.name.localeCo
     </p>
 
     <p v-else-if="!sorted.length" class="text-[13px] text-fg-mute">
-      No projects registered yet. Add one from Settings → Projects, or when creating an agent.
+      No projects registered yet. Add one from
+      <button type="button" data-testid="projects-open-settings" class="border-none bg-transparent p-0 font-inherit text-accent underline-offset-2 hover:underline cursor-pointer rounded focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent" @click="openSettings('projects')">
+        Settings → Projects
+      </button>, or when creating an agent.
     </p>
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">

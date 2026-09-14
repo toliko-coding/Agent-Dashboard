@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { PanelState } from '../panelState'
 import { computed, onMounted } from 'vue'
+import { useSettingsSection } from '@/composables/useSettingsSection'
 import { useGitHubSummary } from '../composables/useGitHubSummary'
 import CockpitPanel from './CockpitPanel.vue'
 
 const { repos, loading, error, denied, unconfigured, fetchSummary } = useGitHubSummary()
+const { openSettings } = useSettingsSection()
 onMounted(() => void fetchSummary())
 
 const pullRequests = computed(() => repos.value.flatMap(r => r.pullRequests.map(pr => ({ ...pr, repo: r.repo }))))
@@ -51,6 +53,12 @@ const message = computed(() => {
 
 <template>
   <CockpitPanel id="github" title="GitHub" :state="state" :message="message">
+    <!-- Unconfigured: the message names the setting; this goes straight to it. -->
+    <template v-if="unconfigured" #action>
+      <button type="button" data-testid="github-open-settings" class="border-none bg-transparent p-0 text-ui-sm text-accent hover:underline cursor-pointer rounded focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent" @click="openSettings('github')">
+        Open GitHub settings
+      </button>
+    </template>
     <p
       v-if="repoFailures.length > 0"
       data-testid="cockpit-github-partial-failure"

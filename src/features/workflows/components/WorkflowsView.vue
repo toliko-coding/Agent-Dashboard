@@ -5,6 +5,7 @@ import AppCard from '@/components/ui/AppCard.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import { usePatterns } from '@/composables/usePatterns'
 import { useSessions } from '@/composables/useSessions'
+import { useSettingsSection } from '@/composables/useSettingsSection'
 import CoOccurrenceMatrix from '@/features/workflows/components/visualizations/CoOccurrenceMatrix.vue'
 import SankeyChart from '@/features/workflows/components/visualizations/SankeyChart.vue'
 import SessionDagChart from '@/features/workflows/components/visualizations/SessionDagChart.vue'
@@ -106,6 +107,8 @@ const toolFrequency = computed(() => {
 
 const maxPatternFreq = computed(() => Math.max(0, ...patterns.value.map(p => p.frequency)))
 const maxToolFreq = computed(() => Math.max(0, ...toolFrequency.value.map(f => f.n)))
+
+const { openSettings } = useSettingsSection()
 </script>
 
 <template>
@@ -124,7 +127,10 @@ const maxToolFreq = computed(() => Math.max(0, ...toolFrequency.value.map(f => f
           Loading…
         </div>
         <div v-else-if="patterns.length === 0" class="text-xs text-fg-mute">
-          No pattern data yet. Refresh patterns via Settings → Analytics.
+          No pattern data yet. Refresh patterns via
+          <button type="button" data-testid="workflows-open-settings" class="border-none bg-transparent p-0 font-inherit text-accent underline-offset-2 hover:underline cursor-pointer rounded focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent" @click="openSettings('analytics')">
+            Settings → Analytics
+          </button>.
         </div>
         <div v-else class="flex flex-col gap-2.5">
           <div

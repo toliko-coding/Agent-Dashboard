@@ -115,3 +115,20 @@ describe('appTopbar — 3F navigation', () => {
     expect(mount(AppTopbar, { props: { activeView: 'terminal' } }).get('h1').text()).toBe('Terminal')
   })
 })
+
+describe('appTopbar — Settings page (3J)', () => {
+  it('names the open Settings section beside the Settings heading', async () => {
+    const { useSettingsSection } = await import('../../composables/useSettingsSection')
+    useSettingsSection().activeSection.value = 'appearance'
+    const w = mount(AppTopbar, { props: { activeView: 'settings' } })
+    expect(w.get('h1').text()).toBe('Settings')
+    expect(w.get('[data-testid="topbar-subsection"]').text()).toContain('Appearance')
+    useSettingsSection().activeSection.value = 'apiKeys'
+    await w.vm.$nextTick()
+    expect(w.get('[data-testid="topbar-subsection"]').text()).toContain('API Keys')
+  })
+
+  it('shows no Settings section on other views', () => {
+    expect(mount(AppTopbar, { props: { activeView: 'cockpit' } }).find('[data-testid="topbar-subsection"]').exists()).toBe(false)
+  })
+})

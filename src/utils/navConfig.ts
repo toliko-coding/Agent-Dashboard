@@ -57,6 +57,8 @@ export const NAV_ITEMS: NavItemConfig[] = [
  */
 const UNLISTED_VIEW_TITLES: Partial<Record<ActiveView, string>> = {
   terminal: 'Terminal',
+  // Settings is a view, but the sidebar renders it as its own trailing entry.
+  settings: 'Settings',
 }
 
 export function viewTitle(view: ActiveView): string {
