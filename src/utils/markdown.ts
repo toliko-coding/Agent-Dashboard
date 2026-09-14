@@ -14,6 +14,18 @@ import { Marked } from 'marked'
  */
 const md = new Marked({ breaks: true, gfm: true })
 
+/*
+ * A code block scrolls sideways when a line is wider than the transcript, and a
+ * region that scrolls must be reachable by keyboard (WCAG 2.1.1; axe
+ * scrollable-region-focusable). Every rendered <pre> is made focusable here,
+ * once, so no caller can forget it. Runs after sanitizing: the only attribute it
+ * adds is a fixed tabindex.
+ */
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.nodeName === 'PRE')
+    node.setAttribute('tabindex', '0')
+})
+
 export function renderMarkdown(text: string): string {
   return DOMPurify.sanitize(md.parse(text, { async: false }) as string)
 }

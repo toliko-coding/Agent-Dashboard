@@ -316,6 +316,8 @@ defineExpose({ focus })
       accept="image/*"
       multiple
       class="hidden"
+      tabindex="-1"
+      aria-label="Attach images"
       @change="onFileChange"
     >
     <!-- Attached images (full variant): injected as @<path> tokens on send -->
@@ -368,8 +370,7 @@ defineExpose({ focus })
         :placeholder="isResumeMode ? 'Prompt… (resumes as a new session)' : 'Enter prompt...'"
         :aria-label="isResumeMode ? 'Prompt to resume this session as a new session' : 'Prompt for this agent'"
         :disabled="isSending"
-        role="combobox"
-        :aria-expanded="showSuggestions"
+        aria-autocomplete="list"
         :aria-describedby="hintId"
         :aria-controls="showSuggestions ? listboxId : undefined"
         class="flex-1 bg-transparent border-none text-fg text-[13px] font-mono focus-visible:outline-none placeholder:text-fg-faint disabled:opacity-50 resize-none leading-snug min-h-[22px] max-h-36 overflow-y-auto"

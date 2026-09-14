@@ -456,7 +456,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <AppModal :open="open" width="600px" @close="emit('close')">
+  <AppModal :open="open" width="600px" labelled-by="spawn-title" @close="emit('close')">
     <AppModalHeader id="spawn-title" title="New Agent" @close="emit('close')" />
 
     <form ref="formEl" class="flex-1 min-h-0 overflow-y-auto p-5 flex flex-col gap-4" @submit.prevent>

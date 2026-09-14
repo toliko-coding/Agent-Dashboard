@@ -65,12 +65,12 @@ async function confirm() {
 <template>
   <AppModal :open="!!agent" :z-index="1200" labelled-by="agent-lifecycle-title" @close="close">
     <div v-if="agent" class="flex flex-col gap-4 p-5" data-testid="agent-lifecycle-dialog" :data-action="action">
-      <header class="flex items-center gap-3">
+      <div class="flex items-center gap-3">
         <AgentGlyph :agent="agent" />
         <h2 id="agent-lifecycle-title" class="m-0 text-title font-semibold text-fg">
           {{ action === 'stop' ? `Stop “${name}”?` : `Delete “${name}”?` }}
         </h2>
-      </header>
+      </div>
 
       <div class="flex flex-col gap-2 text-ui text-fg-soft" data-testid="agent-lifecycle-explanation">
         <template v-if="action === 'stop'">

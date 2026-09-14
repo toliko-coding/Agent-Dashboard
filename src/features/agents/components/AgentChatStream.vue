@@ -298,7 +298,7 @@ defineExpose({ scrollToBottom })
                   <span class="text-fg-mute ml-1.5 text-[10px]">— {{ call.filePath || 'no target' }}</span>
                   <span class="text-fg-mute ml-1.5 text-[10px]">({{ call.result ? 'with output' : 'no output' }})</span>
                 </summary>
-                <pre v-if="call.result" class="bg-raised rounded p-2 text-[11px] text-fg-mute max-h-[200px] overflow-y-auto mt-1 mb-1 whitespace-pre-wrap break-words">{{ call.result }}</pre>
+                <pre v-if="call.result" tabindex="0" :aria-label="`${call.toolName} output`" class="bg-raised rounded p-2 text-[11px] text-fg-mute max-h-[200px] overflow-y-auto mt-1 mb-1 whitespace-pre-wrap break-words focus-visible:outline-2 focus-visible:outline-ring">{{ call.result }}</pre>
               </details>
             </div>
           </details>

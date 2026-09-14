@@ -24,7 +24,7 @@ describe('renderMarkdown', () => {
 
     it('renders fenced code blocks (gfm)', () => {
       const html = renderMarkdown('```\nconst x = 1\n```')
-      expect(html).toContain('<pre>')
+      expect(html).toContain('<pre tabindex="0">')
       expect(html).toContain('<code>')
     })
 
@@ -82,5 +82,23 @@ describe('renderMarkdown', () => {
 
   it('returns an empty string for empty input', () => {
     expect(renderMarkdown('').trim()).toBe('')
+  })
+})
+
+describe('renderMarkdown — keyboard access (3N.2.1)', () => {
+  it('makes every code block focusable, so a block that scrolls sideways can be scrolled by keyboard', () => {
+    const html = renderMarkdown('```\nconst a = 1\n```\n\ntext\n\n    indented code')
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const pres = [...doc.querySelectorAll('pre')]
+    expect(pres.length).toBe(2)
+    for (const pre of pres)
+      expect(pre.getAttribute('tabindex')).toBe('0')
+  })
+
+  it('still strips what sanitizing strips', () => {
+    const html = renderMarkdown('<pre onfocus="alert(1)">x</pre><script>alert(1)</script>')
+    expect(html).not.toContain('onfocus')
+    expect(html).not.toContain('<script')
+    expect(html).toContain('tabindex="0"')
   })
 })

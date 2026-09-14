@@ -9,7 +9,8 @@ const emit = defineEmits<{ close: [] }>()
 </script>
 
 <template>
-  <header class="flex items-center gap-2.5 px-5 py-4 border-b border-line shrink-0">
+  <!-- A div, not <header>: inside a dialog a header element is a second page banner landmark. -->
+  <div class="flex items-center gap-2.5 px-5 py-4 border-b border-line shrink-0">
     <h2
       :id="id"
       class="text-xl font-semibold text-fg m-0 whitespace-nowrap"
@@ -26,5 +27,5 @@ const emit = defineEmits<{ close: [] }>()
     >
       &#x2715;
     </button>
-  </header>
+  </div>
 </template>

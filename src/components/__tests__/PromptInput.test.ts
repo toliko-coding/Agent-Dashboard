@@ -157,3 +157,19 @@ describe('promptInput argument hints', () => {
     expect(w.find('[data-testid="command-usage"]').text()).toBe('[env] [--dry-run]')
   })
 })
+
+describe('promptInput — composer semantics (3N.2.1)', () => {
+  it('gives the multi-line composer a textbox role with a name, and no combobox role a textarea cannot have', async () => {
+    const { axe } = await import('@/utils/testA11y')
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(url.startsWith('/api/slash-commands') ? commandsResponse : []) })))
+    const w = mount(PromptInput, { props: { agent: makeAgent(), variant: 'full' }, attachTo: document.body })
+    await flushPromises()
+    const textarea = w.get('textarea')
+    expect(textarea.attributes('role')).toBeUndefined()
+    expect(textarea.attributes('aria-expanded')).toBeUndefined()
+    expect(textarea.attributes('aria-label')).toBe('Prompt for this agent')
+    expect(textarea.attributes('aria-autocomplete')).toBe('list')
+    expect(await axe(w.element as Element)).toHaveNoViolations()
+    w.unmount()
+  })
+})

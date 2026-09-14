@@ -678,3 +678,9 @@ html, body {
 @utility table-head {
   @apply text-left text-label font-semibold uppercase tracking-wide text-fg-mute;
 }
+
+/* Scrollable code blocks are focusable (3N.2.1); show where focus is. */
+.markdown-body pre:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

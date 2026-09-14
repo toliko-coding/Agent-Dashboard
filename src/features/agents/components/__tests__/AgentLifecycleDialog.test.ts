@@ -120,3 +120,19 @@ describe('agentLifecycleDialog — stop', () => {
     w.unmount()
   })
 })
+
+// 3N.2.1: inside a dialog a <header> is a second page banner landmark (axe).
+describe('agentLifecycleDialog — landmarks', () => {
+  it('adds no banner landmark inside the dialog, and the shared modal header neither', async () => {
+    useAgentLifecycle().requestDelete(agent({ dashboardOwned: true }))
+    const w = await mountDialog()
+    expect(q('agent-lifecycle-dialog')).not.toBeNull()
+    expect(document.querySelector('[data-testid="agent-lifecycle-dialog"] header')).toBeNull()
+    const { default: AppModalHeader } = await import('@/components/ui/AppModalHeader.vue')
+    const header = mount(AppModalHeader, { props: { title: 'New Agent', id: 'spawn-title' } })
+    expect(header.find('header').exists()).toBe(false)
+    expect(header.get('h2').attributes('id')).toBe('spawn-title')
+    header.unmount()
+    w.unmount()
+  })
+})
