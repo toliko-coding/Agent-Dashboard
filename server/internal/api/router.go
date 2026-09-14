@@ -16,6 +16,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/sdk"
 	"github.com/lx-wnk/agent-dashboard/server/frontend"
 	"github.com/lx-wnk/agent-dashboard/server/internal/agentbroadcast"
+	"github.com/lx-wnk/agent-dashboard/server/internal/agentprofile"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/adapters"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/admin"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/agents"
@@ -166,7 +167,9 @@ type RouterDeps struct {
 	ApiKeyRepo        repo.ApiKeyRepo
 	ProjectRepo       repo.ProjectRepo
 	ProjectFolderRepo repo.ProjectFolderRepo
-	SpawnerRepo       repo.SpawnerRepo
+	// AgentProfiles stores display names and icon categories given at spawn.
+	AgentProfiles *agentprofile.Store
+	SpawnerRepo   repo.SpawnerRepo
 	// SpawnerBroadcaster fans out spawner CRUD events to SSE subscribers.
 	// May be nil; Stream is only mounted in DI where a broadcaster is always provided.
 	SpawnerBroadcaster *sse.SpawnerBroadcaster
@@ -572,6 +575,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 			deps.SpawnerRepo, spawnPolicy,
 		)
 		spawnMgr.SetProjectFolderRepo(deps.ProjectFolderRepo)
+		if deps.AgentProfiles != nil {
+			spawnMgr.SetAgentProfiles(deps.AgentProfiles)
+		}
 		// Lets a spawn's status report Claude's folder trust question, which is
 		// asked before the session exists anywhere else.
 		spawnMgr.SetScreenProbe(merger.RealScreenProbe)

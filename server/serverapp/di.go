@@ -21,6 +21,7 @@ import (
 
 	sdk "github.com/lx-wnk/agent-dashboard/sdk"
 	"github.com/lx-wnk/agent-dashboard/server/internal/agentbroadcast"
+	"github.com/lx-wnk/agent-dashboard/server/internal/agentprofile"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/adapters"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/admin"
@@ -525,12 +526,19 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 	var taskRepoForResolver repo.TaskRepo
 	var projectRepo repo.ProjectRepo
 	var projectFolderRepo repo.ProjectFolderRepo
+	var agentProfiles *agentprofile.Store
 	var spawnerRepo repo.SpawnerRepo
 	var spawnerResolver services.SpawnerResolver
 	if entClient != nil {
 		taskRepoForResolver = repo.NewTaskRepo(entClient)
 		projectRepo = repo.NewProjectRepo(entClient)
 		projectFolderRepo = repo.NewProjectFolderRepo(entClient)
+		// Display names and icon categories given at spawn, by session id (3N.1).
+		agentProfiles = agentprofile.New(repo.NewAgentProfileRepo(entClient))
+		if err := agentProfiles.Load(ctx); err != nil {
+			slog.Warn("agent profiles not loaded; agents show their session titles", "err", err)
+		}
+		agentMerger.SetAgentProfiles(agentProfiles)
 		spawnerRepo = repo.NewSpawnerRepo(entClient)
 		if bundle != nil {
 			if err := repairSpawnerAdapterConfig(ctx, bundle.DB); err != nil {
@@ -972,6 +980,7 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 		ApiKeyRepo:             apiKeyRepo,
 		ProjectRepo:            projectRepo,
 		ProjectFolderRepo:      projectFolderRepo,
+		AgentProfiles:          agentProfiles,
 		SpawnerRepo:            spawnerRepo,
 		SpawnerBroadcaster:     spawnerBroadcaster,
 		ProjectBroadcaster:     projectBroadcaster,

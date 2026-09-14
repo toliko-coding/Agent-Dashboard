@@ -14,6 +14,8 @@ type Tx struct {
 	config
 	// AgentCostTrend is the client for interacting with the AgentCostTrend builders.
 	AgentCostTrend *AgentCostTrendClient
+	// AgentProfile is the client for interacting with the AgentProfile builders.
+	AgentProfile *AgentProfileClient
 	// ApiKey is the client for interacting with the ApiKey builders.
 	ApiKey *ApiKeyClient
 	// AppSetting is the client for interacting with the AppSetting builders.
@@ -216,6 +218,7 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.AgentCostTrend = NewAgentCostTrendClient(tx.config)
+	tx.AgentProfile = NewAgentProfileClient(tx.config)
 	tx.ApiKey = NewApiKeyClient(tx.config)
 	tx.AppSetting = NewAppSettingClient(tx.config)
 	tx.AuditEvent = NewAuditEventClient(tx.config)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/lx-wnk/agent-dashboard/server/internal/agentprofile"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -277,6 +278,9 @@ type Merger struct {
 	// workspaces resolves an agent's cwd to the checkout it runs in. Cached,
 	// because this rebuilds every agent on every SSE tick; see the resolver.
 	workspaces *identity.Resolver
+	// profiles attaches the display name and icon category a user gave an agent
+	// at spawn, by session id (3N.1). Nil: no agent carries either.
+	profiles ProfileLookup
 
 	// Pending folder trust: Claude processes with no session yet that show
 	// Claude Code's trust question (3M.1). Rebuilt on every scan.
@@ -284,6 +288,29 @@ type Merger struct {
 	trust     []sdk.PendingFolderTrust
 	trustSeen map[int]time.Time
 	trustCwd  map[int]string
+}
+
+// ProfileLookup finds the presentation metadata saved for a session.
+type ProfileLookup interface {
+	Lookup(sessionID string) (agentprofile.Profile, bool)
+}
+
+// SetAgentProfiles installs the profile lookup. Call once, before serving.
+func (m *Merger) SetAgentProfiles(p ProfileLookup) { m.profiles = p }
+
+// applyProfiles attaches saved presentation metadata to each agent by session
+// id — never by folder, Project or process — on every scan, so a rebuilt agent
+// carries it again. Only DisplayName and Category are touched.
+func (m *Merger) applyProfiles(agents []sdk.Agent) {
+	if m.profiles == nil {
+		return
+	}
+	for i := range agents {
+		if p, ok := m.profiles.Lookup(agents[i].SessionID); ok {
+			agents[i].DisplayName = p.DisplayName
+			agents[i].Category = p.Category
+		}
+	}
 }
 
 // ScreenProbeFn resolves whichever AskUserQuestion screen is currently open on
@@ -442,6 +469,8 @@ func (m *Merger) GetAgents(ctx context.Context, opts GetAgentsOpts) ([]sdk.Agent
 		}
 		result = append(result, s)
 	}
+
+	m.applyProfiles(result)
 
 	if opts.Enricher != nil {
 		opts.Enricher(ctx, result)

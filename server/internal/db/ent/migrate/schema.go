@@ -46,6 +46,20 @@ var (
 			},
 		},
 	}
+	// AgentProfilesColumns holds the columns for the "agent_profiles" table.
+	AgentProfilesColumns = []*schema.Column{
+		{Name: "session_id", Type: field.TypeString},
+		{Name: "display_name", Type: field.TypeString, Default: ""},
+		{Name: "category", Type: field.TypeString, Default: ""},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// AgentProfilesTable holds the schema information for the "agent_profiles" table.
+	AgentProfilesTable = &schema.Table{
+		Name:       "agent_profiles",
+		Columns:    AgentProfilesColumns,
+		PrimaryKey: []*schema.Column{AgentProfilesColumns[0]},
+	}
 	// APIKeysColumns holds the columns for the "api_keys" table.
 	APIKeysColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -1096,6 +1110,7 @@ var (
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		AgentCostTrendsTable,
+		AgentProfilesTable,
 		APIKeysTable,
 		AppSettingsTable,
 		AuditEventsTable,

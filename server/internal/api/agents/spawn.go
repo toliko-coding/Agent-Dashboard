@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/lx-wnk/agent-dashboard/sdk"
+	"github.com/lx-wnk/agent-dashboard/server/internal/agentprofile"
 	"github.com/lx-wnk/agent-dashboard/server/internal/auth"
 	"github.com/lx-wnk/agent-dashboard/server/internal/channelconfig"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent"
@@ -77,7 +78,9 @@ type SpawnManager struct {
 	rateLimitMax    int
 	rateLimitWindow time.Duration
 
-	spawnerRepo       repo.SpawnerRepo
+	spawnerRepo repo.SpawnerRepo
+	// profiles persists the display name and icon category given at spawn (3N.1).
+	profiles          ProfileSaver
 	spawnPolicy       services.SpawnPolicy
 	projectFolderRepo repo.ProjectFolderRepo // may be nil
 	// screenProbe reads whichever interactive screen is open on a spawned
@@ -141,6 +144,17 @@ func (m *SpawnManager) SetProjectFolderRepo(r repo.ProjectFolderRepo) {
 	m.projectFolderRepo = r
 }
 
+// ProfileSaver persists an agent's presentation metadata by session id.
+type ProfileSaver interface {
+	Save(ctx context.Context, sessionID string, p agentprofile.Profile) error
+}
+
+// SetAgentProfiles wires the store a spawn's display name and icon category are
+// saved to. Unset, a spawn that carries them reports them as not saved.
+func (m *SpawnManager) SetAgentProfiles(p ProfileSaver) {
+	m.profiles = p
+}
+
 // SetScreenProbe installs the probe used to see Claude Code's folder trust
 // question on a spawned session's terminal. Safe to leave unset.
 func (m *SpawnManager) SetScreenProbe(fn func(pid int) *sdk.PendingScreen) {
@@ -199,6 +213,11 @@ type spawnRequest struct {
 	permissionMode  string
 	projectID       string
 	enableChannel   bool
+	// profile is the optional display name and icon category (presentation only).
+	profile agentprofile.Profile
+	// sessionID is the Claude session this spawn pins (--session-id) or resumes;
+	// set by buildSpawnArgs, "" for an adapter that cannot be pinned.
+	sessionID string
 }
 
 // enforceSpawnPolicy validates the request body fields and applies the spawn
@@ -254,6 +273,15 @@ func (m *SpawnManager) enforceSpawnPolicy(body map[string]any) (*spawnRequest, e
 		enableChannel = true // default on
 	}
 
+	// Presentation only, checked after the policy gate on purpose: a name or a
+	// category can never make a folder allowed, and neither affects the args.
+	displayName, _ := body["displayName"].(string)
+	category, _ := body["category"].(string)
+	profile, err := agentprofile.Normalize(displayName, category)
+	if err != nil {
+		return nil, err
+	}
+
 	return &spawnRequest{
 		prompt:          prompt,
 		cwd:             cwd,
@@ -263,6 +291,7 @@ func (m *SpawnManager) enforceSpawnPolicy(body map[string]any) (*spawnRequest, e
 		permissionMode:  permissionMode,
 		projectID:       projectID,
 		enableChannel:   enableChannel,
+		profile:         profile,
 	}, nil
 }
 
@@ -320,6 +349,7 @@ func (m *SpawnManager) buildSpawnArgs(req *spawnRequest, spawnerRow *ent.Spawner
 	var canonicalArgs []string
 	switch {
 	case req.resumeSessionID != "":
+		req.sessionID = req.resumeSessionID
 		canonicalArgs = append(canonicalArgs, "--resume", req.resumeSessionID)
 	case nativeClaudeAdapter(spawnerRow):
 		// Pin the session up front. Claude writes sessions/{pid}.json only after
@@ -328,7 +358,8 @@ func (m *SpawnManager) buildSpawnArgs(req *spawnRequest, spawnerRow *ent.Spawner
 		// agent's session when the folder already has one. The new agent then
 		// shows the old agent's transcript. An id in argv is visible on the very
 		// first scan tick (parser.SessionIDFromArgs).
-		canonicalArgs = append(canonicalArgs, "--session-id", uuid.NewString())
+		req.sessionID = uuid.NewString()
+		canonicalArgs = append(canonicalArgs, "--session-id", req.sessionID)
 	}
 	if req.model != "" {
 		canonicalArgs = append(canonicalArgs, "--model", req.model)
@@ -383,16 +414,37 @@ func nativeClaudeAdapter(spawnerRow *ent.Spawner) bool {
 // Spawn validates the request, spawns a claude process, and returns the PID.
 // sub identifies the requesting user (JWT sub claim). Pass "__global__" in bypass-auth mode.
 func (m *SpawnManager) Spawn(sub string, body map[string]any) (int, error) {
+	out, err := m.SpawnWithOutcome(sub, body)
+	return out.PID, err
+}
+
+// Profile outcomes a spawn reports for its display name and icon category.
+const (
+	ProfileSaved       = "saved"
+	ProfileUnsupported = "unsupported" // no session id to key it by (a custom adapter)
+	ProfileFailed      = "failed"
+)
+
+// SpawnOutcome is what a successful spawn reports.
+type SpawnOutcome struct {
+	PID int
+	// Profile is "" when no name or category was given, else a Profile* outcome.
+	Profile string
+}
+
+// SpawnWithOutcome is Spawn, also reporting whether the display name and icon
+// category given with the request were saved.
+func (m *SpawnManager) SpawnWithOutcome(sub string, body map[string]any) (SpawnOutcome, error) {
 	m.recordAttempt(sub)
 
 	req, err := m.enforceSpawnPolicy(body)
 	if err != nil {
-		return 0, err
+		return SpawnOutcome{}, err
 	}
 
 	spawnerRow, err := m.resolveSpawner(body, req)
 	if err != nil {
-		return 0, err
+		return SpawnOutcome{}, err
 	}
 
 	if req.projectID != "" {
@@ -405,7 +457,7 @@ func (m *SpawnManager) Spawn(sub string, body map[string]any) (int, error) {
 
 	binary, args, err := m.buildSpawnArgs(req, spawnerRow)
 	if err != nil {
-		return 0, err
+		return SpawnOutcome{}, err
 	}
 
 	var channelCfgPath string
@@ -433,7 +485,7 @@ func (m *SpawnManager) Spawn(sub string, body map[string]any) (int, error) {
 		if channelCfgPath != "" {
 			_ = os.Remove(channelCfgPath)
 		}
-		return 0, fmt.Errorf("spawn failed: %w", err)
+		return SpawnOutcome{}, fmt.Errorf("spawn failed: %w", err)
 	}
 	status := &SpawnStatus{
 		PID: pid, Status: "running",
@@ -448,7 +500,24 @@ func (m *SpawnManager) Spawn(sub string, body map[string]any) (int, error) {
 	m.spawnStore[pid] = status
 	m.mu.Unlock()
 	go watch()
-	return pid, nil
+	return SpawnOutcome{PID: pid, Profile: m.saveProfile(req)}, nil
+}
+
+// saveProfile persists the display name and icon category given with a spawn,
+// keyed by the session id the spawn pinned or resumed. It runs only after the
+// process started, so a failed spawn leaves no profile behind.
+func (m *SpawnManager) saveProfile(req *spawnRequest) string {
+	if req.profile.Empty() {
+		return ""
+	}
+	if req.sessionID == "" || m.profiles == nil {
+		return ProfileUnsupported
+	}
+	if err := m.profiles.Save(context.Background(), req.sessionID, req.profile); err != nil {
+		slog.Warn("spawn: agent profile not saved", "err", err)
+		return ProfileFailed
+	}
+	return ProfileSaved
 }
 
 // launchInteractive starts the resolved command under a headless live transport
@@ -903,7 +972,7 @@ func (h *SpawnHandler) Spawn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pid, err := h.manager.Spawn(sub, body)
+	outcome, err := h.manager.SpawnWithOutcome(sub, body)
 	if err != nil {
 		code := http.StatusBadRequest
 		if errors.Is(err, services.ErrCwdBlacklisted) || errors.Is(err, services.ErrCwdNotAllowed) {
@@ -917,7 +986,11 @@ func (h *SpawnHandler) Spawn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "pid": pid})
+	resp := map[string]any{"ok": true, "pid": outcome.PID}
+	if outcome.Profile != "" {
+		resp["profile"] = outcome.Profile
+	}
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // Status handles GET /api/agents/spawn/{pid}/status.

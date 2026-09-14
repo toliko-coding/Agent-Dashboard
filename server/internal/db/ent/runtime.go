@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/agentcosttrend"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/agentprofile"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/apikey"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/appsetting"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/auditevent"
@@ -69,6 +70,30 @@ func init() {
 	agentcosttrendDescSourceMtime := agentcosttrendFields[10].Descriptor()
 	// agentcosttrend.DefaultSourceMtime holds the default value on creation for the source_mtime field.
 	agentcosttrend.DefaultSourceMtime = agentcosttrendDescSourceMtime.Default.(int64)
+	agentprofileFields := schema.AgentProfile{}.Fields()
+	_ = agentprofileFields
+	// agentprofileDescDisplayName is the schema descriptor for display_name field.
+	agentprofileDescDisplayName := agentprofileFields[1].Descriptor()
+	// agentprofile.DefaultDisplayName holds the default value on creation for the display_name field.
+	agentprofile.DefaultDisplayName = agentprofileDescDisplayName.Default.(string)
+	// agentprofileDescCategory is the schema descriptor for category field.
+	agentprofileDescCategory := agentprofileFields[2].Descriptor()
+	// agentprofile.DefaultCategory holds the default value on creation for the category field.
+	agentprofile.DefaultCategory = agentprofileDescCategory.Default.(string)
+	// agentprofileDescCreatedAt is the schema descriptor for created_at field.
+	agentprofileDescCreatedAt := agentprofileFields[3].Descriptor()
+	// agentprofile.DefaultCreatedAt holds the default value on creation for the created_at field.
+	agentprofile.DefaultCreatedAt = agentprofileDescCreatedAt.Default.(func() time.Time)
+	// agentprofileDescUpdatedAt is the schema descriptor for updated_at field.
+	agentprofileDescUpdatedAt := agentprofileFields[4].Descriptor()
+	// agentprofile.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	agentprofile.DefaultUpdatedAt = agentprofileDescUpdatedAt.Default.(func() time.Time)
+	// agentprofile.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	agentprofile.UpdateDefaultUpdatedAt = agentprofileDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// agentprofileDescID is the schema descriptor for id field.
+	agentprofileDescID := agentprofileFields[0].Descriptor()
+	// agentprofile.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	agentprofile.IDValidator = agentprofileDescID.Validators[0].(func(string) error)
 	apikeyFields := schema.ApiKey{}.Fields()
 	_ = apikeyFields
 	// apikeyDescScopes is the schema descriptor for scopes field.

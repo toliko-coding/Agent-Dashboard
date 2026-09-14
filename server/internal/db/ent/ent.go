@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/agentcosttrend"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/agentprofile"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/apikey"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/appsetting"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/auditevent"
@@ -109,6 +110,7 @@ func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			agentcosttrend.Table:     agentcosttrend.ValidColumn,
+			agentprofile.Table:       agentprofile.ValidColumn,
 			apikey.Table:             apikey.ValidColumn,
 			appsetting.Table:         appsetting.ValidColumn,
 			auditevent.Table:         auditevent.ValidColumn,

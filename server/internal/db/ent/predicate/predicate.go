@@ -9,6 +9,9 @@ import (
 // AgentCostTrend is the predicate function for agentcosttrend builders.
 type AgentCostTrend func(*sql.Selector)
 
+// AgentProfile is the predicate function for agentprofile builders.
+type AgentProfile func(*sql.Selector)
+
 // ApiKey is the predicate function for apikey builders.
 type ApiKey func(*sql.Selector)
 

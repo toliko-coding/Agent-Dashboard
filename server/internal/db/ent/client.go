@@ -16,6 +16,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/agentcosttrend"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/agentprofile"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/apikey"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/appsetting"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/auditevent"
@@ -60,6 +61,8 @@ type Client struct {
 	Schema *migrate.Schema
 	// AgentCostTrend is the client for interacting with the AgentCostTrend builders.
 	AgentCostTrend *AgentCostTrendClient
+	// AgentProfile is the client for interacting with the AgentProfile builders.
+	AgentProfile *AgentProfileClient
 	// ApiKey is the client for interacting with the ApiKey builders.
 	ApiKey *ApiKeyClient
 	// AppSetting is the client for interacting with the AppSetting builders.
@@ -142,6 +145,7 @@ func NewClient(opts ...Option) *Client {
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.AgentCostTrend = NewAgentCostTrendClient(c.config)
+	c.AgentProfile = NewAgentProfileClient(c.config)
 	c.ApiKey = NewApiKeyClient(c.config)
 	c.AppSetting = NewAppSettingClient(c.config)
 	c.AuditEvent = NewAuditEventClient(c.config)
@@ -270,6 +274,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ctx:                ctx,
 		config:             cfg,
 		AgentCostTrend:     NewAgentCostTrendClient(cfg),
+		AgentProfile:       NewAgentProfileClient(cfg),
 		ApiKey:             NewApiKeyClient(cfg),
 		AppSetting:         NewAppSettingClient(cfg),
 		AuditEvent:         NewAuditEventClient(cfg),
@@ -325,6 +330,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ctx:                ctx,
 		config:             cfg,
 		AgentCostTrend:     NewAgentCostTrendClient(cfg),
+		AgentProfile:       NewAgentProfileClient(cfg),
 		ApiKey:             NewApiKeyClient(cfg),
 		AppSetting:         NewAppSettingClient(cfg),
 		AuditEvent:         NewAuditEventClient(cfg),
@@ -389,9 +395,9 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.AgentCostTrend, c.ApiKey, c.AppSetting, c.AuditEvent, c.Capability,
-		c.Checkpoint, c.CoordLock, c.DriftAlert, c.EvalMetricSnapshot, c.Grant,
-		c.GrantUsage, c.Materialization, c.MemoryEntry, c.MemoryInjection,
+		c.AgentCostTrend, c.AgentProfile, c.ApiKey, c.AppSetting, c.AuditEvent,
+		c.Capability, c.Checkpoint, c.CoordLock, c.DriftAlert, c.EvalMetricSnapshot,
+		c.Grant, c.GrantUsage, c.Materialization, c.MemoryEntry, c.MemoryInjection,
 		c.PermissionPreset, c.PermissionRequest, c.PipelineConfig, c.Plugin,
 		c.PluginSetting, c.Project, c.ProjectFolder, c.PromptTemplate,
 		c.ProviderSetting, c.RefinementTurn, c.RemoteRegistration, c.Resource,
@@ -406,9 +412,9 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.AgentCostTrend, c.ApiKey, c.AppSetting, c.AuditEvent, c.Capability,
-		c.Checkpoint, c.CoordLock, c.DriftAlert, c.EvalMetricSnapshot, c.Grant,
-		c.GrantUsage, c.Materialization, c.MemoryEntry, c.MemoryInjection,
+		c.AgentCostTrend, c.AgentProfile, c.ApiKey, c.AppSetting, c.AuditEvent,
+		c.Capability, c.Checkpoint, c.CoordLock, c.DriftAlert, c.EvalMetricSnapshot,
+		c.Grant, c.GrantUsage, c.Materialization, c.MemoryEntry, c.MemoryInjection,
 		c.PermissionPreset, c.PermissionRequest, c.PipelineConfig, c.Plugin,
 		c.PluginSetting, c.Project, c.ProjectFolder, c.PromptTemplate,
 		c.ProviderSetting, c.RefinementTurn, c.RemoteRegistration, c.Resource,
@@ -424,6 +430,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
 	case *AgentCostTrendMutation:
 		return c.AgentCostTrend.mutate(ctx, m)
+	case *AgentProfileMutation:
+		return c.AgentProfile.mutate(ctx, m)
 	case *ApiKeyMutation:
 		return c.ApiKey.mutate(ctx, m)
 	case *AppSettingMutation:
@@ -629,6 +637,139 @@ func (c *AgentCostTrendClient) mutate(ctx context.Context, m *AgentCostTrendMuta
 		return (&AgentCostTrendDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown AgentCostTrend mutation op: %q", m.Op())
+	}
+}
+
+// AgentProfileClient is a client for the AgentProfile schema.
+type AgentProfileClient struct {
+	config
+}
+
+// NewAgentProfileClient returns a client for the AgentProfile from the given config.
+func NewAgentProfileClient(c config) *AgentProfileClient {
+	return &AgentProfileClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `agentprofile.Hooks(f(g(h())))`.
+func (c *AgentProfileClient) Use(hooks ...Hook) {
+	c.hooks.AgentProfile = append(c.hooks.AgentProfile, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `agentprofile.Intercept(f(g(h())))`.
+func (c *AgentProfileClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AgentProfile = append(c.inters.AgentProfile, interceptors...)
+}
+
+// Create returns a builder for creating a AgentProfile entity.
+func (c *AgentProfileClient) Create() *AgentProfileCreate {
+	mutation := newAgentProfileMutation(c.config, OpCreate)
+	return &AgentProfileCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AgentProfile entities.
+func (c *AgentProfileClient) CreateBulk(builders ...*AgentProfileCreate) *AgentProfileCreateBulk {
+	return &AgentProfileCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AgentProfileClient) MapCreateBulk(slice any, setFunc func(*AgentProfileCreate, int)) *AgentProfileCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AgentProfileCreateBulk{err: fmt.Errorf("calling to AgentProfileClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AgentProfileCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AgentProfileCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AgentProfile.
+func (c *AgentProfileClient) Update() *AgentProfileUpdate {
+	mutation := newAgentProfileMutation(c.config, OpUpdate)
+	return &AgentProfileUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AgentProfileClient) UpdateOne(_m *AgentProfile) *AgentProfileUpdateOne {
+	mutation := newAgentProfileMutation(c.config, OpUpdateOne, withAgentProfile(_m))
+	return &AgentProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AgentProfileClient) UpdateOneID(id string) *AgentProfileUpdateOne {
+	mutation := newAgentProfileMutation(c.config, OpUpdateOne, withAgentProfileID(id))
+	return &AgentProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AgentProfile.
+func (c *AgentProfileClient) Delete() *AgentProfileDelete {
+	mutation := newAgentProfileMutation(c.config, OpDelete)
+	return &AgentProfileDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AgentProfileClient) DeleteOne(_m *AgentProfile) *AgentProfileDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AgentProfileClient) DeleteOneID(id string) *AgentProfileDeleteOne {
+	builder := c.Delete().Where(agentprofile.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AgentProfileDeleteOne{builder}
+}
+
+// Query returns a query builder for AgentProfile.
+func (c *AgentProfileClient) Query() *AgentProfileQuery {
+	return &AgentProfileQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAgentProfile},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AgentProfile entity by its id.
+func (c *AgentProfileClient) Get(ctx context.Context, id string) (*AgentProfile, error) {
+	return c.Query().Where(agentprofile.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AgentProfileClient) GetX(ctx context.Context, id string) *AgentProfile {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *AgentProfileClient) Hooks() []Hook {
+	return c.hooks.AgentProfile
+}
+
+// Interceptors returns the client interceptors.
+func (c *AgentProfileClient) Interceptors() []Interceptor {
+	return c.inters.AgentProfile
+}
+
+func (c *AgentProfileClient) mutate(ctx context.Context, m *AgentProfileMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AgentProfileCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AgentProfileUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AgentProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AgentProfileDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AgentProfile mutation op: %q", m.Op())
 	}
 }
 
@@ -5482,21 +5623,23 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		AgentCostTrend, ApiKey, AppSetting, AuditEvent, Capability, Checkpoint,
-		CoordLock, DriftAlert, EvalMetricSnapshot, Grant, GrantUsage, Materialization,
-		MemoryEntry, MemoryInjection, PermissionPreset, PermissionRequest,
-		PipelineConfig, Plugin, PluginSetting, Project, ProjectFolder, PromptTemplate,
-		ProviderSetting, RefinementTurn, RemoteRegistration, Resource, Scratchpad,
-		Skill, Spawner, StageRun, SystemPrompt, Task, TaskDependency, TaskPermission,
-		TaskSchedule, User []ent.Hook
+		AgentCostTrend, AgentProfile, ApiKey, AppSetting, AuditEvent, Capability,
+		Checkpoint, CoordLock, DriftAlert, EvalMetricSnapshot, Grant, GrantUsage,
+		Materialization, MemoryEntry, MemoryInjection, PermissionPreset,
+		PermissionRequest, PipelineConfig, Plugin, PluginSetting, Project,
+		ProjectFolder, PromptTemplate, ProviderSetting, RefinementTurn,
+		RemoteRegistration, Resource, Scratchpad, Skill, Spawner, StageRun,
+		SystemPrompt, Task, TaskDependency, TaskPermission, TaskSchedule,
+		User []ent.Hook
 	}
 	inters struct {
-		AgentCostTrend, ApiKey, AppSetting, AuditEvent, Capability, Checkpoint,
-		CoordLock, DriftAlert, EvalMetricSnapshot, Grant, GrantUsage, Materialization,
-		MemoryEntry, MemoryInjection, PermissionPreset, PermissionRequest,
-		PipelineConfig, Plugin, PluginSetting, Project, ProjectFolder, PromptTemplate,
-		ProviderSetting, RefinementTurn, RemoteRegistration, Resource, Scratchpad,
-		Skill, Spawner, StageRun, SystemPrompt, Task, TaskDependency, TaskPermission,
-		TaskSchedule, User []ent.Interceptor
+		AgentCostTrend, AgentProfile, ApiKey, AppSetting, AuditEvent, Capability,
+		Checkpoint, CoordLock, DriftAlert, EvalMetricSnapshot, Grant, GrantUsage,
+		Materialization, MemoryEntry, MemoryInjection, PermissionPreset,
+		PermissionRequest, PipelineConfig, Plugin, PluginSetting, Project,
+		ProjectFolder, PromptTemplate, ProviderSetting, RefinementTurn,
+		RemoteRegistration, Resource, Scratchpad, Skill, Spawner, StageRun,
+		SystemPrompt, Task, TaskDependency, TaskPermission, TaskSchedule,
+		User []ent.Interceptor
 	}
 )
