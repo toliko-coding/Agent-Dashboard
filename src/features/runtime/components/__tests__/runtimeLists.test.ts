@@ -119,6 +119,58 @@ beforeEach(() => {
 })
 
 describe('runtime services', () => {
+  // 3N.2.2 P25–P32: a port opens its local service, from the validated port alone.
+  describe('port links', () => {
+    it('opens localhost for a loopback or all-interfaces TCP service, in a new tab, with its own name', () => {
+      state.services = list({ items: [
+        service({ id: 'v', port: 5173, protocol: 'tcp', bindScope: 'loopback', address: '127.0.0.1', url: 'http://localhost:5173' }),
+        service({ id: 'n', port: 3000, protocol: 'tcp', bindScope: 'all', address: '0.0.0.0', url: null }),
+        service({ id: 's', port: 3001, protocol: 'tcp', bindScope: 'all', address: '::', url: null }),
+      ] })
+      const links = mount(RuntimeServices).findAll('a[data-testid="service-port"]')
+      expect(links.map(l => l.attributes('href'))).toEqual(['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'])
+      const vite = links[2]
+      expect(vite.attributes('target')).toBe('_blank')
+      expect(vite.attributes('rel')).toBe('noopener noreferrer')
+      expect(vite.attributes('aria-label')).toBe('Open localhost port 5173')
+      expect(vite.text()).toBe(':5173')
+    })
+
+    it('never puts a service-supplied host or path into the link, and has no raw-url Open link', () => {
+      state.services = list({ items: [service({ port: 5173, protocol: 'tcp', bindScope: 'loopback', url: 'http://evil.example:5173/x' })] })
+      const w = mount(RuntimeServices)
+      expect(w.get('[data-testid="service-port"]').attributes('href')).toBe('http://localhost:5173')
+      expect(w.html()).not.toContain('evil.example')
+      expect(w.find('[data-testid="service-open"]').exists()).toBe(false)
+    })
+
+    it('renders an invalid, non-TCP or non-local port as plain text', () => {
+      state.services = list({ items: [
+        service({ id: 'a', port: 70000, protocol: 'tcp', bindScope: 'loopback' }),
+        service({ id: 'b', port: 5353, protocol: 'udp', bindScope: 'all' }),
+        service({ id: 'c', port: 5432, protocol: 'tcp', bindScope: 'specific', address: '192.168.1.20' }),
+      ] })
+      const ports = mount(RuntimeServices).findAll('[data-testid="service-port"]')
+      expect(ports).toHaveLength(3)
+      for (const p of ports) {
+        expect(p.element.tagName).toBe('SPAN')
+        expect(p.attributes('href')).toBeUndefined()
+      }
+    })
+
+    it('is a native link, so Tab reaches it and Enter opens it, and has no axe violations', async () => {
+      state.services = list({ items: [service({ port: 5173, protocol: 'tcp', bindScope: 'loopback' })] })
+      const w = mount(RuntimeServices, { attachTo: document.body })
+      const link = w.get('[data-testid="service-port"]').element as HTMLAnchorElement
+      link.focus()
+      expect(document.activeElement).toBe(link)
+      expect(link.tagName).toBe('A')
+      expect(link.getAttribute('tabindex')).toBeNull()
+      expect(await axe(w.element as Element)).toHaveNoViolations()
+      w.unmount()
+    })
+  })
+
   // I
   it('lists services by port with name, runtime, count and workspace', () => {
     const w = mount(RuntimeServices)

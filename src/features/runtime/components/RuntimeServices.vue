@@ -2,6 +2,7 @@
 import type { MachineService } from '@/features/localscope'
 import { computed, ref } from 'vue'
 import { DataFreshnessIndicator, useMachineServices } from '@/features/localscope'
+import { localServiceUrl } from '@/utils/localServiceUrl'
 import { runtimeLabel } from '../format'
 import RuntimeWorkspaceLabel from './RuntimeWorkspaceLabel.vue'
 
@@ -20,6 +21,11 @@ import RuntimeWorkspaceLabel from './RuntimeWorkspaceLabel.vue'
  *
  * `items: null` is "not known" and `[]` is "looked, found none"; the two never
  * share a sentence. A stale list keeps its rows and says it is stale.
+ *
+ * A port opens its local service (3N.2.2): `http://localhost:<port>`, built by
+ * localServiceUrl from the validated port alone — never from the bind address
+ * or LocalScope's url string — and only for TCP reachable on loopback. Not every
+ * port speaks HTTP; the browser shows what is there.
  */
 const { data, loaded } = useMachineServices()
 
@@ -80,9 +86,20 @@ function startedLabel(iso: string | null): string | null {
     <ul v-else class="m-0 list-none divide-y divide-line overflow-hidden rounded-panel border border-line bg-card p-0" data-testid="services-list">
       <li v-for="(s, i) in sorted" :key="s.id" class="min-w-0" data-testid="service-row">
         <div
-          class="grid min-w-0 grid-cols-[4.75rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-2.5 md:grid-cols-[4.75rem_minmax(0,1.2fr)_minmax(0,1fr)_auto]"
+          class="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-2.5 md:grid-cols-[5.5rem_minmax(0,1.2fr)_minmax(0,1fr)_auto]"
         >
-          <span class="justify-self-start rounded-full border border-line px-2 py-0.5 font-mono text-ui-sm font-semibold tabular-nums text-fg" data-testid="service-port">:{{ s.port }}</span>
+          <a
+            v-if="localServiceUrl(s)"
+            :href="localServiceUrl(s)!"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-1 justify-self-start rounded-full border border-accent/40 px-2 py-0.5 font-mono text-ui-sm font-semibold tabular-nums text-accent no-underline transition-colors hover:border-accent hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent motion-reduce:transition-none"
+            :aria-label="`Open localhost port ${s.port}`"
+            :title="`Open localhost:${s.port} in a new tab`"
+            data-testid="service-port"
+            data-actionable="true"
+          >:{{ s.port }}<svg viewBox="0 0 12 12" class="size-2.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.5 2.5h5v5M9.5 2.5 3 9" /></svg></a>
+          <span v-else class="justify-self-start rounded-full border border-line px-2 py-0.5 font-mono text-ui-sm font-semibold tabular-nums text-fg" data-testid="service-port">:{{ s.port }}</span>
 
           <div class="flex min-w-0 flex-col">
             <span class="flex min-w-0 items-center gap-1.5">
@@ -110,14 +127,6 @@ function startedLabel(iso: string | null): string | null {
           </div>
 
           <div class="col-start-3 row-start-1 flex items-center gap-3 justify-self-end md:col-start-4">
-            <a
-              v-if="s.url"
-              :href="s.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="rounded-control text-ui-sm text-accent hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
-              data-testid="service-open"
-            >Open<span class="sr-only"> {{ name(s) }} on port {{ s.port }}, in a new tab</span></a>
             <button
               type="button"
               class="cursor-pointer rounded-control border-none bg-transparent px-1 text-ui-sm text-fg-mute hover:text-fg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
