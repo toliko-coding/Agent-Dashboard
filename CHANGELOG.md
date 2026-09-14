@@ -13,6 +13,12 @@ from [Conventional Commits](https://www.conventionalcommits.org/) by GoReleaser.
 Preparing the first public release.
 
 ### Changed
+- **New Agent no longer needs a Project.**
+  - **Working folder first:** the dialog starts with the folder Claude runs in — any local folder, including a plain folder with no Git repository or a local repository with no GitHub remote — and shows what it resolves to (repository, branch and checkout kind, or a plain folder with no repository).
+  - **Project is optional:** **None** is a real choice and sends no project. A chosen project only suggests its default folder when none is chosen, never overwrites a chosen folder, and adds its other folders to the agent only when the agent works in one of that project's folders.
+  - **Allowed folders, not project membership:** the dashboard still starts agents only inside allowed folders, but a folder can now be allowed on its own (**Allow this folder for agents**, stored in `spawn.workingFolders`) instead of requiring a project. Sensitive directories can never be allowed.
+  - **Claude's folder trust question is visible and answered only by you:** when Claude stops before its session to ask whether to trust a new folder, the dialog shows the exact folder with **Trust this folder** and **Don't trust — stop the agent**; closed, it waits in **Needs you**. Before, such an agent sat invisibly at that question. The dashboard never answers it, never writes Claude's trust and never skips it; declining makes Claude exit.
+  - **Creating a project needs only a name:** the quick project form in New Agent no longer requires a folder, and creating a project starts nothing and asks nothing of GitHub.
 - **The remaining surfaces speak the Command Center's language.**
   - **Agent names:** the Pipeline task card's agent chip, search results and the Terminal list now name an agent the way every other surface does — its pipeline task, or provider and short session id — instead of its folder, and the agent details diagram no longer reads the working directory's absolute path aloud.
   - **Search:** results place an agent by repository and workspace, state it in words ("Working", "Idle") rather than the raw status id, show a task's stage by its label, and no longer lose what you type straight after ⌘K.

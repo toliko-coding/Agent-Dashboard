@@ -20,17 +20,30 @@ agent-dashboard live --yolo   # adds --dangerously-skip-permissions
 
 ## Spawning new agents
 
-Click **"+ New Agent"** in the header to open the spawn dialog.
+Click **"+ New Agent"** in the header to open the New Agent dialog.
 
 | Field | Required | Description |
 |---|---|---|
+| Working folder | Yes | The folder Claude runs in — any local folder: a repository checkout, a worktree, or a plain folder. No Project and no GitHub remote are needed. As you type, the dialog shows what the folder resolves to: its repository, branch and whether it is the main checkout or a worktree, or that it is a plain folder with no repository. Known folders (project folders and allowed working folders) can be picked from the list below the field. |
+| Project | No | Organisation only; **None** is a valid choice and sends no project. Choosing a project suggests its default folder when no folder is chosen yet, and never changes a folder you already chose or the repository the folder resolves to. A project's other folders are added to the agent (`--add-dir`) only when the agent works in one of that project's own folders. |
+| Spawner | No | Claude default, or the project's default spawner when a project is chosen |
 | Prompt | Yes | What the agent should do |
-| Working Directory | Yes | Project path the agent runs in |
-| Model | No | e.g. `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5` |
-| System Prompt | No | Custom system instructions |
-| Enable Channel | No | Dashboard control channel (default: on) |
+| System prompt | No | Custom system instructions |
+| Permissions | No | Claude's permission mode. The two modes that skip every prompt need a second click to confirm. |
 
-Spawned agents run **detached** — they survive dashboard restarts and appear in the table within ~3 seconds.
+Spawned agents run **detached** — they survive dashboard restarts and appear in the roster once Claude has started its session.
+
+### Where agents may start
+
+The dashboard starts new agents only inside folders you have allowed: the folders of any Project, and the working folders you allow from the dialog with **Allow this folder for agents**. Working folders are stored in the `spawn.workingFolders` setting and can be listed and removed with `GET` and `DELETE /api/agents/working-folders`. While no project folder and no working folder exists, only the sensitive-directory block applies; `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config` and `~/.claude` can never be used, and cannot be allowed.
+
+Allowing a folder is the dashboard's own permission to start an agent there. It is not Claude Code's trust.
+
+### Claude's folder trust question
+
+The first time Claude Code starts in a folder it has not trusted, it asks *"Quick safety check: Is this a project you created or one you trust?"* before its session begins — so the agent is not yet in the roster, and no hook reports it. The dashboard reads that question from the agent's terminal and shows it, with the exact folder, in the New Agent dialog; if you close the dialog, it stays in **Needs you** as a blocking item until you answer. **Trust this folder** lets Claude continue; **Don't trust — stop the agent** answers Claude's own *No, exit*, and the agent stops.
+
+The dashboard never answers the question for you, never writes Claude's trust settings, and never passes a flag that skips the question. An answer is delivered only while the question is on screen and names the folder the agent was started in.
 
 ## Slash commands
 
