@@ -18,7 +18,7 @@ func TestBuildTmuxArgs(t *testing.T) {
 	got := buildTmuxArgs("claude-spawn-x", []string{"FOO=bar", "BAZ=qux"}, "claude", []string{"--model", "opus", "hi there"})
 	want := []string{
 		"new-session", "-d", "-P", "-F", "#{pane_pid}", "-s", "claude-spawn-x",
-		"env", "FOO=bar", "BAZ=qux", "claude", "--model", "opus", "hi there",
+		"env", "-u", "CLAUDE_CODE_CHILD_SESSION", "FOO=bar", "BAZ=qux", "claude", "--model", "opus", "hi there",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)

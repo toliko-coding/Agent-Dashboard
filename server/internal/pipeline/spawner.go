@@ -458,6 +458,11 @@ func BuildSpawnEnv(opts SpawnAgentOptions) []string {
 		if _, denied := deniedEnvKeys[key]; denied {
 			continue
 		}
+		// A stage agent is a top-level session; the CLAUDE_ prefix must not carry
+		// Claude Code's child-session marker in from the server's own launch (see envsec).
+		if envsec.IsInheritedSessionMarker(key) {
+			continue
+		}
 		if _, ok := allowedEnvKeys[key]; ok {
 			merged[key] = val
 			continue

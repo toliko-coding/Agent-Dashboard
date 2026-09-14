@@ -4,6 +4,8 @@ package refine
 import (
 	"os"
 
+	"github.com/lx-wnk/agent-dashboard/server/internal/envsec"
+
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent"
 )
 
@@ -31,6 +33,10 @@ func mergeEnv(sp *ent.Spawner) []string {
 			if kv[i] == '=' {
 				k := kv[:i]
 				if _, blocked := blockedKeys[k]; blocked {
+					break
+				}
+				// A refinement turn is a top-level session (see envsec).
+				if envsec.IsInheritedSessionMarker(k) {
 					break
 				}
 				merged[k] = kv[i+1:]

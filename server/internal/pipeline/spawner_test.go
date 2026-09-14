@@ -313,6 +313,23 @@ func TestBuildSpawnEnv_InjectsDashboardIdentifiers(t *testing.T) {
 	require.Contains(t, env, "DASHBOARD_MCP_URL=http://127.0.0.1:13120/api/mcp")
 }
 
+// 3M.1: a stage agent is a top-level session — the CLAUDE_ prefix forwards the
+// dashboard's Claude settings but not Claude Code's child-session marker.
+func TestBuildSpawnEnv_DropsInheritedChildSessionMarker(t *testing.T) {
+	t.Setenv("CLAUDE_CODE_CHILD_SESSION", "1")
+	t.Setenv("CLAUDE_CONFIG_DIR", "/tmp/claude-config")
+
+	env := pipeline.BuildSpawnEnv(pipeline.SpawnAgentOptions{
+		Task:     &ent.Task{ID: "t-marker"},
+		StageRun: &ent.StageRun{ID: "r-marker"},
+	})
+
+	require.Contains(t, env, "CLAUDE_CONFIG_DIR=/tmp/claude-config")
+	for _, e := range env {
+		require.False(t, strings.HasPrefix(e, "CLAUDE_CODE_CHILD_SESSION="), "stage agents must not inherit the marker, got %s", e)
+	}
+}
+
 func TestBuildSpawnEnv_ArbitraryVarsNotForwarded(t *testing.T) {
 	t.Setenv("MY_SECRET_VAR", "leaked")
 

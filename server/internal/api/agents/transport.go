@@ -2,6 +2,7 @@ package agents
 
 import (
 	"fmt"
+	"github.com/lx-wnk/agent-dashboard/server/internal/envsec"
 	"strconv"
 	"strings"
 )
@@ -31,6 +32,11 @@ func selectHeadlessTransport(tmuxPath string) headlessTransport {
 // shell). `-P -F '#{pane_pid}'` makes tmux print the pane command's PID.
 func buildTmuxArgs(session string, env []string, binary string, args []string) []string {
 	out := []string{"new-session", "-d", "-P", "-F", "#{pane_pid}", "-s", session, "env"}
+	// tmux starts the pane from the tmux server's environment, which may carry
+	// Claude Code's child-session marker even when env does not; unset it there.
+	for key := range envsec.InheritedSessionMarkerKeys {
+		out = append(out, "-u", key)
+	}
 	out = append(out, env...)
 	out = append(out, binary)
 	out = append(out, args...)

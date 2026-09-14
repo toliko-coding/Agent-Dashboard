@@ -489,6 +489,40 @@ func TestSpawn_EnvMerge_DashboardWins(t *testing.T) {
 		"non-conflicting spawner env var must be present")
 }
 
+// 3M.1 A + B: a top-level agent does not inherit Claude Code's child-session
+// marker from the server's launch environment; everything else is untouched.
+func TestResolveSpawnEnv_DropsInheritedChildSessionMarkerOnly(t *testing.T) {
+	t.Setenv("CLAUDE_CODE_CHILD_SESSION", "1")
+	t.Setenv("CLAUDE_CODE_ENTRYPOINT", "cli")
+	t.Setenv("CLAUDE_CONFIG_DIR", "/tmp/claude-config")
+	t.Setenv("SOME_UNRELATED_VAR", "kept")
+	env := envToMap(resolveSpawnEnv(nil))
+	_, has := env["CLAUDE_CODE_CHILD_SESSION"]
+	assert.False(t, has, "the child-session marker must not reach a top-level agent")
+	assert.Equal(t, "cli", env["CLAUDE_CODE_ENTRYPOINT"])
+	assert.Equal(t, "/tmp/claude-config", env["CLAUDE_CONFIG_DIR"])
+	assert.Equal(t, "kept", env["SOME_UNRELATED_VAR"])
+	assert.NotEmpty(t, env["PATH"])
+}
+
+// C: a spawner row that deliberately declares the marker is configuration, not inheritance.
+func TestResolveSpawnEnv_KeepsAnExplicitSpawnerMarker(t *testing.T) {
+	t.Setenv("CLAUDE_CODE_CHILD_SESSION", "")
+	os.Unsetenv("CLAUDE_CODE_CHILD_SESSION")
+	env := envToMap(resolveSpawnEnv(&ent.Spawner{Env: map[string]string{"CLAUDE_CODE_CHILD_SESSION": "intentional"}}))
+	assert.Equal(t, "intentional", env["CLAUDE_CODE_CHILD_SESSION"])
+}
+
+func envToMap(env []string) map[string]string {
+	out := make(map[string]string, len(env))
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			out[k] = v
+		}
+	}
+	return out
+}
+
 func TestMergeEnv_NilSpawner_StripsSecrets(t *testing.T) {
 	t.Setenv("DASHBOARD_SECRET_KEY", "w")
 	t.Setenv("DASHBOARD_JWT_SECRET", "x")
