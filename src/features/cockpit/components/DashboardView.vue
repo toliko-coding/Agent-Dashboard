@@ -112,7 +112,7 @@ defineExpose({ rosterAgents })
   />
   <template v-if="dashboardLayout === 'list'">
     <EmptyAgentState v-if="rosterAgents.length === 0" :search-query="searchQuery" />
-    <AgentTable v-else :agents="rosterAgents" :groups="rosterGroups" @select="selectAgent" />
+    <AgentTable v-else :agents="rosterAgents" :groups="rosterGroups" :attention-items="attention.items" @select="selectAgent" />
   </template>
   <template v-else>
     <EmptyAgentState v-if="rosterAgents.length === 0" :search-query="searchQuery" />

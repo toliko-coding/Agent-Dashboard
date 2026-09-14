@@ -37,7 +37,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: AgentStatusFilter] }>()
     >
       {{ f.label }}
       <span
-        class="font-mono text-[10px] tabular-nums"
+        class="font-mono text-label tabular-nums"
         :class="modelValue === f.value ? 'text-accent' : 'text-fg-faint'"
       >{{ counts[f.value] }}</span>
     </button>

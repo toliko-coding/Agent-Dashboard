@@ -30,6 +30,21 @@ export function agentTitle(agent: Agent): string {
   return agent.sessionId ? `${provider} session ${shortId(agent.sessionId)}` : `${provider} session`
 }
 
+/**
+ * What an agent is doing, for surfaces that show every agent (the card and the
+ * list row), not only working ones: working names its tool; otherwise the last
+ * tool it used, by name. Tool names only — never arguments, which can be a
+ * command or a path.
+ */
+export function agentActivity(agent: Agent): string {
+  if (agent.status === 'finished')
+    return 'Finished'
+  if (agent.working)
+    return workActivity(agent).label
+  const last = agent.currentAction || agent.lastTools?.at(-1)?.name
+  return last ? `Last tool ${last}` : 'No tool used yet'
+}
+
 export type WorkState = 'working' | 'tool'
 
 /**

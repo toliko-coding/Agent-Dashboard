@@ -15,7 +15,7 @@ import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vu
 import MetricsPopover from '@/features/agents/components/MetricsPopover.vue'
 import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
 import { useMetricsDisclosure } from '@/features/agents/composables/useMetricsDisclosure'
-import { agentTitle, workActivity } from '@/utils/agentLabels'
+import { agentActivity, agentTitle } from '@/utils/agentLabels'
 import { formatCost, formatRelativeActivity, isAwaitingInput, secondsSince, shortModel } from '@/utils/format'
 import { agentDisplayStatus } from '@/utils/statusColors'
 
@@ -74,14 +74,7 @@ const awaitingInput = computed(() => isAwaitingInput(props.agent))
  * What the agent is doing. Tool names only — never a tool call's arguments,
  * which can be a command or a path.
  */
-const activity = computed(() => {
-  if (isFinished.value)
-    return 'Finished'
-  if (props.agent.working)
-    return workActivity(props.agent).label
-  const last = props.agent.currentAction || props.agent.lastTools?.at(-1)?.name
-  return last ? `Last tool ${last}` : 'No tool used yet'
-})
+const activity = computed(() => agentActivity(props.agent))
 
 const facts = computed(() => {
   const list: string[] = []

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AttentionItem } from '@/features/attention'
 import type { Agent } from '@/types'
 import type { AgentGrouping } from '@/utils/agentGroup'
 import { computed } from 'vue'
@@ -10,11 +11,23 @@ import WorkspaceGroupRow from './WorkspaceGroupRow.vue'
 const props = defineProps<{
   agents: Agent[]
   groups?: AgentGrouping[]
+  /** The canonical attention queue's items; each row shows only its own. */
+  attentionItems?: AttentionItem[]
 }>()
 
 const emit = defineEmits<{
   select: [agent: Agent]
 }>()
+
+// The same lookup as the card grid, so a row and a card show the same item.
+const attentionBySession = computed(() => {
+  const map = new Map<string, AttentionItem>()
+  for (const item of props.attentionItems ?? []) {
+    if (item.subject.type === 'agent')
+      map.set(item.subject.sessionId, item)
+  }
+  return map
+})
 
 // Groups with non-null labels trigger the grouped rendering path.
 const useGroups = computed(() =>
@@ -43,6 +56,7 @@ const useGroups = computed(() =>
               v-for="agent in child.agents"
               :key="agent.pid"
               :agent="agent"
+              :attention="attentionBySession.get(agent.sessionId) ?? null"
               @select="emit('select', agent)"
             />
           </template>
@@ -52,6 +66,7 @@ const useGroups = computed(() =>
             v-for="agent in group.agents"
             :key="agent.pid"
             :agent="agent"
+            :attention="attentionBySession.get(agent.sessionId) ?? null"
             @select="emit('select', agent)"
           />
         </template>
@@ -64,6 +79,7 @@ const useGroups = computed(() =>
         v-for="agent in agents"
         :key="agent.pid"
         :agent="agent"
+        :attention="attentionBySession.get(agent.sessionId) ?? null"
         @select="emit('select', agent)"
       />
       <p v-if="agents.length === 0" class="text-center py-12 text-fg-mute text-sm">
