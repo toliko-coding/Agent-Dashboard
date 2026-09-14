@@ -46,13 +46,39 @@ const sampleSpawner = {
   updatedAt: '',
 }
 
+/*
+ * 3M: the dialog checks the working folder against the server before Start.
+ * Every folder is allowed unless a test says otherwise; its identity comes from
+ * the folder, never from a Project.
+ */
+let preflight: (path: string) => Record<string, unknown>
+const PLAIN_WS = { id: 'ws_plain', name: 'plain', kind: 'plain', branch: '', repository: null }
+
+function folderRoutes(url: string, init?: RequestInit): Promise<unknown> {
+  if (url === '/api/agents/spawn/preflight') {
+    const { path } = JSON.parse(String(init?.body ?? '{}')) as { path: string }
+    return Promise.resolve({ ok: true, json: async () => preflight(path) })
+  }
+  if (url === '/api/agents/working-folders' && (init?.method ?? 'GET') === 'GET')
+    return Promise.resolve({ ok: true, json: async () => ({ folders: [] }) })
+  return Promise.resolve({ ok: true, json: async () => [] })
+}
+
+/** Lets the folder check's debounce run and its response land. */
+async function waitForFolderCheck() {
+  await flushPromises()
+  await new Promise(resolve => setTimeout(resolve, 350))
+  await flushPromises()
+}
+
 function setInputValue(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
   el.value = value
   el.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
 beforeEach(() => {
-  vi.stubGlobal('fetch', vi.fn((url: string) => {
+  preflight = path => ({ path, allowed: true, canAllow: false, workspace: PLAIN_WS })
+  vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
     if (url === '/api/projects')
       return Promise.resolve({ ok: true, json: async () => [sampleProject] })
     if (url === '/api/spawners')
@@ -65,7 +91,7 @@ beforeEach(() => {
     }
     if (url.startsWith('/api/agents/spawn/12345/status'))
       return Promise.resolve({ ok: true, json: async () => ({ pid: 12345, status: 'running' }) })
-    return Promise.resolve({ ok: true, json: async () => [] })
+    return folderRoutes(url, init)
   }))
   vi.stubGlobal('EventSource', class {
     static CONNECTING = 0
@@ -86,47 +112,138 @@ afterEach(() => {
 })
 
 describe('spawnDialog', () => {
-  it('does not offer a "None (manual)" option — project is required', async () => {
+  // 3M: Project is optional; None is a real choice.
+  it('offers Project = None first, and no longer requires a project', async () => {
     const wrapper = mount(SpawnDialog, { props: { open: true }, attachTo: document.body })
     await flushPromises()
-
-    const optionValues = selectOptionsById(wrapper, 'spawn-project').map(o => o.value)
-    expect(optionValues).not.toContain('')
-
+    const options = selectOptionsById(wrapper, 'spawn-project')
+    expect(options[0]).toMatchObject({ value: '', label: 'None' })
     wrapper.unmount()
   })
 
-  it('spawn button is disabled until a project with a folder is selected', async () => {
+  // A + B
+  it('starts an agent with Project = None in a typed folder, sending no projectId and creating no project', async () => {
     const wrapper = mount(SpawnDialog, { props: { open: true }, attachTo: document.body })
     await flushPromises()
 
-    const promptInput = document.querySelector('[data-testid="spawn-prompt-wrap"]') as HTMLTextAreaElement
-    expect(promptInput).not.toBeNull()
-    setInputValue(promptInput, 'do a thing')
+    setInputValue(document.querySelector('[data-testid="spawn-folder-input-wrap"]') as HTMLInputElement, '/Users/me/scratch/plain')
+    setInputValue(document.querySelector('[data-testid="spawn-prompt-wrap"]') as HTMLTextAreaElement, 'look around')
+    await waitForFolderCheck()
+
+    const spawnBtn = document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement
+    expect(spawnBtn.textContent).toContain('Start Agent')
+    expect(spawnBtn.disabled).toBe(false)
+    spawnBtn.click()
     await flushPromises()
 
-    // Button must remain disabled — no project selected yet, so cwd is empty.
-    const spawnBtn = document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement
-    expect(spawnBtn).not.toBeNull()
-    expect(spawnBtn.disabled).toBe(true)
+    const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls
+    const body = JSON.parse(calls.find(c => c[0] === '/api/agents/spawn')![1].body as string)
+    expect(body.cwd).toBe('/Users/me/scratch/plain')
+    expect(body).not.toHaveProperty('projectId')
+    expect(calls.some(c => c[0] === '/api/projects' && c[1]?.method === 'POST')).toBe(false)
+    wrapper.unmount()
+  })
 
-    // Select a project — cwd should now be filled from the default folder.
+  // D: a plain folder states that it has no repository.
+  it('describes a plain folder as having no repository, from the folder itself', async () => {
+    const wrapper = mount(SpawnDialog, { props: { open: true }, attachTo: document.body })
+    await flushPromises()
+    setInputValue(document.querySelector('[data-testid="spawn-folder-input-wrap"]') as HTMLInputElement, '/Users/me/scratch/plain')
+    await waitForFolderCheck()
+    expect(document.querySelector('[data-testid="spawn-folder-identity"]')?.textContent).toContain('plain · not a Git repository · no repository')
+    wrapper.unmount()
+  })
+
+  // E: a local repository without GitHub is a repository.
+  it('describes a local Git repository by repository, branch and kind — no remote needed', async () => {
+    preflight = path => ({ path, allowed: true, canAllow: false, workspace: { id: 'ws_r', name: 'local-repo', kind: 'git-main', branch: 'main', repository: { id: 'repo_r', name: 'local-repo' } } })
+    const wrapper = mount(SpawnDialog, { props: { open: true }, attachTo: document.body })
+    await flushPromises()
+    setInputValue(document.querySelector('[data-testid="spawn-folder-input-wrap"]') as HTMLInputElement, '/Users/me/code/local-repo')
+    await waitForFolderCheck()
+    expect(document.querySelector('[data-testid="spawn-folder-identity"]')?.textContent).toContain('Repository local-repo · main · main checkout')
+    wrapper.unmount()
+  })
+
+  it('keeps Start disabled for a folder outside the allowed folders until the user explicitly allows it', async () => {
+    let allowed = false
+    preflight = path => allowed
+      ? { path, allowed: true, canAllow: false, workspace: PLAIN_WS }
+      : { path, allowed: false, reason: 'outside-allowed-folders', canAllow: true, workspace: PLAIN_WS }
+    const base = globalThis.fetch as unknown as (url: string, init?: RequestInit) => Promise<unknown>
+    const allowCalls: string[] = []
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/agents/working-folders' && init?.method === 'POST') {
+        allowCalls.push(String(init.body))
+        allowed = true
+        return Promise.resolve({ ok: true, json: async () => ({ folders: ['/Users/me/scratch/plain'], check: preflight('/Users/me/scratch/plain') }) })
+      }
+      return base(url, init)
+    }))
+
+    const wrapper = mount(SpawnDialog, { props: { open: true }, attachTo: document.body })
+    await flushPromises()
+    setInputValue(document.querySelector('[data-testid="spawn-folder-input-wrap"]') as HTMLInputElement, '/Users/me/scratch/plain')
+    setInputValue(document.querySelector('[data-testid="spawn-prompt-wrap"]') as HTMLTextAreaElement, 'look around')
+    await waitForFolderCheck()
+
+    const spawnBtn = document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement
+    expect(spawnBtn.disabled).toBe(true)
+    expect(document.querySelector('[data-testid="spawn-folder-not-allowed"]')).not.toBeNull()
+    expect(allowCalls).toEqual([])
+
+    ;(document.querySelector('[data-testid="spawn-allow-folder"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(allowCalls).toEqual([JSON.stringify({ path: '/Users/me/scratch/plain' })])
+    expect(spawnBtn.disabled).toBe(false)
+    wrapper.unmount()
+  })
+
+  // N: Claude's trust question appears at the top of the dialog, above the form, and nothing answers it.
+  it('shows Claude\'s folder trust question first, and sends no answer by itself', async () => {
+    const base = globalThis.fetch as unknown as (url: string, init?: RequestInit) => Promise<unknown>
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
+      if (url.startsWith('/api/agents/spawn/12345/status'))
+        return Promise.resolve({ ok: true, json: async () => ({ pid: 12345, status: 'running', awaitingFolderTrust: { path: '/Users/me/scratch/plain', selected: 'exit' } }) })
+      return base(url, init)
+    }))
+    const wrapper = mount(SpawnDialog, { props: { open: true }, attachTo: document.body })
+    await flushPromises()
+    setInputValue(document.querySelector('[data-testid="spawn-folder-input-wrap"]') as HTMLInputElement, '/Users/me/scratch/plain')
+    setInputValue(document.querySelector('[data-testid="spawn-prompt-wrap"]') as HTMLTextAreaElement, 'look around')
+    await waitForFolderCheck()
+    ;(document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement).click()
+    await flushPromises()
+    await flushPromises()
+
+    const decision = document.querySelector('[data-testid="folder-trust-decision"]')
+    const folderSection = document.querySelector('[data-testid="spawn-folder-section"]')
+    expect(decision?.querySelector('[data-testid="folder-trust-path"]')?.textContent).toBe('/Users/me/scratch/plain')
+    expect(decision!.compareDocumentPosition(folderSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls
+    expect(calls.some(c => String(c[0]).endsWith('/folder-trust'))).toBe(false)
+    wrapper.unmount()
+  })
+
+  // I + C: a Project is an association — it suggests its folder only when none is chosen, and never rewrites one.
+  it('fills an empty folder from the chosen project, but never overwrites a folder the user typed', async () => {
+    const wrapper = mount(SpawnDialog, { props: { open: true }, attachTo: document.body })
+    await flushPromises()
+    const folder = () => (document.querySelector('[data-testid="spawn-folder-input-wrap"]') as HTMLInputElement).value
+
     const projectTrigger = document.querySelector('#spawn-project') as HTMLElement
     await selectByLabel(projectTrigger, 'Alpha')
+    await waitForFolderCheck()
+    expect(folder()).toBe('/home/u/alpha')
+
+    await selectByLabel(projectTrigger, 'None')
     await flushPromises()
+    expect(folder()).toBe('/home/u/alpha')
 
-    expect(spawnBtn.disabled).toBe(false)
-
-    wrapper.unmount()
-  })
-
-  it('there is no free-text working directory input', async () => {
-    const wrapper = mount(SpawnDialog, { props: { open: true }, attachTo: document.body })
-    await flushPromises()
-
-    const cwdWrap = document.querySelector('[data-testid="spawn-cwd-wrap"]')
-    expect(cwdWrap).toBeNull()
-
+    setInputValue(document.querySelector('[data-testid="spawn-folder-input-wrap"]') as HTMLInputElement, '/Users/me/elsewhere')
+    await selectByLabel(projectTrigger, 'Alpha')
+    await waitForFolderCheck()
+    expect(folder()).toBe('/Users/me/elsewhere')
     wrapper.unmount()
   })
 
@@ -148,7 +265,7 @@ describe('spawnDialog', () => {
     // Select a project — spawner should be hydrated from project.defaultSpawnerId
     const projectTrigger = document.querySelector('#spawn-project') as HTMLElement
     await selectByLabel(projectTrigger, 'Alpha')
-    await flushPromises()
+    await waitForFolderCheck()
 
     expect(spawnerTrigger.textContent).toContain('Claude (Opus)')
     // First option label changes to "Project default" when a project is chosen
@@ -248,7 +365,7 @@ describe('spawnDialog', () => {
     // Select a project to enable spawn
     const projectTrigger = document.querySelector('#spawn-project') as HTMLElement
     await selectByLabel(projectTrigger, 'Alpha')
-    await flushPromises()
+    await waitForFolderCheck()
 
     const promptInput = document.querySelector('[data-testid="spawn-prompt-wrap"]') as HTMLTextAreaElement
     setInputValue(promptInput, 'do something dangerous')
@@ -287,7 +404,7 @@ describe('spawnDialog', () => {
 
     const projectTrigger = document.querySelector('#spawn-project') as HTMLElement
     await selectByLabel(projectTrigger, 'Alpha')
-    await flushPromises()
+    await waitForFolderCheck()
 
     const promptInput = document.querySelector('[data-testid="spawn-prompt-wrap"]') as HTMLTextAreaElement
     setInputValue(promptInput, 'risky task')
@@ -319,7 +436,7 @@ describe('spawnDialog', () => {
 
     const projectTrigger = document.querySelector('#spawn-project') as HTMLElement
     await selectByLabel(projectTrigger, 'Alpha')
-    await flushPromises()
+    await waitForFolderCheck()
 
     const promptInput = document.querySelector('[data-testid="spawn-prompt-wrap"]') as HTMLTextAreaElement
     expect(promptInput).not.toBeNull()
@@ -350,7 +467,7 @@ describe('spawnDialog', () => {
   })
 
   it('does not show an error when an interactive session exits with a null exit code', async () => {
-    vi.stubGlobal('fetch', vi.fn((url: string) => {
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
       if (url === '/api/projects')
         return Promise.resolve({ ok: true, json: async () => [sampleProject] })
       if (url === '/api/spawners')
@@ -359,7 +476,7 @@ describe('spawnDialog', () => {
         return Promise.resolve({ ok: true, json: async () => ({ ok: true, pid: 12345 }) })
       if (url.startsWith('/api/agents/spawn/12345/status'))
         return Promise.resolve({ ok: true, json: async () => ({ pid: 12345, status: 'exited', exitCode: null }) })
-      return Promise.resolve({ ok: true, json: async () => [] })
+      return folderRoutes(url, init)
     }))
 
     const wrapper = mount(SpawnDialog, { props: { open: true }, attachTo: document.body })
@@ -367,7 +484,7 @@ describe('spawnDialog', () => {
 
     const projectTrigger = document.querySelector('#spawn-project') as HTMLElement
     await selectByLabel(projectTrigger, 'Alpha')
-    await flushPromises()
+    await waitForFolderCheck()
 
     const promptInput = document.querySelector('[data-testid="spawn-prompt-wrap"]') as HTMLTextAreaElement
     setInputValue(promptInput, 'do a thing')
@@ -390,7 +507,7 @@ describe('spawnDialog', () => {
 
     const projectTrigger = document.querySelector('#spawn-project') as HTMLElement
     await selectByLabel(projectTrigger, 'Alpha')
-    await flushPromises()
+    await waitForFolderCheck()
 
     const promptInput = document.querySelector('[data-testid="spawn-prompt-wrap"]') as HTMLTextAreaElement
     setInputValue(promptInput, 'edit files')

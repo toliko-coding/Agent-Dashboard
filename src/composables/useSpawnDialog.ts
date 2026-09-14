@@ -9,9 +9,14 @@ export interface UseSpawnDialogDeps {
 }
 
 /**
- * State + actions for the project/folder/spawner hydration flow inside
- * the SpawnDialog modal. Decoupled from the SFC so it can be unit-tested
+ * State + actions for the working folder, optional Project and spawner inside
+ * the New Agent dialog. Decoupled from the SFC so it can be unit-tested
  * without rendering Vue.
+ *
+ * The working folder is primary and independent (3M). A Project is an optional
+ * organisational association: choosing one suggests its default folder only
+ * when no folder is chosen yet, and changing or clearing it never rewrites the
+ * folder the user picked.
  */
 export function useSpawnDialog(deps: UseSpawnDialogDeps) {
   const project = shallowRef<Project | null>(null)
@@ -27,7 +32,8 @@ export function useSpawnDialog(deps: UseSpawnDialogDeps) {
 
     const defaultFolder = list.find(f => f.isDefault) ?? list[0] ?? null
     selectedFolderId.value = defaultFolder?.id ?? null
-    cwd.value = defaultFolder?.path ?? ''
+    if (!cwd.value.trim())
+      cwd.value = defaultFolder?.path ?? ''
 
     if (p.defaultSpawnerId) {
       const sp = deps.lookupSpawner(p.defaultSpawnerId)
@@ -46,12 +52,18 @@ export function useSpawnDialog(deps: UseSpawnDialogDeps) {
     cwd.value = f.path
   }
 
+  /** Removes the Project association; the chosen working folder stays. */
   function clearProject(): void {
     project.value = null
     folders.value = []
     selectedFolderId.value = null
-    cwd.value = ''
     spawnerId.value = null
+  }
+
+  /** Clears everything, for a closed dialog. */
+  function reset(): void {
+    clearProject()
+    cwd.value = ''
   }
 
   return {
@@ -63,5 +75,6 @@ export function useSpawnDialog(deps: UseSpawnDialogDeps) {
     selectProject,
     selectFolder,
     clearProject,
+    reset,
   }
 }

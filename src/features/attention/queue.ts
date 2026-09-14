@@ -65,12 +65,15 @@ export type AttentionKind
     | 'task-permissions'
     | 'api-error'
     | 'task-waiting'
+    | 'folder-trust'
 
 /** What an item is about, and so where selecting it leads. */
 export type AttentionSubject
   = | { type: 'agent', sessionId: string }
     | { type: 'task', taskId: string }
     | { type: 'capability', decisionId: string }
+    /** An agent the dashboard started that is not a session yet (3M). */
+    | { type: 'spawn', pid: number }
 
 export interface AttentionItem {
   /** Stable per subject: `agent:<sessionId>`, `task:<taskId>`, `capability:<id>`. */
@@ -95,11 +98,24 @@ export interface AttentionItem {
   lastActivity: string | null
 }
 
+/**
+ * Claude Code's folder trust question on an agent the dashboard just started.
+ * It is asked before a session exists, so it cannot come from an agent.
+ */
+export interface SpawnTrustSource {
+  pid: number
+  /** The folder the agent was started in; only its name reaches the queue. */
+  cwd: string
+  since: string | null
+}
+
 export interface AttentionSources {
   agents: Agent[]
   permissionItems: PermissionItem[]
   capabilityDecisions: PendingCapabilityDecision[]
   tasks: PipelineTask[]
+  /** Pending folder trust questions from agents started in this browser. */
+  spawnTrust?: SpawnTrustSource[]
 }
 
 const LEVEL_RANK: Record<AttentionLevel, number> = { blocking: 0, failed: 1, stalled: 2, ready: 3 }
@@ -256,6 +272,26 @@ export function buildAttentionQueue(sources: AttentionSources): AttentionItem[] 
       reason: 'Waiting for your decision',
       detail: decision.capability,
       since: validIso(decision.requestedAt),
+      lastActivity: null,
+    })
+  }
+
+  // Claude's own folder trust question. Blocking: the agent does nothing until
+  // the user answers, and only the user answers it. The queue carries the
+  // folder's name; the full path is on the decision surface.
+  for (const spawn of sources.spawnTrust ?? []) {
+    items.push({
+      id: `spawn:${spawn.pid}`,
+      level: 'blocking',
+      kind: 'folder-trust',
+      subject: { type: 'spawn', pid: spawn.pid },
+      agentSessionId: null,
+      workspace: null,
+      repository: null,
+      title: 'New agent',
+      reason: 'Claude asks whether to trust its folder',
+      detail: spawn.cwd.split('/').filter(Boolean).pop() ?? undefined,
+      since: validIso(spawn.since),
       lastActivity: null,
     })
   }

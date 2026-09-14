@@ -11,6 +11,7 @@ import AppButton from '@/components/ui/AppButton.vue'
 import { useCapabilityDecisions } from '@/composables/useCapabilityDecisions'
 import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
+import { openFolderTrust } from '@/composables/useSpawnWatch'
 import { toast } from '@/composables/useToast'
 import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
 import { agentTitle } from '@/utils/agentLabels'
@@ -156,6 +157,13 @@ const capabilityCards = computed<PendingCapabilityDecision[]>(() => {
 })
 
 const readyTaskItems = computed(() => items.value.filter(item => item.kind === 'task-waiting'))
+// Claude's folder trust question on an agent that is not a session yet (3M).
+const folderTrustItems = computed(() => items.value.filter(item => item.kind === 'folder-trust'))
+
+function reviewFolderTrust(item: AttentionItem): void {
+  if (item.subject.type === 'spawn')
+    openFolderTrust(item.subject.pid)
+}
 
 // Grant eligibility per agent card, computed once per update. grantableToolUse
 // folds in attention.ts's Attention.grantable — the single source for which
@@ -906,6 +914,28 @@ watch(() => props.focusedSessionId, (id) => {
               Deny
             </AppButton>
           </div>
+        </div>
+
+        <!-- Folder trust: a new agent waits for Claude's own trust question. Answered on its decision surface. -->
+        <div
+          v-for="item in folderTrustItems"
+          :key="item.id"
+          data-testid="triage-folder-trust"
+          class="min-w-[280px] flex-1 basis-[280px] max-w-[420px] rounded-lg bg-card border border-l-[3px] border-warning-dot border-l-warning-dot p-3 flex items-center gap-2"
+        >
+          <span class="min-w-0 flex-1 flex flex-col gap-0.5">
+            <span class="font-semibold text-[13px] text-fg truncate">{{ item.title }}<template v-if="item.detail"> · <span class="font-mono">{{ item.detail }}</span></template></span>
+            <span class="text-[12px] text-fg-mute">{{ item.reason }}</span>
+          </span>
+          <AppButton
+            variant="outline"
+            size="sm"
+            class="shrink-0 whitespace-nowrap"
+            data-testid="triage-review-folder-trust"
+            @click="reviewFolderTrust(item)"
+          >
+            Review
+          </AppButton>
         </div>
 
         <!-- Ready: a pipeline task handed back to you. Answered in its task,

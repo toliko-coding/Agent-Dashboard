@@ -54,8 +54,10 @@ const spawnerOptions = computed(() => [
 async function submit(): Promise<void> {
   if (isSubmitting.value)
     return
-  if (!name.value.trim() || !path.value.trim() || !slug.value.trim()) {
-    toast.error('Name, Path and Slug are required.')
+  // A Project needs a name and a slug. A folder is optional: a Project is an
+  // organisational grouping, not a working directory or a repository.
+  if (!name.value.trim() || !slug.value.trim()) {
+    toast.error('Name and Slug are required.')
     return
   }
   isSubmitting.value = true
@@ -74,6 +76,12 @@ async function submit(): Promise<void> {
   }
   catch (e) {
     toast.error(errorMessage(e))
+    isSubmitting.value = false
+    return
+  }
+
+  if (!path.value.trim()) {
+    emit('created', { ...project, folders: [] })
     isSubmitting.value = false
     return
   }
@@ -111,12 +119,11 @@ async function submit(): Promise<void> {
         >
       </div>
       <div class="mb-2">
-        <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="qcp-path">Path *</label>
+        <label class="block text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-1" for="qcp-path">Folder (optional)</label>
         <input
           id="qcp-path"
           v-model="path"
           name="path"
-          required
           placeholder="/home/me/projects/my-project"
           :class="inputClass"
         >
@@ -173,7 +180,7 @@ async function submit(): Promise<void> {
         <AppButton type="button" variant="secondary" @click="emit('cancel')">
           Cancel
         </AppButton>
-        <AppButton type="submit" variant="primary" :disabled="isSubmitting || !name.trim() || !path.trim() || !slug.trim()">
+        <AppButton type="submit" variant="primary" :disabled="isSubmitting || !name.trim() || !slug.trim()">
           {{ isSubmitting ? 'Creating…' : 'Create' }}
         </AppButton>
       </div>

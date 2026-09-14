@@ -76,17 +76,33 @@ describe('useSpawnDialog', () => {
     expect(d.cwd.value).toBe('/home/u/alpha-experimental')
   })
 
-  it('clearing project resets cwd and spawnerId', async () => {
+  // 3M: a Project is an association; removing it never rewrites the working folder.
+  it('clearing the project keeps the working folder and resets the spawner', async () => {
     const fetchFolders = vi.fn().mockResolvedValue(singleFolder)
     const lookupSpawner = vi.fn().mockReturnValue(sampleSpawner)
 
     const d = useSpawnDialog({ fetchFolders, lookupSpawner })
     await d.selectProject(sampleProject)
+    const chosen = d.cwd.value
     d.clearProject()
 
-    expect(d.cwd.value).toBe('')
+    expect(d.cwd.value).toBe(chosen)
     expect(d.spawnerId.value).toBeNull()
     expect(d.folders.value).toEqual([])
+    d.reset()
+    expect(d.cwd.value).toBe('')
+  })
+
+  it('selecting a project never overwrites a folder the user already chose', async () => {
+    const fetchFolders = vi.fn().mockResolvedValue(singleFolder)
+    const lookupSpawner = vi.fn().mockReturnValue(sampleSpawner)
+
+    const d = useSpawnDialog({ fetchFolders, lookupSpawner })
+    d.cwd.value = '/Users/me/scratch/plain'
+    await d.selectProject(sampleProject)
+
+    expect(d.cwd.value).toBe('/Users/me/scratch/plain')
+    expect(d.project.value?.id).toBe(sampleProject.id)
   })
 
   it('project without defaultSpawnerId leaves spawnerId empty', async () => {

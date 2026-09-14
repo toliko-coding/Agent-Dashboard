@@ -65,13 +65,9 @@ test('spawn dialog shows project picker and hydrates cwd from default folder', a
     //    appended for a project without a default folder.
     await selectListboxOption(page, page.locator('#spawn-project'), `E2E ${slug}`)
 
-    // 7. Assert cwd is NOT a free-text field — the manual working directory
-    //    input was removed. cwd now flows exclusively from the selected
-    //    project folder, so [data-testid="spawn-cwd-wrap"] must not exist.
-    await expect(page.locator('[data-testid="spawn-cwd-wrap"]')).toHaveCount(0)
-
-    // Assert the folder picker is not shown (single folder → no picker).
-    await expect(page.locator('#spawn-folder')).toHaveCount(0)
+    // 7. The working folder is a real input (3M) — the primary field — and the
+    //    project's default folder is suggested into it because none was chosen.
+    await expect(page.getByTestId('spawn-folder-input-wrap')).toHaveValue('/tmp')
 
     // 8. Assert spawner picker is present.
     await expect(page.locator('[data-testid="spawn-spawner"]')).toBeVisible()
@@ -112,7 +108,7 @@ test('spawn dialog shows project picker and hydrates cwd from default folder', a
 //
 // Same project/folder pre-seed as above, but this time we intercept the real
 // spawn POST (SpawnDialog.vue's handleSpawn -> POST /api/agents/spawn) before
-// clicking "Spawn Agent", so no Claude process actually launches — the route
+// clicking "Start Agent", so no Claude process actually launches — the route
 // is fulfilled with the { pid } shape the client reads (`data.pid`). Asserts
 // the captured request body carries the values the form drove: cwd from the
 // selected project's default folder, the chosen permission mode, and the
@@ -164,6 +160,8 @@ test('spawn dialog submits payload with project cwd, permission mode, and prompt
       })
     })
 
+    // Start enables once the server has checked the folder against its allow-list.
+    await expect(page.getByTestId('spawn-btn')).toBeEnabled()
     await page.getByTestId('spawn-btn').click()
 
     await expect.poll(() => capturedPayload).not.toBeNull()
@@ -176,6 +174,50 @@ test('spawn dialog submits payload with project cwd, permission mode, and prompt
     // No spawner override was picked and the project has no defaultSpawnerId,
     // so handleSpawn() omits spawnerId entirely rather than sending it empty.
     expect(payload.spawnerId).toBeUndefined()
+  }
+  finally {
+    await request.delete(`/api/projects/${project.id}`, { headers: csrfHeaders })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// 3M: New Agent with Project = None
+//
+// A project with /tmp registered keeps the spawn allow-list non-empty, so this
+// also proves the allow-list is enforced by folder, not by project membership:
+// the agent is started in /tmp with no project chosen and no projectId sent.
+// ---------------------------------------------------------------------------
+
+test('spawn dialog starts an agent with Project = None in a chosen folder', async ({ page, request, baseURL }) => {
+  const slug = `e2e-none-${Date.now()}`
+  const csrfHeaders = { Origin: baseURL ?? 'http://localhost:13199' }
+
+  const projectRes = await request.post('/api/projects', { headers: csrfHeaders, data: { name: `E2E ${slug}`, slug } })
+  await expect(projectRes).toBeOK()
+  const project = await projectRes.json() as { id: string }
+  await expect(await request.post(`/api/projects/${project.id}/folders`, { headers: csrfHeaders, data: { path: '/tmp', isDefault: true } })).toBeOK()
+
+  try {
+    await page.goto('/')
+    await page.getByRole('button', { name: '+ New Agent' }).click()
+    await expect(page.locator('#spawn-project')).toContainText('None')
+
+    await page.getByTestId('spawn-folder-input-wrap').fill('/tmp')
+    await expect(page.getByTestId('spawn-folder-identity')).toBeVisible()
+    await page.locator('#spawn-prompt').fill('Look around')
+
+    let capturedPayload: Record<string, unknown> | null = null
+    await page.route('/api/agents/spawn', async (route) => {
+      capturedPayload = route.request().postDataJSON()
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ pid: 9998 }) })
+    })
+
+    await expect(page.getByTestId('spawn-btn')).toBeEnabled()
+    await page.getByTestId('spawn-btn').click()
+    await expect.poll(() => capturedPayload).not.toBeNull()
+    const payload = capturedPayload as unknown as Record<string, unknown>
+    expect(payload.cwd).toBe('/tmp')
+    expect(payload).not.toHaveProperty('projectId')
   }
   finally {
     await request.delete(`/api/projects/${project.id}`, { headers: csrfHeaders })

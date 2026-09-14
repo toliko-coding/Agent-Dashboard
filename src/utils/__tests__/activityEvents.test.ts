@@ -66,3 +66,14 @@ describe('activityEvents', () => {
     expect(toActivityFeed([])).toEqual([])
   })
 })
+
+// 3M: the working-folder and folder-trust audit actions read as sentences, not raw keys.
+describe('activity titles — agent working folders', () => {
+  it('names the new audit actions', () => {
+    const at = '2026-09-14T10:00:00Z'
+    const title = (action: string) => toActivityEvent({ id: action, timestamp: at, actor: 'user', action, target: '' } as never).title
+    expect(title('working_folder_allow')).toBe('Folder allowed for agents')
+    expect(title('working_folder_remove')).toBe('Folder no longer allowed for agents')
+    expect(title('folder_trust')).toBe('Folder trust question answered')
+  })
+})

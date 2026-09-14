@@ -60,6 +60,8 @@ function where(item: AttentionItem): string {
     return 'Pipeline task'
   if (item.subject.type === 'capability')
     return 'Dashboard server'
+  if (item.subject.type === 'spawn')
+    return 'Starting · not a session yet'
   const ws = item.workspace
   if (!ws)
     return 'Workspace unknown'

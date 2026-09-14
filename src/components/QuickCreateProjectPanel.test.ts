@@ -166,6 +166,27 @@ describe('quickCreateProjectPanel', () => {
   })
 })
 
+describe('quickCreateProjectPanel — folder optional (3M)', () => {
+  it('creates a project with only a name and slug, and requests no folder', async () => {
+    const calls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push(`${init?.method ?? 'GET'} ${url}`)
+      if (url === '/api/projects')
+        return { ok: true, json: async () => ({ id: 'prj_new', name: 'Bare', slug: 'bare', createdAt: '', updatedAt: '' }) }
+      return { ok: true, json: async () => ({}) }
+    }))
+    const wrapper = mount(QuickCreateProjectPanel, { props: { spawners: [] } })
+    await wrapper.find('input[name="name"]').setValue('Bare')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(calls).toEqual(['POST /api/projects'])
+    expect(calls.some(c => c.includes('/folders') || c.includes('/agents') || c.includes('github'))).toBe(false)
+    expect(wrapper.emitted('created')?.[0]?.[0]).toMatchObject({ id: 'prj_new', folders: [] })
+    expect(wrapper.find('label[for="qcp-path"]').text()).toContain('optional')
+    vi.unstubAllGlobals()
+  })
+})
+
 describe('quickCreateProjectPanel length limits', () => {
   it('caps the name and description fields at the limits the server enforces', () => {
     const wrapper = mount(QuickCreateProjectPanel, { props: { spawners: [] } })

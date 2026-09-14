@@ -60,6 +60,9 @@ const ACTION_TITLES: Record<string, string> = {
   task_cancelled: 'Task cancelled',
   retry_requested: 'Task retry requested',
   worktree_removed: 'Worktree removed',
+  working_folder_allow: 'Folder allowed for agents',
+  working_folder_remove: 'Folder no longer allowed for agents',
+  folder_trust: 'Folder trust question answered',
 }
 
 const SEVERITY_BY_ACTION: Record<string, ActivitySeverity> = {

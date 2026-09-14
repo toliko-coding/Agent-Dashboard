@@ -6,6 +6,7 @@ import { useAttentionQueue } from '@/features/attention/useAttentionQueue'
 import { activeWorkAgents } from '@/features/cockpit/commandModel'
 import BacklogForm from '@/features/pipeline/components/BacklogForm.vue'
 import { useTasks } from '@/features/pipeline/composables/useTasks'
+import FolderTrustModal from './components/FolderTrustModal.vue'
 import LoginPage from './components/LoginPage.vue'
 import OnboardingFlow from './components/onboarding/OnboardingFlow.vue'
 import ServerReconnectOverlay from './components/ServerReconnectOverlay.vue'
@@ -441,6 +442,7 @@ onMounted(() => usageComposable.start())
     </div>
     <ToastHost />
     <SpawnDialog :open="showSpawnDialog" @close="showSpawnDialog = false" @spawned="selectAgentWhenAvailable" />
+    <FolderTrustModal />
     <RefinementChat
       :open="showRefinementChat"
       :task="activeConceptTask"

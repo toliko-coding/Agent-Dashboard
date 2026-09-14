@@ -3,6 +3,7 @@ import type { ActiveView } from '@/composables/useViewState'
 import type { AttentionItem, AttentionQueue } from '@/features/attention'
 import type { Agent } from '@/types'
 import { computed } from 'vue'
+import { openFolderTrust } from '@/composables/useSpawnWatch'
 import { useViewState } from '@/composables/useViewState'
 import { useAgents } from '@/features/agents'
 import { NeedsYouBand } from '@/features/attention'
@@ -70,6 +71,10 @@ function openAttention(item: AttentionItem): void {
   }
   else if (subject.type === 'task') {
     emit('openTask', subject.taskId)
+  }
+  else if (subject.type === 'spawn') {
+    // Claude's folder trust question has its own decision surface.
+    openFolderTrust(subject.pid)
   }
   else {
     activeView.value = 'dashboard'

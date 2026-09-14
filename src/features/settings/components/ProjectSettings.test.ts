@@ -212,3 +212,34 @@ describe('projectSettings length limits', () => {
     expect((wrapper.get('#proj-desc').element as HTMLInputElement).maxLength).toBe(MAX_DESCRIPTION_CHARS)
   })
 })
+
+// F + G + H (3M): creating a Dashboard Project needs a name and a slug only —
+// it launches nothing, asks nothing of GitHub, and GitHub stays a separate,
+// optional Settings section to connect later.
+describe('projectSettings — create', () => {
+  it('creates a project with name and slug alone, starting no agent and calling no GitHub route', async () => {
+    const { createProject } = await import('@/composables/useProjects')
+    const created = { id: 'p9', slug: 'no-github', name: 'No GitHub', folders: [], createdAt: '', updatedAt: '' }
+    vi.mocked(createProject).mockResolvedValueOnce(created as never)
+    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({}) }))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const wrapper = mount(ProjectSettings)
+    await wrapper.get('[data-testid="proj-new"]').trigger('click')
+    await wrapper.get('[data-testid="proj-name"]').setValue('No GitHub')
+    const save = wrapper.findAll('button').find(b => b.text().trim() === 'Create Project')!
+    await save.trigger('click')
+    await flushPromises()
+
+    expect(createProject).toHaveBeenCalledTimes(1)
+    const input = vi.mocked(createProject).mock.calls[0][0] as unknown as Record<string, unknown>
+    expect(input).toMatchObject({ name: 'No GitHub', slug: 'no-github' })
+    expect(Object.keys(input).some(k => /github|repo|remote|cwd|folder/i.test(k))).toBe(false)
+    const urls = fetchSpy.mock.calls.map(c => String((c as unknown as [string])[0]))
+    expect(urls.some(u => u.includes('/api/agents/spawn') || u.includes('github'))).toBe(false)
+
+    const { SETTINGS_SECTIONS } = await import('@/utils/settingsSections')
+    expect(SETTINGS_SECTIONS.map(sec => sec.id)).toContain('github')
+    vi.unstubAllGlobals()
+  })
+})
