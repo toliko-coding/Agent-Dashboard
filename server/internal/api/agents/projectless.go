@@ -1,11 +1,14 @@
 package agents
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"os"
 
+	"github.com/lx-wnk/agent-dashboard/server/internal/agentprofile"
 	"github.com/lx-wnk/agent-dashboard/server/internal/services"
 )
 
@@ -16,9 +19,11 @@ import (
  *   GET  /api/agents/projectless              the root, and whether it is the default
  *   PUT  /api/agents/projectless              set the root ("" restores the default)
  *   POST /api/agents/projectless/preview      where a workspace for a name would go
- *   POST /api/agents/projectless/workspaces   create it, allowing exactly that folder
  *
- * All four need the working-folder settings; without them they answer 404,
+ * Creating one happens only inside POST /api/agents/spawn ("projectless": true),
+ * so the server records that it created the folder (createProjectlessForSpawn).
+ *
+ * All three need the working-folder settings; without them they answer 404,
  * like the working-folder routes.
  */
 
@@ -107,15 +112,28 @@ func (h *SpawnHandler) PreviewProjectlessWorkspace(w http.ResponseWriter, r *htt
 	writeFolderJSON(w, http.StatusOK, ws)
 }
 
-// CreateProjectlessWorkspace handles POST /api/agents/projectless/workspaces.
-func (h *SpawnHandler) CreateProjectlessWorkspace(w http.ResponseWriter, r *http.Request) {
+/*
+ * createProjectlessForSpawn is the only way a projectless workspace is created
+ * (3N.2.1): inside POST /api/agents/spawn with "projectless": true, so the folder
+ * the server creates, the one allowed-folder entry it adds and the agent it then
+ * launches are recorded together — the provenance delete later relies on to
+ * remove that entry. The request can never claim that provenance for a folder
+ * the server did not create.
+ */
+func (h *SpawnHandler) createProjectlessForSpawn(w http.ResponseWriter, r *http.Request, body map[string]any) (services.ProjectlessWorkspace, spawnProvenance, bool) {
 	if h.workingFolders == nil {
-		http.NotFound(w, r)
-		return
+		writeFolderJSON(w, http.StatusBadRequest, map[string]string{"error": "projectless workspaces are not available on this server"})
+		return services.ProjectlessWorkspace{}, spawnProvenance{}, false
 	}
-	name, ok := decodeAgentName(w, r)
-	if !ok {
-		return
+	name, _ := body["displayName"].(string)
+	category, _ := body["category"].(string)
+	if _, err := agentprofile.Normalize(name, category); err != nil {
+		writeFolderJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return services.ProjectlessWorkspace{}, spawnProvenance{}, false
+	}
+	if prompt, _ := body["prompt"].(string); prompt == "" {
+		writeFolderJSON(w, http.StatusBadRequest, map[string]string{"error": "missing or invalid prompt"})
+		return services.ProjectlessWorkspace{}, spawnProvenance{}, false
 	}
 	ws, err := services.CreateProjectlessWorkspace(r.Context(), h.workingFolders, name)
 	if err != nil {
@@ -127,10 +145,23 @@ func (h *SpawnHandler) CreateProjectlessWorkspace(w http.ResponseWriter, r *http
 			status = http.StatusForbidden
 		}
 		writeFolderJSON(w, status, map[string]string{"error": err.Error()})
-		return
+		return services.ProjectlessWorkspace{}, spawnProvenance{}, false
 	}
+	// A projectless workspace belongs to no Project and resumes nothing.
+	body["cwd"] = ws.Path
+	delete(body, "projectId")
+	delete(body, "resumeSessionId")
 	if h.auditRepo != nil {
 		_ = h.auditRepo.RecordAudit(r.Context(), nil, "projectless_workspace_create", "folder:"+ws.Folder, nil)
 	}
-	writeFolderJSON(w, http.StatusCreated, ws)
+	return ws, spawnProvenance{workspaceCreated: true, allowedFolder: ws.Path}, true
+}
+
+// undoProjectlessWorkspace reverts a workspace whose agent failed to start: its
+// allowed-folder entry goes, and the folder is removed only if still empty.
+func (h *SpawnHandler) undoProjectlessWorkspace(ctx context.Context, ws services.ProjectlessWorkspace) {
+	if _, err := services.RemoveWorkingFolder(ctx, h.workingFolders, ws.Path); err != nil {
+		slog.Warn("projectless: allowed folder not removed after a failed spawn", "err", err)
+	}
+	_ = os.Remove(ws.Path) // fails, harmlessly, on a non-empty folder
 }

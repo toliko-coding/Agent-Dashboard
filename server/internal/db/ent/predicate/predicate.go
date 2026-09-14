@@ -42,6 +42,9 @@ type Grant func(*sql.Selector)
 // GrantUsage is the predicate function for grantusage builders.
 type GrantUsage func(*sql.Selector)
 
+// ManagedAgent is the predicate function for managedagent builders.
+type ManagedAgent func(*sql.Selector)
+
 // Materialization is the predicate function for materialization builders.
 type Materialization func(*sql.Selector)
 

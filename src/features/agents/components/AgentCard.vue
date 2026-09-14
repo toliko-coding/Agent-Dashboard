@@ -8,7 +8,7 @@ import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
-import { agentIsRunning, editorLabel, openInEditor, useAgentLifecycle } from '@/composables/useAgentLifecycle'
+import { agentIsDashboardOwned, agentIsRunning, editorLabel, lifecycleNote, openInEditor, useAgentLifecycle } from '@/composables/useAgentLifecycle'
 import { useNow } from '@/composables/useNow'
 import { toast } from '@/composables/useToast'
 import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vue'
@@ -64,7 +64,10 @@ const { nowMs } = useNow()
 const { requestStop, requestDelete } = useAgentLifecycle()
 
 const isFinished = computed(() => props.agent.status === 'finished')
-const running = computed(() => agentIsRunning(props.agent) && !props.agent.machine && !props.agent.internalProcess)
+// Stop and Delete only for an agent this dashboard launched (3N.2.1).
+const owned = computed(() => agentIsDashboardOwned(props.agent))
+const running = computed(() => owned.value && agentIsRunning(props.agent))
+const observeNote = computed(() => lifecycleNote(props.agent))
 const displayStatus = computed(() => agentDisplayStatus(props.agent))
 const statusBadgeTitle = computed(() => displayStatus.value === 'waiting'
   ? 'No new activity for a bit — the agent process is still alive, not waiting on you'
@@ -456,6 +459,14 @@ const ICON_BUTTON = 'inline-flex size-8 shrink-0 items-center justify-center rou
       </button>
 
       <span class="ml-auto flex items-center gap-1.5">
+        <span
+          v-if="observeNote"
+          class="inline-flex h-8 cursor-default items-center gap-1.5 rounded-lg border border-line px-2.5 text-ui-sm text-fg-mute"
+          data-testid="agent-card-observe-only"
+          :title="observeNote"
+        >
+          <svg viewBox="0 0 16 16" class="size-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z" /><circle cx="8" cy="8" r="1.8" /></svg>Observe only<span class="sr-only">. {{ observeNote }}</span>
+        </span>
         <button
           v-if="running"
           type="button"
@@ -467,7 +478,7 @@ const ICON_BUTTON = 'inline-flex size-8 shrink-0 items-center justify-center rou
           <span class="size-2 rounded-[2px] bg-danger-text" aria-hidden="true" />Stop
         </button>
         <button
-          v-if="!agent.internalProcess && !agent.machine"
+          v-if="owned"
           type="button"
           class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg border border-line text-fg-mute hover:border-danger-line hover:bg-danger-soft hover:text-danger-text focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
           data-testid="agent-card-delete"

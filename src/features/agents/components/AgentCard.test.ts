@@ -165,19 +165,19 @@ describe('agentCard finished state', () => {
   })
 
   it('offers Stop only while the agent is running', () => {
-    expect(render({ status: 'active' }).find('[data-testid="agent-card-stop"]').exists()).toBe(true)
-    expect(render({ status: 'finished' }).find('[data-testid="agent-card-stop"]').exists()).toBe(false)
+    expect(render({ status: 'active', dashboardOwned: true }).find('[data-testid="agent-card-stop"]').exists()).toBe(true)
+    expect(render({ status: 'finished', dashboardOwned: true }).find('[data-testid="agent-card-stop"]').exists()).toBe(false)
   })
 
   it('offers Delete for a finished agent, which reads Finished', () => {
-    const w = render({ status: 'finished' })
+    const w = render({ status: 'finished', dashboardOwned: true })
     expect(w.find('[data-testid="agent-card-delete"]').exists()).toBe(true)
     expect(w.get('[data-testid="agent-card-activity"]').text()).toBe('Finished')
   })
 
   it('asks for confirmation instead of deleting straight away', async () => {
     const { useAgentLifecycle } = await import('@/composables/useAgentLifecycle')
-    const w = render({ pid: 4242, status: 'finished' })
+    const w = render({ pid: 4242, status: 'finished', dashboardOwned: true })
     await w.get('[data-testid="agent-card-delete"]').trigger('click')
     expect(useAgentLifecycle().pending.value).toMatchObject({ action: 'delete', agent: { pid: 4242 } })
     expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining('/api/agents/4242'), expect.anything())

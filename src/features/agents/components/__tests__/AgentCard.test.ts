@@ -73,7 +73,7 @@ describe('agentCard interaction', () => {
   })
 
   it('does not emit select when Delete is clicked', async () => {
-    const w = mount(AgentCard, { props: { agent: makeAgent({ status: 'finished' }) }, global: { stubs } })
+    const w = mount(AgentCard, { props: { agent: makeAgent({ status: 'finished', dashboardOwned: true }) }, global: { stubs } })
     await w.get('[data-testid="agent-card-delete"]').trigger('click')
     expect(w.emitted('select')).toBeFalsy()
     const { useAgentLifecycle } = await import('@/composables/useAgentLifecycle')

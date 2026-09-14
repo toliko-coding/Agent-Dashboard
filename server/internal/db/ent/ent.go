@@ -24,6 +24,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/evalmetricsnapshot"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/grant"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/grantusage"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/managedagent"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/materialization"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/memoryentry"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/memoryinjection"
@@ -121,6 +122,7 @@ func checkColumn(t, c string) error {
 			evalmetricsnapshot.Table: evalmetricsnapshot.ValidColumn,
 			grant.Table:              grant.ValidColumn,
 			grantusage.Table:         grantusage.ValidColumn,
+			managedagent.Table:       managedagent.ValidColumn,
 			materialization.Table:    materialization.ValidColumn,
 			memoryentry.Table:        memoryentry.ValidColumn,
 			memoryinjection.Table:    memoryinjection.ValidColumn,

@@ -157,7 +157,8 @@ describe('rich agent card — actions', () => {
     const { useAgentLifecycle } = await import('@/composables/useAgentLifecycle')
     const fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
-    const w = await render()
+    const w = await render({ dashboardOwned: true })
+    expect(w.find('[data-testid="agent-card-observe-only"]').exists()).toBe(false)
     await w.get('[data-testid="agent-card-stop"]').trigger('click')
     expect(useAgentLifecycle().pending.value).toMatchObject({ action: 'stop' })
     await w.get('[data-testid="agent-card-delete"]').trigger('click')
@@ -168,9 +169,37 @@ describe('rich agent card — actions', () => {
   })
 
   it('offers neither Stop nor Delete for Claude Code internal processes', async () => {
-    const w = await render({ internalProcess: true })
+    const w = await render({ internalProcess: true, dashboardOwned: true })
     expect(w.find('[data-testid="agent-card-stop"]').exists()).toBe(false)
     expect(w.find('[data-testid="agent-card-delete"]').exists()).toBe(false)
+  })
+
+  // 3N.2.1 C/D/E/F: running in the scan, being Claude, a live terminal or a known
+  // workspace is not ownership — only the server's dashboardOwned is.
+  it('offers neither Stop nor Delete for a session the dashboard did not launch, and says it is observed', async () => {
+    for (const o of [{}, { liveInjectable: true }, { entrypoint: 'cli' }, { entrypoint: 'claude-vscode' }, { dashboardOwned: false }] as Partial<Agent>[]) {
+      const w = await render(o)
+      expect(w.find('[data-testid="agent-card-stop"]').exists()).toBe(false)
+      expect(w.find('[data-testid="agent-card-delete"]').exists()).toBe(false)
+      const note = w.get('[data-testid="agent-card-observe-only"]')
+      expect(note.text()).toContain('Observe only')
+      expect(note.attributes('title')).toBe('External session — stop it from the terminal or application that started it.')
+      // Open stays available.
+      expect(w.find('[data-testid="agent-card-open-button"]').exists()).toBe(true)
+      w.unmount()
+    }
+  })
+
+  it('points a pipeline agent at its task instead of offering Stop', async () => {
+    const w = await render({ dashboardOwned: true, pipelineTaskId: 'task-1' })
+    expect(w.find('[data-testid="agent-card-stop"]').exists()).toBe(false)
+    expect(w.get('[data-testid="agent-card-observe-only"]').attributes('title')).toContain('pipeline task')
+  })
+
+  it('has no axe violations for an observed session', async () => {
+    const w = await render({}, true)
+    expect(await axe(w.element as Element)).toHaveNoViolations()
+    w.unmount()
   })
 
   it('has no axe violations', async () => {

@@ -281,6 +281,9 @@ type Merger struct {
 	// profiles attaches the display name and icon category a user gave an agent
 	// at spawn, by session id (3N.1). Nil: no agent carries either.
 	profiles ProfileLookup
+	// ownership says which agents this server launched (3N.2.1).
+	ownerMu   sync.RWMutex
+	ownership OwnershipLookup
 
 	// latest is the most recent GetAgents result by pid, for routes that must
 	// act only on a PID the scan knows as an agent (stop, delete).
@@ -303,6 +306,18 @@ type ProfileLookup interface {
 	Lookup(sessionID string) (agentprofile.Profile, bool)
 }
 
+// OwnershipLookup reports whether this server launched pid for sessionID.
+type OwnershipLookup interface {
+	Owns(pid int, sessionID string) bool
+}
+
+// SetOwnership installs the ownership check attached as Agent.DashboardOwned.
+func (m *Merger) SetOwnership(o OwnershipLookup) {
+	m.ownerMu.Lock()
+	m.ownership = o
+	m.ownerMu.Unlock()
+}
+
 // SetAgentProfiles installs the profile lookup. Call once, before serving.
 func (m *Merger) SetAgentProfiles(p ProfileLookup) { m.profiles = p }
 
@@ -310,6 +325,13 @@ func (m *Merger) SetAgentProfiles(p ProfileLookup) { m.profiles = p }
 // id — never by folder, Project or process — on every scan, so a rebuilt agent
 // carries it again. Only DisplayName and Category are touched.
 func (m *Merger) applyProfiles(agents []sdk.Agent) {
+	m.ownerMu.RLock()
+	ownership := m.ownership
+	m.ownerMu.RUnlock()
+	for i := range agents {
+		// Ownership is a fact about who launched the process, never inferred.
+		agents[i].DashboardOwned = ownership != nil && ownership.Owns(agents[i].PID, agents[i].SessionID)
+	}
 	if m.profiles == nil {
 		return
 	}

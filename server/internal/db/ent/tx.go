@@ -36,6 +36,8 @@ type Tx struct {
 	Grant *GrantClient
 	// GrantUsage is the client for interacting with the GrantUsage builders.
 	GrantUsage *GrantUsageClient
+	// ManagedAgent is the client for interacting with the ManagedAgent builders.
+	ManagedAgent *ManagedAgentClient
 	// Materialization is the client for interacting with the Materialization builders.
 	Materialization *MaterializationClient
 	// MemoryEntry is the client for interacting with the MemoryEntry builders.
@@ -229,6 +231,7 @@ func (tx *Tx) init() {
 	tx.EvalMetricSnapshot = NewEvalMetricSnapshotClient(tx.config)
 	tx.Grant = NewGrantClient(tx.config)
 	tx.GrantUsage = NewGrantUsageClient(tx.config)
+	tx.ManagedAgent = NewManagedAgentClient(tx.config)
 	tx.Materialization = NewMaterializationClient(tx.config)
 	tx.MemoryEntry = NewMemoryEntryClient(tx.config)
 	tx.MemoryInjection = NewMemoryInjectionClient(tx.config)

@@ -160,7 +160,7 @@ describe('agentModal — workspace', () => {
 
   it('names the agent in its header with state, handle and topic, and offers Stop and Delete through the shared confirmation', async () => {
     const { useAgentLifecycle } = await import('@/composables/useAgentLifecycle')
-    const w = workspace({ ...baseAgent, status: 'active', displayName: 'Portfolio', title: 'Refactoring responsive navigation' } as Agent)
+    const w = workspace({ ...baseAgent, status: 'active', dashboardOwned: true, displayName: 'Portfolio', title: 'Refactoring responsive navigation' } as Agent)
     expect(w.get('[data-testid="agent-modal-title"]').text()).toBe('Portfolio')
     expect(w.get('[data-testid="agent-modal-technical"]').text()).toMatch(/^Claude · /)
     expect(w.get('[data-testid="agent-modal-topic"]').text()).toBe('Refactoring responsive navigation')
@@ -169,6 +169,32 @@ describe('agentModal — workspace', () => {
     await w.get('[data-testid="agent-modal-delete"]').trigger('click')
     expect(useAgentLifecycle().pending.value).toMatchObject({ action: 'delete' })
     useAgentLifecycle().cancel()
+  })
+
+  // 3N.2.1 C/D/E: a session the dashboard did not launch is observed, and says where to stop it.
+  it('offers no Stop or Delete for an external session, and says where it can be stopped', () => {
+    const w = workspace({ ...baseAgent, status: 'active', liveInjectable: true } as Agent)
+    expect(w.find('[data-testid="agent-modal-stop"]').exists()).toBe(false)
+    expect(w.find('[data-testid="agent-modal-delete"]').exists()).toBe(false)
+    expect(w.get('[data-testid="agent-modal-observe-only"]').text()).toBe('External session — stop it from the terminal or application that started it.')
+    expect(w.find('[data-testid="agent-modal-remove-profile"]').exists()).toBe(false)
+  })
+
+  it('lets the name and icon of an external session be removed without touching its process', async () => {
+    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ profileRemoved: true }) }))
+    vi.stubGlobal('fetch', fetchSpy)
+    const w = workspace({ ...baseAgent, status: 'active', displayName: 'Portfolio', category: 'web' } as Agent)
+    await w.get('[data-testid="agent-modal-remove-profile"]').trigger('click')
+    const lifecycleCalls = (fetchSpy.mock.calls as unknown as [string, RequestInit?][]).filter(([url]) => url.startsWith('/api/agents/1234'))
+    // Only the profile: never stop, delete or dismiss.
+    expect(lifecycleCalls).toEqual([['/api/agents/1234/profile', expect.objectContaining({ method: 'DELETE' })]])
+    vi.unstubAllGlobals()
+  })
+
+  it('says a pipeline agent is stopped through its task', () => {
+    const w = workspace({ ...baseAgent, status: 'active', dashboardOwned: true, pipelineTaskId: 't-1' } as Agent)
+    expect(w.find('[data-testid="agent-modal-stop"]').exists()).toBe(false)
+    expect(w.get('[data-testid="agent-modal-observe-only"]').text()).toContain('pipeline task')
   })
 
   it('gives the conversation its own labelled region', () => {

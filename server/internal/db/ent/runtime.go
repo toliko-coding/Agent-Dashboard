@@ -17,6 +17,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/evalmetricsnapshot"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/grant"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/grantusage"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/managedagent"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/materialization"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/memoryentry"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/memoryinjection"
@@ -277,6 +278,38 @@ func init() {
 	grantusageDescUsedAt := grantusageFields[1].Descriptor()
 	// grantusage.DefaultUsedAt holds the default value on creation for the used_at field.
 	grantusage.DefaultUsedAt = grantusageDescUsedAt.Default.(func() time.Time)
+	managedagentFields := schema.ManagedAgent{}.Fields()
+	_ = managedagentFields
+	// managedagentDescPid is the schema descriptor for pid field.
+	managedagentDescPid := managedagentFields[1].Descriptor()
+	// managedagent.PidValidator is a validator for the "pid" field. It is called by the builders before save.
+	managedagent.PidValidator = managedagentDescPid.Validators[0].(func(int) error)
+	// managedagentDescCwd is the schema descriptor for cwd field.
+	managedagentDescCwd := managedagentFields[2].Descriptor()
+	// managedagent.DefaultCwd holds the default value on creation for the cwd field.
+	managedagent.DefaultCwd = managedagentDescCwd.Default.(string)
+	// managedagentDescWorkspaceCreated is the schema descriptor for workspace_created field.
+	managedagentDescWorkspaceCreated := managedagentFields[3].Descriptor()
+	// managedagent.DefaultWorkspaceCreated holds the default value on creation for the workspace_created field.
+	managedagent.DefaultWorkspaceCreated = managedagentDescWorkspaceCreated.Default.(bool)
+	// managedagentDescAllowedFolder is the schema descriptor for allowed_folder field.
+	managedagentDescAllowedFolder := managedagentFields[4].Descriptor()
+	// managedagent.DefaultAllowedFolder holds the default value on creation for the allowed_folder field.
+	managedagent.DefaultAllowedFolder = managedagentDescAllowedFolder.Default.(string)
+	// managedagentDescCreatedAt is the schema descriptor for created_at field.
+	managedagentDescCreatedAt := managedagentFields[5].Descriptor()
+	// managedagent.DefaultCreatedAt holds the default value on creation for the created_at field.
+	managedagent.DefaultCreatedAt = managedagentDescCreatedAt.Default.(func() time.Time)
+	// managedagentDescUpdatedAt is the schema descriptor for updated_at field.
+	managedagentDescUpdatedAt := managedagentFields[6].Descriptor()
+	// managedagent.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	managedagent.DefaultUpdatedAt = managedagentDescUpdatedAt.Default.(func() time.Time)
+	// managedagent.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	managedagent.UpdateDefaultUpdatedAt = managedagentDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// managedagentDescID is the schema descriptor for id field.
+	managedagentDescID := managedagentFields[0].Descriptor()
+	// managedagent.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	managedagent.IDValidator = managedagentDescID.Validators[0].(func(string) error)
 	materializationMixin := schema.Materialization{}.Mixin()
 	materializationMixinFields0 := materializationMixin[0].Fields()
 	_ = materializationMixinFields0

@@ -60,6 +60,7 @@ import (
 	authpkg "github.com/lx-wnk/agent-dashboard/server/internal/auth"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/repo"
 	"github.com/lx-wnk/agent-dashboard/server/internal/hookstore"
+	"github.com/lx-wnk/agent-dashboard/server/internal/managedagent"
 	mcp "github.com/lx-wnk/agent-dashboard/server/internal/mcp"
 	"github.com/lx-wnk/agent-dashboard/server/internal/merger"
 	"github.com/lx-wnk/agent-dashboard/server/internal/plugin"
@@ -169,6 +170,8 @@ type RouterDeps struct {
 	ProjectFolderRepo repo.ProjectFolderRepo
 	// AgentProfiles stores display names and icon categories given at spawn.
 	AgentProfiles *agentprofile.Store
+	// ManagedAgents records the agents this server launched (lifecycle ownership).
+	ManagedAgents *managedagent.Store
 	SpawnerRepo   repo.SpawnerRepo
 	// SpawnerBroadcaster fans out spawner CRUD events to SSE subscribers.
 	// May be nil; Stream is only mounted in DI where a broadcaster is always provided.
@@ -578,6 +581,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 		if deps.AgentProfiles != nil {
 			spawnMgr.SetAgentProfiles(deps.AgentProfiles)
 		}
+		if deps.ManagedAgents != nil {
+			spawnMgr.SetManagedAgents(deps.ManagedAgents)
+		}
 		// Lets a spawn's status report Claude's folder trust question, which is
 		// asked before the session exists anywhere else.
 		spawnMgr.SetScreenProbe(merger.RealScreenProbe)
@@ -585,6 +591,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 		spawnHandler := agents.NewSpawnHandler(spawnMgr)
 		if deps.AgentProfiles != nil {
 			spawnHandler.SetProfileDeleter(deps.AgentProfiles)
+		}
+		if deps.ManagedAgents != nil {
+			spawnHandler.SetManagedAgents(deps.ManagedAgents)
 		}
 		if deps.AuditEventRepo != nil {
 			spawnHandler.SetAuditRepo(deps.AuditEventRepo)
@@ -597,6 +606,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 			// Stop and delete act only on PIDs this scan knows as agents (3N.2).
 			spawnHandler.SetAgentLookup(deps.Merger)
 			spawnHandler.SetAgentForgetter(deps.Merger)
+			deps.Merger.SetOwnership(agents.NewOwnership(deps.ManagedAgents, spawnMgr))
 		}
 		r.Post("/api/agents/spawn", spawnHandler.Spawn)
 		r.Get("/api/agents/spawn/{pid}/status", spawnHandler.Status)
@@ -615,7 +625,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Get("/api/agents/projectless", spawnHandler.GetProjectlessRoot)
 		r.Put("/api/agents/projectless", spawnHandler.SetProjectlessRoot)
 		r.Post("/api/agents/projectless/preview", spawnHandler.PreviewProjectlessWorkspace)
-		r.Post("/api/agents/projectless/workspaces", spawnHandler.CreateProjectlessWorkspace)
+		r.Delete("/api/agents/{pid}/profile", spawnHandler.RemoveAgentProfile)
 		uploadImageHandler := agents.NewUploadImageHandler()
 		r.Post("/api/agents/{pid}/upload-image", uploadImageHandler.UploadImage)
 		// WebSocket proxy — registered raw specifically because the upgrade

@@ -12,6 +12,11 @@ import { EDITOR_SCHEMES, editorHref, loadEditorScheme } from '../utils/worktree'
  * rules exist once. Deleting removes the agent from the dashboard; it never
  * deletes its folder, repository or Claude transcript (server/internal/api/
  * agents/lifecycle.go).
+ *
+ * Both exist only for an agent this dashboard launched (3N.2.1): the server
+ * marks it dashboardOwned from its own launch record. A session started in a
+ * terminal, VS Code or anything else is observed, never stopped or deleted —
+ * the server refuses it too, so hiding the buttons is not the safeguard.
  */
 
 export type LifecycleAction = 'stop' | 'delete'
@@ -37,6 +42,25 @@ async function errorFrom(res: Response, fallback: string): Promise<Error> {
   return new Error(body?.error || `${fallback} (${res.status})`)
 }
 
+/** Stop and Delete belong only to an agent this dashboard launched. */
+export function agentIsDashboardOwned(agent: Agent): boolean {
+  return !!agent.dashboardOwned && !agent.machine && !agent.internalProcess && !agent.pipelineTaskId
+}
+
+export const EXTERNAL_SESSION_NOTE = 'External session — stop it from the terminal or application that started it.'
+export const PIPELINE_AGENT_NOTE = 'Managed by its pipeline task — stop or cancel the task instead.'
+
+/**
+ * Why an agent offers no Stop or Delete: an external session or a pipeline
+ * agent. Null for an owned agent, and for internal processes and remote
+ * sessions, which say so elsewhere.
+ */
+export function lifecycleNote(agent: Agent): string | null {
+  if (agentIsDashboardOwned(agent) || agent.internalProcess || agent.machine)
+    return null
+  return agent.pipelineTaskId ? PIPELINE_AGENT_NOTE : EXTERNAL_SESSION_NOTE
+}
+
 /** Whether the agent's process is running, as far as the payload says. */
 export function agentIsRunning(agent: Agent): boolean {
   return agent.status !== 'finished'
@@ -59,6 +83,16 @@ export async function deleteAgent(pid: number, stop: boolean): Promise<DeleteRes
   if (!res.ok)
     throw await errorFrom(res, 'Could not delete the agent')
   return await res.json() as DeleteResult
+}
+
+/**
+ * Removes only the name and icon the dashboard stored for a session — its own
+ * presentation metadata. The process is untouched, whoever started it.
+ */
+export async function removeAgentProfile(pid: number): Promise<void> {
+  const res = await fetch(`/api/agents/${pid}/profile`, { method: 'DELETE', credentials: 'same-origin' })
+  if (!res.ok)
+    throw await errorFrom(res, 'Could not remove the name and icon')
 }
 
 /** The editor the user picked for worktrees, or VS Code. */
@@ -119,16 +153,5 @@ export async function previewProjectlessWorkspace(name: string, signal?: AbortSi
   })
   if (!res.ok)
     throw await errorFrom(res, 'Could not name a workspace folder')
-  return await res.json() as ProjectlessWorkspace
-}
-
-export async function createProjectlessWorkspace(name: string): Promise<ProjectlessWorkspace> {
-  const res = await fetch('/api/agents/projectless/workspaces', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  })
-  if (!res.ok)
-    throw await errorFrom(res, 'Could not create the workspace folder')
   return await res.json() as ProjectlessWorkspace
 }

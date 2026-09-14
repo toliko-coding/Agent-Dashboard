@@ -353,6 +353,22 @@ var (
 			},
 		},
 	}
+	// ManagedAgentsColumns holds the columns for the "managed_agents" table.
+	ManagedAgentsColumns = []*schema.Column{
+		{Name: "session_id", Type: field.TypeString},
+		{Name: "pid", Type: field.TypeInt},
+		{Name: "cwd", Type: field.TypeString, Default: ""},
+		{Name: "workspace_created", Type: field.TypeBool, Default: false},
+		{Name: "allowed_folder", Type: field.TypeString, Default: ""},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// ManagedAgentsTable holds the schema information for the "managed_agents" table.
+	ManagedAgentsTable = &schema.Table{
+		Name:       "managed_agents",
+		Columns:    ManagedAgentsColumns,
+		PrimaryKey: []*schema.Column{ManagedAgentsColumns[0]},
+	}
 	// MaterializationsColumns holds the columns for the "materializations" table.
 	MaterializationsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -1121,6 +1137,7 @@ var (
 		EvalMetricSnapshotsTable,
 		GrantsTable,
 		GrantUsagesTable,
+		ManagedAgentsTable,
 		MaterializationsTable,
 		MemoryEntriesTable,
 		MemoryInjectionsTable,

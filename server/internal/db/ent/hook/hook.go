@@ -153,6 +153,18 @@ func (f GrantUsageFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, 
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.GrantUsageMutation", m)
 }
 
+// The ManagedAgentFunc type is an adapter to allow the use of ordinary
+// function as ManagedAgent mutator.
+type ManagedAgentFunc func(context.Context, *ent.ManagedAgentMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ManagedAgentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ManagedAgentMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ManagedAgentMutation", m)
+}
+
 // The MaterializationFunc type is an adapter to allow the use of ordinary
 // function as Materialization mutator.
 type MaterializationFunc func(context.Context, *ent.MaterializationMutation) (ent.Value, error)

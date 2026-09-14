@@ -68,6 +68,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/eval"
 	histsvc "github.com/lx-wnk/agent-dashboard/server/internal/history"
 	"github.com/lx-wnk/agent-dashboard/server/internal/hookstore"
+	"github.com/lx-wnk/agent-dashboard/server/internal/managedagent"
 	"github.com/lx-wnk/agent-dashboard/server/internal/materializer"
 	mcppkg "github.com/lx-wnk/agent-dashboard/server/internal/mcp"
 	"github.com/lx-wnk/agent-dashboard/server/internal/memory"
@@ -527,6 +528,7 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 	var projectRepo repo.ProjectRepo
 	var projectFolderRepo repo.ProjectFolderRepo
 	var agentProfiles *agentprofile.Store
+	var managedAgents *managedagent.Store
 	var spawnerRepo repo.SpawnerRepo
 	var spawnerResolver services.SpawnerResolver
 	if entClient != nil {
@@ -539,6 +541,11 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 			slog.Warn("agent profiles not loaded; agents show their session titles", "err", err)
 		}
 		agentMerger.SetAgentProfiles(agentProfiles)
+		// Which agents this server launched: the only basis for Stop and Delete (3N.2.1).
+		managedAgents = managedagent.New(repo.NewManagedAgentRepo(entClient))
+		if err := managedAgents.Load(ctx); err != nil {
+			slog.Warn("managed agents not loaded; dashboard-started agents are treated as external until restarted by it", "err", err)
+		}
 		spawnerRepo = repo.NewSpawnerRepo(entClient)
 		if bundle != nil {
 			if err := repairSpawnerAdapterConfig(ctx, bundle.DB); err != nil {
@@ -981,6 +988,7 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 		ProjectRepo:            projectRepo,
 		ProjectFolderRepo:      projectFolderRepo,
 		AgentProfiles:          agentProfiles,
+		ManagedAgents:          managedAgents,
 		SpawnerRepo:            spawnerRepo,
 		SpawnerBroadcaster:     spawnerBroadcaster,
 		ProjectBroadcaster:     projectBroadcaster,

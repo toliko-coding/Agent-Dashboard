@@ -27,6 +27,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/evalmetricsnapshot"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/grant"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/grantusage"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/managedagent"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/materialization"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/memoryentry"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/memoryinjection"
@@ -83,6 +84,8 @@ type Client struct {
 	Grant *GrantClient
 	// GrantUsage is the client for interacting with the GrantUsage builders.
 	GrantUsage *GrantUsageClient
+	// ManagedAgent is the client for interacting with the ManagedAgent builders.
+	ManagedAgent *ManagedAgentClient
 	// Materialization is the client for interacting with the Materialization builders.
 	Materialization *MaterializationClient
 	// MemoryEntry is the client for interacting with the MemoryEntry builders.
@@ -156,6 +159,7 @@ func (c *Client) init() {
 	c.EvalMetricSnapshot = NewEvalMetricSnapshotClient(c.config)
 	c.Grant = NewGrantClient(c.config)
 	c.GrantUsage = NewGrantUsageClient(c.config)
+	c.ManagedAgent = NewManagedAgentClient(c.config)
 	c.Materialization = NewMaterializationClient(c.config)
 	c.MemoryEntry = NewMemoryEntryClient(c.config)
 	c.MemoryInjection = NewMemoryInjectionClient(c.config)
@@ -285,6 +289,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		EvalMetricSnapshot: NewEvalMetricSnapshotClient(cfg),
 		Grant:              NewGrantClient(cfg),
 		GrantUsage:         NewGrantUsageClient(cfg),
+		ManagedAgent:       NewManagedAgentClient(cfg),
 		Materialization:    NewMaterializationClient(cfg),
 		MemoryEntry:        NewMemoryEntryClient(cfg),
 		MemoryInjection:    NewMemoryInjectionClient(cfg),
@@ -341,6 +346,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		EvalMetricSnapshot: NewEvalMetricSnapshotClient(cfg),
 		Grant:              NewGrantClient(cfg),
 		GrantUsage:         NewGrantUsageClient(cfg),
+		ManagedAgent:       NewManagedAgentClient(cfg),
 		Materialization:    NewMaterializationClient(cfg),
 		MemoryEntry:        NewMemoryEntryClient(cfg),
 		MemoryInjection:    NewMemoryInjectionClient(cfg),
@@ -397,9 +403,9 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.AgentCostTrend, c.AgentProfile, c.ApiKey, c.AppSetting, c.AuditEvent,
 		c.Capability, c.Checkpoint, c.CoordLock, c.DriftAlert, c.EvalMetricSnapshot,
-		c.Grant, c.GrantUsage, c.Materialization, c.MemoryEntry, c.MemoryInjection,
-		c.PermissionPreset, c.PermissionRequest, c.PipelineConfig, c.Plugin,
-		c.PluginSetting, c.Project, c.ProjectFolder, c.PromptTemplate,
+		c.Grant, c.GrantUsage, c.ManagedAgent, c.Materialization, c.MemoryEntry,
+		c.MemoryInjection, c.PermissionPreset, c.PermissionRequest, c.PipelineConfig,
+		c.Plugin, c.PluginSetting, c.Project, c.ProjectFolder, c.PromptTemplate,
 		c.ProviderSetting, c.RefinementTurn, c.RemoteRegistration, c.Resource,
 		c.Scratchpad, c.Skill, c.Spawner, c.StageRun, c.SystemPrompt, c.Task,
 		c.TaskDependency, c.TaskPermission, c.TaskSchedule, c.User,
@@ -414,9 +420,9 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.AgentCostTrend, c.AgentProfile, c.ApiKey, c.AppSetting, c.AuditEvent,
 		c.Capability, c.Checkpoint, c.CoordLock, c.DriftAlert, c.EvalMetricSnapshot,
-		c.Grant, c.GrantUsage, c.Materialization, c.MemoryEntry, c.MemoryInjection,
-		c.PermissionPreset, c.PermissionRequest, c.PipelineConfig, c.Plugin,
-		c.PluginSetting, c.Project, c.ProjectFolder, c.PromptTemplate,
+		c.Grant, c.GrantUsage, c.ManagedAgent, c.Materialization, c.MemoryEntry,
+		c.MemoryInjection, c.PermissionPreset, c.PermissionRequest, c.PipelineConfig,
+		c.Plugin, c.PluginSetting, c.Project, c.ProjectFolder, c.PromptTemplate,
 		c.ProviderSetting, c.RefinementTurn, c.RemoteRegistration, c.Resource,
 		c.Scratchpad, c.Skill, c.Spawner, c.StageRun, c.SystemPrompt, c.Task,
 		c.TaskDependency, c.TaskPermission, c.TaskSchedule, c.User,
@@ -452,6 +458,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Grant.mutate(ctx, m)
 	case *GrantUsageMutation:
 		return c.GrantUsage.mutate(ctx, m)
+	case *ManagedAgentMutation:
+		return c.ManagedAgent.mutate(ctx, m)
 	case *MaterializationMutation:
 		return c.Materialization.mutate(ctx, m)
 	case *MemoryEntryMutation:
@@ -2100,6 +2108,139 @@ func (c *GrantUsageClient) mutate(ctx context.Context, m *GrantUsageMutation) (V
 		return (&GrantUsageDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown GrantUsage mutation op: %q", m.Op())
+	}
+}
+
+// ManagedAgentClient is a client for the ManagedAgent schema.
+type ManagedAgentClient struct {
+	config
+}
+
+// NewManagedAgentClient returns a client for the ManagedAgent from the given config.
+func NewManagedAgentClient(c config) *ManagedAgentClient {
+	return &ManagedAgentClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `managedagent.Hooks(f(g(h())))`.
+func (c *ManagedAgentClient) Use(hooks ...Hook) {
+	c.hooks.ManagedAgent = append(c.hooks.ManagedAgent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `managedagent.Intercept(f(g(h())))`.
+func (c *ManagedAgentClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ManagedAgent = append(c.inters.ManagedAgent, interceptors...)
+}
+
+// Create returns a builder for creating a ManagedAgent entity.
+func (c *ManagedAgentClient) Create() *ManagedAgentCreate {
+	mutation := newManagedAgentMutation(c.config, OpCreate)
+	return &ManagedAgentCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ManagedAgent entities.
+func (c *ManagedAgentClient) CreateBulk(builders ...*ManagedAgentCreate) *ManagedAgentCreateBulk {
+	return &ManagedAgentCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ManagedAgentClient) MapCreateBulk(slice any, setFunc func(*ManagedAgentCreate, int)) *ManagedAgentCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ManagedAgentCreateBulk{err: fmt.Errorf("calling to ManagedAgentClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ManagedAgentCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ManagedAgentCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ManagedAgent.
+func (c *ManagedAgentClient) Update() *ManagedAgentUpdate {
+	mutation := newManagedAgentMutation(c.config, OpUpdate)
+	return &ManagedAgentUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ManagedAgentClient) UpdateOne(_m *ManagedAgent) *ManagedAgentUpdateOne {
+	mutation := newManagedAgentMutation(c.config, OpUpdateOne, withManagedAgent(_m))
+	return &ManagedAgentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ManagedAgentClient) UpdateOneID(id string) *ManagedAgentUpdateOne {
+	mutation := newManagedAgentMutation(c.config, OpUpdateOne, withManagedAgentID(id))
+	return &ManagedAgentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ManagedAgent.
+func (c *ManagedAgentClient) Delete() *ManagedAgentDelete {
+	mutation := newManagedAgentMutation(c.config, OpDelete)
+	return &ManagedAgentDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ManagedAgentClient) DeleteOne(_m *ManagedAgent) *ManagedAgentDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ManagedAgentClient) DeleteOneID(id string) *ManagedAgentDeleteOne {
+	builder := c.Delete().Where(managedagent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ManagedAgentDeleteOne{builder}
+}
+
+// Query returns a query builder for ManagedAgent.
+func (c *ManagedAgentClient) Query() *ManagedAgentQuery {
+	return &ManagedAgentQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeManagedAgent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ManagedAgent entity by its id.
+func (c *ManagedAgentClient) Get(ctx context.Context, id string) (*ManagedAgent, error) {
+	return c.Query().Where(managedagent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ManagedAgentClient) GetX(ctx context.Context, id string) *ManagedAgent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ManagedAgentClient) Hooks() []Hook {
+	return c.hooks.ManagedAgent
+}
+
+// Interceptors returns the client interceptors.
+func (c *ManagedAgentClient) Interceptors() []Interceptor {
+	return c.inters.ManagedAgent
+}
+
+func (c *ManagedAgentClient) mutate(ctx context.Context, m *ManagedAgentMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ManagedAgentCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ManagedAgentUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ManagedAgentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ManagedAgentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ManagedAgent mutation op: %q", m.Op())
 	}
 }
 
@@ -5625,7 +5766,7 @@ type (
 	hooks struct {
 		AgentCostTrend, AgentProfile, ApiKey, AppSetting, AuditEvent, Capability,
 		Checkpoint, CoordLock, DriftAlert, EvalMetricSnapshot, Grant, GrantUsage,
-		Materialization, MemoryEntry, MemoryInjection, PermissionPreset,
+		ManagedAgent, Materialization, MemoryEntry, MemoryInjection, PermissionPreset,
 		PermissionRequest, PipelineConfig, Plugin, PluginSetting, Project,
 		ProjectFolder, PromptTemplate, ProviderSetting, RefinementTurn,
 		RemoteRegistration, Resource, Scratchpad, Skill, Spawner, StageRun,
@@ -5635,7 +5776,7 @@ type (
 	inters struct {
 		AgentCostTrend, AgentProfile, ApiKey, AppSetting, AuditEvent, Capability,
 		Checkpoint, CoordLock, DriftAlert, EvalMetricSnapshot, Grant, GrantUsage,
-		Materialization, MemoryEntry, MemoryInjection, PermissionPreset,
+		ManagedAgent, Materialization, MemoryEntry, MemoryInjection, PermissionPreset,
 		PermissionRequest, PipelineConfig, Plugin, PluginSetting, Project,
 		ProjectFolder, PromptTemplate, ProviderSetting, RefinementTurn,
 		RemoteRegistration, Resource, Scratchpad, Skill, Spawner, StageRun,

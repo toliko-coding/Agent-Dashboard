@@ -609,12 +609,15 @@ describe('spawnDialog — new projectless workspace (3N.2)', () => {
         const folder = folderOf()
         return Promise.resolve({ ok: true, json: async () => ({ root: ROOT, folder, path: `${ROOT}/${folder}`, exists: existing.has(folder) }) })
       }
-      if (url === '/api/agents/projectless/workspaces') {
-        const folder = folderOf()
+      // 3N.2.1: the server creates the workspace inside the spawn, so it can
+      // record that it made the folder and its allowed-folder entry.
+      const spawnBody = url === '/api/agents/spawn' ? JSON.parse(String(init?.body ?? '{}')) as { projectless?: boolean, displayName?: string } : null
+      if (spawnBody?.projectless) {
+        const folder = String(spawnBody.displayName).replace(/[^A-Z0-9]+/gi, '-')
         if (createStatus !== 201)
           return Promise.resolve({ ok: false, status: createStatus, json: async () => ({ error: 'a folder with that name already exists in the projectless agents folder; choose another name' }) })
         created.push(folder)
-        return Promise.resolve({ ok: true, status: 201, json: async () => ({ root: ROOT, folder, path: `${ROOT}/${folder}`, exists: false }) })
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true, pid: 4321, workspace: { root: ROOT, folder, path: `${ROOT}/${folder}`, exists: false } }) })
       }
       return base(url, init)
     }))
@@ -656,15 +659,19 @@ describe('spawnDialog — new projectless workspace (3N.2)', () => {
     expect(created).toEqual(['Resume-Editor'])
     const spawn = calls().find(c => c[0] === '/api/agents/spawn')!
     const body = JSON.parse(spawn[1].body as string)
-    expect(body.cwd).toBe(`${ROOT}/Resume-Editor`)
+    expect(body.projectless).toBe(true)
+    // The client never names the folder, nor claims the server made it.
+    expect(body).not.toHaveProperty('cwd')
+    expect(body).not.toHaveProperty('workspaceCreated')
+    expect(body).not.toHaveProperty('allowedFolder')
     expect(body.displayName).toBe('Resume Editor')
     expect(body).not.toHaveProperty('projectId')
     const urls = calls().map(c => String(c[0]))
     expect(urls.some(u => u.includes('github') || u.includes('/api/repositories'))).toBe(false)
     expect(calls().some(c => c[0] === '/api/projects' && c[1]?.method === 'POST')).toBe(false)
     expect(urls.some(u => u.includes('/folder-trust'))).toBe(false)
-    // The workspace was created before the spawn, never after.
-    expect(urls.indexOf('/api/agents/projectless/workspaces')).toBeLessThan(urls.indexOf('/api/agents/spawn'))
+    // One request creates the workspace and starts the agent; there is no separate create call.
+    expect(urls).not.toContain('/api/agents/projectless/workspaces')
     wrapper.unmount()
   })
 
@@ -682,7 +689,7 @@ describe('spawnDialog — new projectless workspace (3N.2)', () => {
     ;(document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement).click()
     await flushPromises()
     expect(document.querySelector('[data-testid="spawn-error"]')!.textContent).toContain('already exists')
-    expect(calls().some(c => c[0] === '/api/agents/spawn')).toBe(false)
+    expect(created).toEqual([])
     wrapper.unmount()
   })
 })

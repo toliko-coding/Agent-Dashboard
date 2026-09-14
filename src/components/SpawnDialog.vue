@@ -5,7 +5,7 @@ import type { Project } from '../types'
 import type { AgentPurpose } from '../utils/agentPurpose'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { allowWorkingFolder, checkFolder, listWorkingFolders } from '../composables/useAgentFolders'
-import { createProjectlessWorkspace, previewProjectlessWorkspace } from '../composables/useAgentLifecycle'
+import { previewProjectlessWorkspace } from '../composables/useAgentLifecycle'
 import { fetchProjectFolders } from '../composables/useProjectFolders'
 import { useProjects } from '../composables/useProjects'
 import { useSpawnDialog } from '../composables/useSpawnDialog'
@@ -347,25 +347,19 @@ async function handleSpawn() {
   isSpawning.value = true
   errorMsg.value = ''
 
-  if (workspaceMode.value === 'new') {
-    try {
-      const ws = await createProjectlessWorkspace(displayName.value.trim())
-      dlg.cwd.value = ws.path
-    }
-    catch (err: unknown) {
-      errorMsg.value = errorMessage(err, 'Could not create the workspace folder')
-      isSpawning.value = false
-      return
-    }
-  }
-
-  const cwd = dlg.cwd.value.trim()
+  const newWorkspace = workspaceMode.value === 'new'
+  const cwd = newWorkspace ? '' : dlg.cwd.value.trim()
   const body: Record<string, unknown> = {
     prompt: prompt.value.trim(),
-    cwd,
     enableChannel: true,
     permissionMode: permissionMode.value,
   }
+  // A new workspace is created by the server as part of this spawn, so it can
+  // record that it made the folder and the allowed-folder entry (3N.2.1).
+  if (newWorkspace)
+    body.projectless = true
+  else
+    body.cwd = cwd
   if (systemPrompt.value.trim())
     body.systemPrompt = systemPrompt.value.trim()
   // Presentation only: sent when given, never derived from the folder or Project.
@@ -397,7 +391,10 @@ async function handleSpawn() {
     else if (data.profile === 'failed')
       toast.error('The agent started, but its name and icon could not be saved.')
     spawnedPid.value = pid
-    watchSpawn(pid, cwd)
+    const startedIn = newWorkspace ? String(data.workspace?.path ?? '') : cwd
+    if (newWorkspace)
+      dlg.cwd.value = startedIn
+    watchSpawn(pid, startedIn)
     emit('spawned', pid)
     // Closes on its own once the agent is simply starting — never while Claude
     // is waiting at its trust question or after a failure, which need the user.

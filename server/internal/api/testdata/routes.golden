@@ -4,6 +4,7 @@ DELETE /*
 DELETE /api/agents/working-folders
 DELETE /api/agents/{pid}
 DELETE /api/agents/{pid}/channel
+DELETE /api/agents/{pid}/profile
 DELETE /api/grants/{id}
 DELETE /api/me
 DELETE /api/memory/entries/{id}
@@ -115,7 +116,6 @@ PATCH /api/spawners/{id}
 PATCH /api/tasks/{id}
 POST /*
 POST /api/agents/projectless/preview
-POST /api/agents/projectless/workspaces
 POST /api/agents/spawn
 POST /api/agents/spawn/preflight
 POST /api/agents/spawn/{pid}/folder-trust

@@ -11,7 +11,7 @@ import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
-import { agentIsRunning, editorLabel, openInEditor, useAgentLifecycle } from '@/composables/useAgentLifecycle'
+import { agentIsDashboardOwned, agentIsRunning, editorLabel, lifecycleNote, openInEditor, removeAgentProfile, useAgentLifecycle } from '@/composables/useAgentLifecycle'
 import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { toast } from '@/composables/useToast'
@@ -43,7 +43,25 @@ const technical = computed(() => props.agent ? agentTechnical(props.agent) : nul
 const topic = computed(() => props.agent ? agentTopic(props.agent) : null)
 const since = computed(() => props.agent ? formatRelativeActivity(secondsSince(props.agent.lastActivity, nowMs.value)) : '')
 const canAct = computed(() => !!props.agent && !props.agent.machine && !props.agent.internalProcess)
-const running = computed(() => canAct.value && agentIsRunning(props.agent!))
+// Stop and Delete only for an agent this dashboard launched (3N.2.1); any other
+// session is observed, and says where it can be stopped.
+const owned = computed(() => !!props.agent && agentIsDashboardOwned(props.agent))
+const running = computed(() => owned.value && agentIsRunning(props.agent!))
+const observeNote = computed(() => props.agent ? lifecycleNote(props.agent) : null)
+// The name and icon are the dashboard's own metadata: removable for any session.
+const hasProfile = computed(() => !!props.agent && (!!props.agent.displayName || !!props.agent.category))
+const profileError = ref('')
+async function removeProfile() {
+  if (!props.agent)
+    return
+  profileError.value = ''
+  try {
+    await removeAgentProfile(props.agent.pid)
+  }
+  catch (err: unknown) {
+    profileError.value = err instanceof Error ? err.message : 'Could not remove the name and icon'
+  }
+}
 
 /*
  * The workspace supersedes the Overview/Transcript tabs of the previous drawer.
@@ -212,6 +230,24 @@ watch(() => props.agent?.sessionId, (sessionId) => {
             >
               Open in {{ editor }}
             </button>
+            <p
+              v-if="observeNote"
+              class="m-0 inline-flex max-w-[26rem] items-center gap-1.5 text-ui-sm text-fg-mute"
+              data-testid="agent-modal-observe-only"
+            >
+              <svg viewBox="0 0 16 16" class="size-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z" /><circle cx="8" cy="8" r="1.8" /></svg><span>{{ observeNote }}</span>
+            </p>
+            <button
+              v-if="observeNote && hasProfile"
+              type="button"
+              class="inline-flex h-8 cursor-pointer items-center rounded-lg border border-line px-3 text-ui-sm text-fg-mute hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+              data-testid="agent-modal-remove-profile"
+              title="Removes only the name and icon shown here — the session keeps running"
+              @click="removeProfile"
+            >
+              Remove name &amp; icon
+            </button>
+            <span v-if="profileError" role="alert" class="text-ui-sm text-danger-text" data-testid="agent-modal-profile-error">{{ profileError }}</span>
             <button
               v-if="running"
               type="button"
@@ -222,7 +258,7 @@ watch(() => props.agent?.sessionId, (sessionId) => {
               <span class="size-2 rounded-[2px] bg-danger-text" aria-hidden="true" />Stop
             </button>
             <button
-              v-if="canAct"
+              v-if="owned"
               type="button"
               class="inline-flex h-8 cursor-pointer items-center rounded-lg border border-line px-3 text-ui-sm text-fg-mute hover:border-danger-line hover:bg-danger-soft hover:text-danger-text focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
               data-testid="agent-modal-delete"

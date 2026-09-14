@@ -8,12 +8,15 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/lx-wnk/agent-dashboard/sdk"
 	"github.com/lx-wnk/agent-dashboard/server/internal/channelconfig"
+	"github.com/lx-wnk/agent-dashboard/server/internal/managedagent"
+	"github.com/lx-wnk/agent-dashboard/server/internal/services"
 )
 
 /*
@@ -34,9 +37,12 @@ import (
  * Project or the Claude transcript: deleting an agent is not deleting its work
  * or its history.
  *
- * Both act only on a PID the dashboard's own scan currently knows as an agent,
- * so they can never be pointed at an arbitrary process. Claude Code's internal
- * daemons and sessions on a remote machine are refused.
+ * Both act only on a PID the dashboard's own scan currently knows as an agent
+ * AND that this server launched (3N.2.1: a managed-agent record for that session
+ * with that PID, or a spawn this run is tracking). An external session — started
+ * in a terminal, VS Code or anything else — is observed, never stopped or
+ * deleted: the answer is 403 and no signal is sent. Pipeline agents belong to
+ * their task. Claude Code's internal daemons and remote sessions are refused.
  */
 
 // AgentLookup finds an agent in the dashboard's most recent scan.
@@ -63,6 +69,43 @@ func (h *SpawnHandler) SetAgentForgetter(f AgentForgetter) { h.forgetter = f }
 
 // SetProfileDeleter wires the profile store delete clears.
 func (h *SpawnHandler) SetProfileDeleter(d ProfileDeleter) { h.profileDeleter = d }
+
+// ManagedAgents is the ownership record the lifecycle routes read and clear.
+type ManagedAgents interface {
+	Owns(pid int, sessionID string) bool
+	Get(sessionID string) (managedagent.Record, bool)
+	Forget(ctx context.Context, sessionID string) error
+	OthersUsing(path, exceptSession string) bool
+}
+
+// SetManagedAgents wires the ownership record. Unset, only this server run's
+// own spawns are owned.
+func (h *SpawnHandler) SetManagedAgents(m ManagedAgents) { h.managed = m }
+
+// ExternalSessionMessage is what the dashboard says about a session it did not launch.
+const ExternalSessionMessage = "External session — stop it from the terminal or application that started it."
+
+// Ownership combines the persisted record with this server run's spawn tracker.
+type Ownership struct {
+	managed *managedagent.Store
+	manager *SpawnManager
+}
+
+// NewOwnership builds the ownership check the merger attaches to every agent.
+func NewOwnership(managed *managedagent.Store, manager *SpawnManager) *Ownership {
+	return &Ownership{managed: managed, manager: manager}
+}
+
+// Owns reports whether this server launched the process pid for sessionID.
+func (o *Ownership) Owns(pid int, sessionID string) bool {
+	if o == nil {
+		return false
+	}
+	if o.managed != nil && o.managed.Owns(pid, sessionID) {
+		return true
+	}
+	return o.manager != nil && o.manager.SpawnedAndRunning(pid)
+}
 
 const (
 	stopGrace    = 5 * time.Second
@@ -108,9 +151,36 @@ func lifecycleJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-// knownAgent validates the path PID against the latest scan and the rules both
-// routes share. ok=false means a response has already been written.
+// owns is the lifecycle ownership rule, evaluated at request time.
+func (h *SpawnHandler) owns(agent sdk.Agent) bool {
+	if h.managed != nil && h.managed.Owns(agent.PID, agent.SessionID) {
+		return true
+	}
+	return h.manager != nil && h.manager.SpawnedAndRunning(agent.PID)
+}
+
+// knownAgent is scannedAgent for a session this server owns: only an agent the
+// dashboard launched can be stopped or deleted. Nothing else proves ownership —
+// not being in the scan, the provider, the workspace, a channel or a terminal.
 func (h *SpawnHandler) knownAgent(w http.ResponseWriter, r *http.Request) (sdk.Agent, bool) {
+	agent, ok := h.scannedAgent(w, r)
+	if !ok {
+		return sdk.Agent{}, false
+	}
+	if agent.PipelineTaskID != "" {
+		lifecycleJSON(w, http.StatusForbidden, map[string]any{"error": "This agent runs a pipeline task; stop or cancel the task instead.", "managedBy": "pipeline"})
+		return sdk.Agent{}, false
+	}
+	if !h.owns(agent) {
+		lifecycleJSON(w, http.StatusForbidden, map[string]any{"error": ExternalSessionMessage, "external": true})
+		return sdk.Agent{}, false
+	}
+	return agent, true
+}
+
+// scannedAgent validates the path PID against the latest scan and the rules every
+// agent route shares. ok=false means a response has already been written.
+func (h *SpawnHandler) scannedAgent(w http.ResponseWriter, r *http.Request) (sdk.Agent, bool) {
 	pid, err := strconv.Atoi(r.PathValue("pid"))
 	if err != nil || pid <= 0 {
 		lifecycleJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid pid"})
@@ -214,8 +284,64 @@ func (h *SpawnHandler) DeleteAgent(w http.ResponseWriter, r *http.Request) {
 			profileRemoved = true
 		}
 	}
-	h.audit(r, "agent_delete", agent.PID, map[string]any{"sessionId": agent.SessionID, "stopped": running})
-	lifecycleJSON(w, http.StatusOK, map[string]any{"deleted": true, "stopped": running, "profileRemoved": profileRemoved})
+	allowedFolderRemoved := h.releaseCreatedWorkspace(r.Context(), agent.SessionID)
+	h.audit(r, "agent_delete", agent.PID, map[string]any{"sessionId": agent.SessionID, "stopped": running, "allowedFolderRemoved": allowedFolderRemoved})
+	lifecycleJSON(w, http.StatusOK, map[string]any{"deleted": true, "stopped": running, "profileRemoved": profileRemoved, "allowedFolderRemoved": allowedFolderRemoved})
+}
+
+/*
+ * releaseCreatedWorkspace removes the allowed-folder entry the dashboard added
+ * for a projectless workspace it created for this agent, then forgets the
+ * ownership record. The folder itself always stays on disk.
+ *
+ * The entry goes only when all of these hold, and otherwise stays (fail closed):
+ * the record says the server created the workspace and names the exact entry it
+ * added; no other owned agent's record runs in or added that folder; and the
+ * entry is still on the list. Folder names are never compared, and no other
+ * entry is touched. Claude Code's own trust state (~/.claude.json) is not the
+ * dashboard's and is never read or written.
+ */
+func (h *SpawnHandler) releaseCreatedWorkspace(ctx context.Context, sessionID string) bool {
+	if h.managed == nil || sessionID == "" {
+		return false
+	}
+	rec, ok := h.managed.Get(sessionID)
+	if !ok {
+		return false
+	}
+	removed := false
+	if rec.WorkspaceCreated && rec.AllowedFolder != "" && h.workingFolders != nil && !h.managed.OthersUsing(rec.AllowedFolder, sessionID) &&
+		slices.Contains(services.WorkingFolders(h.workingFolders), rec.AllowedFolder) {
+		if _, err := services.RemoveWorkingFolder(ctx, h.workingFolders, rec.AllowedFolder); err != nil {
+			slog.Warn("agent delete: allowed folder not removed", "err", err)
+		} else {
+			removed = true
+		}
+	}
+	if err := h.managed.Forget(ctx, sessionID); err != nil {
+		slog.Warn("agent delete: ownership record not removed", "err", err)
+	}
+	return removed
+}
+
+// RemoveAgentProfile handles DELETE /api/agents/{pid}/profile: it removes the
+// name and icon the dashboard stored for a session — presentation metadata the
+// dashboard owns — without touching the process, whoever started it.
+func (h *SpawnHandler) RemoveAgentProfile(w http.ResponseWriter, r *http.Request) {
+	agent, ok := h.scannedAgent(w, r)
+	if !ok {
+		return
+	}
+	if h.profileDeleter == nil || agent.SessionID == "" {
+		lifecycleJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "agent names are not stored on this server"})
+		return
+	}
+	if err := h.profileDeleter.Delete(r.Context(), agent.SessionID); err != nil {
+		lifecycleJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	h.audit(r, "agent_profile_remove", agent.PID, map[string]any{"sessionId": agent.SessionID})
+	lifecycleJSON(w, http.StatusOK, map[string]any{"profileRemoved": true})
 }
 
 // removeDiscoveryFiles removes the channel discovery files the dashboard reads

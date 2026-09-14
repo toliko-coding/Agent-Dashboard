@@ -19,6 +19,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/repo"
 	"github.com/lx-wnk/agent-dashboard/server/internal/envsec"
 	"github.com/lx-wnk/agent-dashboard/server/internal/httputil"
+	"github.com/lx-wnk/agent-dashboard/server/internal/managedagent"
 	"github.com/lx-wnk/agent-dashboard/server/internal/services"
 	"io"
 	"log/slog"
@@ -80,7 +81,9 @@ type SpawnManager struct {
 
 	spawnerRepo repo.SpawnerRepo
 	// profiles persists the display name and icon category given at spawn (3N.1).
-	profiles          ProfileSaver
+	profiles ProfileSaver
+	// managed records every agent this server launches: lifecycle ownership (3N.2.1).
+	managed           ManagedRecorder
 	spawnPolicy       services.SpawnPolicy
 	projectFolderRepo repo.ProjectFolderRepo // may be nil
 	// screenProbe reads whichever interactive screen is open on a spawned
@@ -155,6 +158,34 @@ func (m *SpawnManager) SetAgentProfiles(p ProfileSaver) {
 	m.profiles = p
 }
 
+// ManagedRecorder stores the proof that this server launched an agent.
+type ManagedRecorder interface {
+	Record(ctx context.Context, rec managedagent.Record) error
+}
+
+// SetManagedAgents wires the ownership record. Unset, ownership lasts only as
+// long as this server run's spawn tracker.
+func (m *SpawnManager) SetManagedAgents(r ManagedRecorder) {
+	m.managed = r
+}
+
+// SpawnedAndRunning reports whether this server run launched pid and it is
+// still running — ownership for a spawn whose session id could not be pinned.
+func (m *SpawnManager) SpawnedAndRunning(pid int) bool {
+	m.mu.Lock()
+	s := m.spawnStore[pid]
+	running := s != nil && s.Status == "running"
+	m.mu.Unlock()
+	return running && processAlive(pid)
+}
+
+// spawnProvenance is what the server itself did before a spawn, never taken
+// from the request body.
+type spawnProvenance struct {
+	workspaceCreated bool
+	allowedFolder    string
+}
+
 // SetScreenProbe installs the probe used to see Claude Code's folder trust
 // question on a spawned session's terminal. Safe to leave unset.
 func (m *SpawnManager) SetScreenProbe(fn func(pid int) *sdk.PendingScreen) {
@@ -218,6 +249,9 @@ type spawnRequest struct {
 	// sessionID is the Claude session this spawn pins (--session-id) or resumes;
 	// set by buildSpawnArgs, "" for an adapter that cannot be pinned.
 	sessionID string
+	// provenance: the server created this working folder and allowed it (3N.2.1).
+	workspaceCreated bool
+	allowedFolder    string
 }
 
 // enforceSpawnPolicy validates the request body fields and applies the spawn
@@ -435,12 +469,18 @@ type SpawnOutcome struct {
 // SpawnWithOutcome is Spawn, also reporting whether the display name and icon
 // category given with the request were saved.
 func (m *SpawnManager) SpawnWithOutcome(sub string, body map[string]any) (SpawnOutcome, error) {
+	return m.spawn(sub, body, spawnProvenance{})
+}
+
+func (m *SpawnManager) spawn(sub string, body map[string]any, prov spawnProvenance) (SpawnOutcome, error) {
 	m.recordAttempt(sub)
 
 	req, err := m.enforceSpawnPolicy(body)
 	if err != nil {
 		return SpawnOutcome{}, err
 	}
+	req.workspaceCreated = prov.workspaceCreated
+	req.allowedFolder = prov.allowedFolder
 
 	spawnerRow, err := m.resolveSpawner(body, req)
 	if err != nil {
@@ -500,7 +540,21 @@ func (m *SpawnManager) SpawnWithOutcome(sub string, body map[string]any) (SpawnO
 	m.spawnStore[pid] = status
 	m.mu.Unlock()
 	go watch()
+	m.recordOwnership(req, pid)
 	return SpawnOutcome{PID: pid, Profile: m.saveProfile(req)}, nil
+}
+
+// recordOwnership stores the proof that this server launched pid for the
+// session it pinned or resumed. A spawn without a session id keeps only the
+// in-memory ownership of this server run (SpawnedAndRunning).
+func (m *SpawnManager) recordOwnership(req *spawnRequest, pid int) {
+	if m.managed == nil || req.sessionID == "" {
+		return
+	}
+	rec := managedagent.Record{SessionID: req.sessionID, PID: pid, Cwd: req.cwd, WorkspaceCreated: req.workspaceCreated, AllowedFolder: req.allowedFolder}
+	if err := m.managed.Record(context.Background(), rec); err != nil {
+		slog.Warn("spawn: ownership record not saved", "err", err)
+	}
 }
 
 // saveProfile persists the display name and icon category given with a spawn,
@@ -932,6 +986,7 @@ type SpawnHandler struct {
 	agentLookup    AgentLookup
 	forgetter      AgentForgetter
 	profileDeleter ProfileDeleter
+	managed        ManagedAgents
 	terminate      func(pid int) error
 	alive          func(pid int) bool
 }
@@ -979,7 +1034,22 @@ func (h *SpawnHandler) Spawn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	outcome, err := h.manager.SpawnWithOutcome(sub, body)
+	var err error
+	var outcome SpawnOutcome
+	var workspace *services.ProjectlessWorkspace
+	if projectless, _ := body["projectless"].(bool); projectless {
+		ws, prov, ok := h.createProjectlessForSpawn(w, r, body)
+		if !ok {
+			return
+		}
+		workspace = &ws
+		outcome, err = h.manager.spawn(sub, body, prov)
+		if err != nil {
+			h.undoProjectlessWorkspace(r.Context(), ws)
+		}
+	} else {
+		outcome, err = h.manager.SpawnWithOutcome(sub, body)
+	}
 	if err != nil {
 		code := http.StatusBadRequest
 		if errors.Is(err, services.ErrCwdBlacklisted) || errors.Is(err, services.ErrCwdNotAllowed) {
@@ -996,6 +1066,9 @@ func (h *SpawnHandler) Spawn(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{"ok": true, "pid": outcome.PID}
 	if outcome.Profile != "" {
 		resp["profile"] = outcome.Profile
+	}
+	if workspace != nil {
+		resp["workspace"] = workspace
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }

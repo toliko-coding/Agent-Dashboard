@@ -517,8 +517,13 @@ type Agent struct {
 	// dashboard; "" when none was given. Category is the icon category given
 	// with it (AgentCategory*); "" when none. Both are presentation metadata keyed
 	// by session id (server/internal/agentprofile) and never authorize anything.
-	DisplayName               string         `json:"displayName,omitempty"`
-	Category                  string         `json:"category,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
+	Category    string `json:"category,omitempty"`
+	// DashboardOwned is true only when this server launched the agent's process
+	// itself: a managed-agent record for this session with this PID, or a spawn
+	// this server run is tracking. Only an owned agent can be stopped or deleted
+	// from the dashboard; every other session is observed, never controlled.
+	DashboardOwned            bool           `json:"dashboardOwned,omitempty"`
 	CurrentAction             *string        `json:"currentAction"`
 	LastTools                 []RecentTool   `json:"lastTools"`
 	Tasks                     []TaskInfo     `json:"tasks"`

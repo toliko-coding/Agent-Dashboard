@@ -551,6 +551,13 @@ export interface Agent {
    */
   displayName?: string
   category?: string
+  /**
+   * DashboardOwned is true only when this server launched the agent's process
+   * itself: a managed-agent record for this session with this PID, or a spawn
+   * this server run is tracking. Only an owned agent can be stopped or deleted
+   * from the dashboard; every other session is observed, never controlled.
+   */
+  dashboardOwned?: boolean
   currentAction?: string
   lastTools: RecentTool[]
   tasks: TaskInfo[]
