@@ -51,6 +51,15 @@ The dashboard never answers the question for you, never writes Claude's trust se
 
 If you start the dashboard server from a terminal inside Claude Code, its environment carries Claude Code's `CLAUDE_CODE_CHILD_SESSION` marker. Agents the dashboard starts do not inherit that marker — they are top-level sessions, not children of the Claude session the server happened to be launched from — so they save transcripts and appear in the roster as usual.
 
+### Naming an agent
+
+New Agent has two optional fields, **Name** and **Icon**, for who the agent is: for example "Resume Editor" with the Documents icon. They work with Project set to None.
+
+- **Storage.** They are saved in the `agent_profile` table, keyed by the Claude session id the dashboard pins with `--session-id` when it starts the agent (or the id it resumes). The agent stream attaches them on every scan as `displayName` and `category`, so they survive browser reloads, dashboard restarts and rescans.
+- **Unsupported spawners.** A custom-adapter spawner cannot pin a session id. For those, the start response says `"profile": "unsupported"` and the dialog tells you the name was not kept.
+- **No effect on access.** A name or icon never changes which folders are allowed, which flags the agent is started with, or anything else it can do.
+- **Without them.** An agent without a name shows its Claude Code session title, or its provider and short session id. An agent without an icon shows the neutral General icon.
+
 ## Slash commands
 
 Typing `/` in the prompt input opens a menu with two kinds of command.

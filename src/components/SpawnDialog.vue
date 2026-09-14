@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { FolderCheck } from '../composables/useAgentFolders'
 import type { Project } from '../types'
+import type { AgentPurpose } from '../utils/agentPurpose'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { allowWorkingFolder, checkFolder, listWorkingFolders } from '../composables/useAgentFolders'
 import { fetchProjectFolders } from '../composables/useProjectFolders'
@@ -8,12 +9,15 @@ import { useProjects } from '../composables/useProjects'
 import { useSpawnDialog } from '../composables/useSpawnDialog'
 import { useSpawners } from '../composables/useSpawners'
 import { useSpawnWatch, watchSpawn } from '../composables/useSpawnWatch'
+import { toast } from '../composables/useToast'
 import { useAgents } from '../features/agents'
 import { workspaceDisplay } from '../utils/agentGroup'
+import { AGENT_PURPOSES, DEFAULT_AGENT_PURPOSE } from '../utils/agentPurpose'
 import { errorMessage } from '../utils/errorMessage'
 import { SPAWN_AUTOCLOSE_MS } from '../utils/timing'
 import FolderTrustDecision from './FolderTrustDecision.vue'
 import QuickCreateProjectPanel from './QuickCreateProjectPanel.vue'
+import AgentGlyph from './ui/AgentGlyph.vue'
 import AppButton from './ui/AppButton.vue'
 import AppFieldLabel from './ui/AppFieldLabel.vue'
 import AppInput from './ui/AppInput.vue'
@@ -24,6 +28,8 @@ import AppSelect from './ui/AppSelect.vue'
 /*
  * New Agent, around how an agent actually runs (3M):
  *
+ *   Name, Icon      optional — who the agent is, shown instead of its session
+ *                   title; presentation only, saved by session id (3N.1)
  *   Working folder  required — where Claude executes
  *   Project         optional — Dashboard organisation only (None is valid)
  *   Spawner, Prompt, System prompt, Permissions — unchanged
@@ -62,6 +68,12 @@ const projectChoice = ref<string>('')
 const showQuickCreate = ref(false)
 const prompt = ref('')
 const systemPrompt = ref('')
+// Who the agent is (3N.1). Optional; never taken from the folder or the Project.
+const NAME_MAX = 60
+const displayName = ref('')
+const category = ref<AgentPurpose>(DEFAULT_AGENT_PURPOSE)
+const nameTooLong = computed(() => [...displayName.value.trim()].length > NAME_MAX)
+const purposeOptions = AGENT_PURPOSES.map(p => ({ value: p.value, label: p.value === DEFAULT_AGENT_PURPOSE ? `${p.label} (default)` : p.label }))
 type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'auto' | 'bypassPermissions' | 'dontAsk'
 const permissionMode = ref<PermissionMode>('default')
 const bypassConfirmed = ref(false)
@@ -255,11 +267,14 @@ const canStart = computed(() =>
   && spawnedPid.value === null
   && prompt.value.trim() !== ''
   && dlg.cwd.value.trim() !== ''
-  && check.value?.allowed === true)
+  && check.value?.allowed === true
+  && !nameTooLong.value)
 
 function resetForm() {
   prompt.value = ''
   systemPrompt.value = ''
+  displayName.value = ''
+  category.value = DEFAULT_AGENT_PURPOSE
   permissionMode.value = 'default'
   bypassConfirmed.value = false
   isSpawning.value = false
@@ -297,6 +312,11 @@ async function handleSpawn() {
   }
   if (systemPrompt.value.trim())
     body.systemPrompt = systemPrompt.value.trim()
+  // Presentation only: sent when given, never derived from the folder or Project.
+  if (displayName.value.trim())
+    body.displayName = displayName.value.trim()
+  if (category.value !== DEFAULT_AGENT_PURPOSE)
+    body.category = category.value
   if (dlg.spawnerId.value)
     body.spawnerId = dlg.spawnerId.value
   // Organisational only: omitted entirely for Project = None.
@@ -315,6 +335,11 @@ async function handleSpawn() {
     }
     const data = await res.json()
     const pid = data.pid as number
+    // The name and icon are saved by session id; say so when that could not happen.
+    if (data.profile === 'unsupported')
+      toast.error('The agent started, but this spawner cannot keep a name or icon. It will show its session title.')
+    else if (data.profile === 'failed')
+      toast.error('The agent started, but its name and icon could not be saved.')
     spawnedPid.value = pid
     watchSpawn(pid, cwd)
     emit('spawned', pid)
@@ -396,6 +421,45 @@ onUnmounted(() => {
       >
         {{ errorMsg || spawned?.error }}
       </p>
+
+      <!-- Who the agent is: optional, presentation only — never Project, folder or permission. -->
+      <section class="flex flex-col gap-1.5" data-testid="spawn-identity-section">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_13rem]">
+          <div class="flex min-w-0 flex-col gap-1.5">
+            <AppFieldLabel for="spawn-name">
+              Name (optional)
+            </AppFieldLabel>
+            <AppInput
+              id="spawn-name"
+              v-model="displayName"
+              placeholder="e.g. Resume Editor"
+              data-testid="spawn-name-wrap"
+            />
+          </div>
+          <div class="flex min-w-0 flex-col gap-1.5">
+            <AppFieldLabel for="spawn-category">
+              Icon
+            </AppFieldLabel>
+            <div class="flex items-center gap-2">
+              <AgentGlyph :purpose="category" />
+              <AppSelect
+                id="spawn-category"
+                :model-value="category"
+                :options="purposeOptions"
+                data-testid="spawn-category"
+                class="min-w-0 flex-1"
+                @update:model-value="category = $event"
+              />
+            </div>
+          </div>
+        </div>
+        <p v-if="nameTooLong" class="m-0 text-ui-sm text-danger-text" role="alert" data-testid="spawn-name-too-long">
+          A name can be at most {{ NAME_MAX }} characters.
+        </p>
+        <p v-else class="m-0 text-ui-sm text-fg-mute">
+          Without a name the agent shows its Claude session title.
+        </p>
+      </section>
 
       <!-- Working folder: required, and the one input that decides where Claude runs. -->
       <section class="flex flex-col gap-1.5" data-testid="spawn-folder-section">

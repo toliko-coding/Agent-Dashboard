@@ -140,15 +140,23 @@ describe('activeWork — presentation (3N)', () => {
     expect(w.get('[data-testid="active-work-group-count"]').text()).toBe('2 working')
   })
 
-  it('marks each row with its category and the process uptime, never a turn duration', () => {
-    const w = render([agent({ workspace: repoWs('w1', 'r1'), uptime: 7260, liveInjectable: true })])
-    expect(w.get('[data-testid="active-work-agent"] [data-testid="agent-glyph"]').attributes('aria-label')).toBe('Terminal session')
+  it('marks each row with its icon and the process uptime, never a turn duration', () => {
+    const w = render([agent({ workspace: repoWs('w1', 'r1'), uptime: 7260, liveInjectable: true, category: 'data' })])
+    expect(w.get('[data-testid="active-work-agent"] [data-testid="agent-glyph"]').attributes('aria-label')).toBe('Data & trading agent')
     expect(w.get('[data-testid="active-work-facts"]').text()).toContain('up 2h 1m')
   })
 
-  it('names an agent by its session title, with the session handle beside it', () => {
+  // M: Command names an agent exactly as the Agents view does.
+  it('names an agent by its given name, with the session title as its topic and the handle beside it', () => {
+    const w = render([agent({ workspace: repoWs('w1', 'r1'), displayName: 'WalletRadar', title: 'Backtest the momentum strategy' })])
+    expect(w.get('[data-testid="active-work-title"]').text()).toBe('WalletRadar')
+    expect(w.get('[data-testid="active-work-topic"]').text()).toBe('Backtest the momentum strategy')
+    expect(w.get('[data-testid="active-work-handle"]').text()).toMatch(/^Claude · [0-9a-f]{8}$/)
+  })
+
+  it('uses the session title as the name when none was given, and does not repeat it', () => {
     const w = render([agent({ workspace: repoWs('w1', 'r1'), title: 'Fix login redirect' })])
     expect(w.get('[data-testid="active-work-title"]').text()).toBe('Fix login redirect')
-    expect(w.get('[data-testid="active-work-handle"]').text()).toMatch(/^Claude session [0-9a-f]{8}$/)
+    expect(w.find('[data-testid="active-work-topic"]').exists()).toBe(false)
   })
 })

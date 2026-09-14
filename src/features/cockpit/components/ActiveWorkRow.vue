@@ -3,7 +3,7 @@ import type { Agent } from '@/types'
 import { computed } from 'vue'
 import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import { useNow } from '@/composables/useNow'
-import { agentSessionLabel, agentTitle, workActivity } from '@/utils/agentLabels'
+import { agentTechnical, agentTitle, agentTopic, workActivity } from '@/utils/agentLabels'
 import { formatRelativeActivity, formatUptime, secondsSince, shortModel } from '@/utils/format'
 
 /*
@@ -28,10 +28,9 @@ const { nowMs } = useNow()
 
 const activity = computed(() => workActivity(props.agent))
 const title = computed(() => agentTitle(props.agent))
-const handle = computed(() => {
-  const label = agentSessionLabel(props.agent)
-  return label === title.value ? null : label
-})
+// The handle beside a human name, and what the session is about when that is not its name.
+const handle = computed(() => agentTechnical(props.agent))
+const topic = computed(() => agentTopic(props.agent))
 const since = computed(() => formatRelativeActivity(secondsSince(props.agent.lastActivity, nowMs.value)))
 
 const facts = computed(() => {
@@ -55,7 +54,7 @@ const STATE = {
 const state = computed(() => STATE[activity.value.state])
 
 const accessibleName = computed(() =>
-  [title.value, activity.value.label, ...facts.value, `last activity ${since.value}`].join(', '))
+  [title.value, activity.value.label, ...(topic.value ? [topic.value] : []), ...facts.value, `last activity ${since.value}`].join(', '))
 </script>
 
 <template>
@@ -82,6 +81,7 @@ const accessibleName = computed(() =>
         <span class="flex flex-wrap items-baseline gap-x-2 min-w-0">
           <span class="text-ui font-semibold text-fg truncate max-w-full" data-testid="active-work-title">{{ title }}</span>
           <span v-if="activity.state === 'tool'" class="text-ui font-medium text-state-tool truncate max-w-full" data-testid="active-work-activity">{{ activity.label }}</span>
+          <span v-if="topic" class="text-ui-sm text-fg-soft truncate max-w-full" data-testid="active-work-topic">{{ topic }}</span>
         </span>
         <span v-if="facts.length || handle" class="flex min-w-0 items-baseline gap-2 text-ui-sm text-fg-mute">
           <span v-if="facts.length" class="truncate" data-testid="active-work-facts">{{ facts.join(' · ') }}</span>

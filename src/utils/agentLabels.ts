@@ -17,13 +17,22 @@ const PROVIDER_LABELS: Record<string, string> = {
 }
 
 /**
- * The agent's name, in order: the pipeline task it runs; the session's own
- * name as Claude Code shows it (the /rename name, else the title Claude Code
- * generated — `agent.title`, from the server); otherwise the provider and a
- * short session id. Never the folder name — basename(cwd) collides across
- * checkouts, and the repository and workspace carry identity.
+ * WHO the agent is — its name, in order:
+ *
+ *   1. the display name the user gave it when starting it (`agent.displayName`,
+ *      saved by session id on the server)
+ *   2. the pipeline task it runs
+ *   3. the session's own title as Claude Code shows it (the /rename name, else
+ *      the title Claude Code generated — `agent.title`)
+ *   4. the provider and a short session id
+ *
+ * Never the folder name, the Project or the repository — basename(cwd) collides
+ * across checkouts, and those carry where an agent runs, not who it is.
  */
 export function agentTitle(agent: Agent): string {
+  const name = agent.displayName?.trim()
+  if (name)
+    return name
   if (agent.pipelineTaskTitle)
     return agent.pipelineTaskTitle
   const title = agent.title?.trim()
@@ -34,14 +43,37 @@ export function agentTitle(agent: Agent): string {
 
 /**
  * The session's stable handle — provider and short session id — which stays
- * the same when a title is generated or renamed. Shown beside a human name so
- * two sessions that share a title remain distinguishable.
+ * the same when a title is generated or renamed. The name of last resort.
  */
 export function agentSessionLabel(agent: Agent): string {
   // A payload without a session id still gets a name rather than breaking the
   // surface that renders it (the details panel header renders this directly).
   const provider = PROVIDER_LABELS[agent.provider] ?? 'Agent'
   return agent.sessionId ? `${provider} session ${shortId(agent.sessionId)}` : `${provider} session`
+}
+
+/**
+ * WHAT the session is about: its Claude Code title, when that title is not
+ * already the agent's name. A persistent name says who; the title — generated
+ * from the conversation — says what this session is doing, so a named agent
+ * shows both and an unnamed one never shows the same words twice.
+ */
+export function agentTopic(agent: Agent): string | null {
+  const title = agent.title?.trim()
+  if (!title)
+    return null
+  return title === agentTitle(agent) ? null : title
+}
+
+/**
+ * The TECHNICAL handle for a named agent: provider and short session id, e.g.
+ * "Claude · 3f2a1b9c". Null when the name already is that handle.
+ */
+export function agentTechnical(agent: Agent): string | null {
+  if (agentTitle(agent) === agentSessionLabel(agent))
+    return null
+  const provider = PROVIDER_LABELS[agent.provider] ?? 'Agent'
+  return agent.sessionId ? `${provider} · ${shortId(agent.sessionId)}` : provider
 }
 
 /**

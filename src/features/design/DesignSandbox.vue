@@ -11,6 +11,7 @@ import { NeedsYouBand } from '@/features/attention'
 import { ActiveWork, agentFootprint, CommandStatusStrip } from '@/features/cockpit'
 import { DataFreshnessIndicator } from '@/features/localscope'
 import { agentKind } from '@/utils/agentCategory'
+import { AGENT_PURPOSES } from '@/utils/agentPurpose'
 
 /*
  * Design-system showcase. Development only.
@@ -325,24 +326,32 @@ const ATTENTION_SAMPLES: { label: string, queue: AttentionQueue }[] = [
         </ul>
       </section>
 
-      <!-- Agent categories -->
+      <!-- Agent icons -->
       <section class="flex flex-col gap-3" data-testid="sandbox-agent-categories">
         <h2 class="text-[13px] font-semibold">
-          Agent categories
+          Agent icons
         </h2>
         <p class="max-w-3xl text-[12px] text-fg-mute">
-          What kind of worker an agent is, from stated facts only; first match wins. The glyph is neutral and still —
-          state stays on the state indicator beside the name.
+          What an agent is for, chosen in New Agent and saved with its name. With none chosen every agent draws the
+          neutral General icon. Presentation only — never permissions, Project, repository or workspace.
         </p>
         <ul class="grid grid-cols-1 gap-2 md:grid-cols-2">
           <li
-            v-for="c in CATEGORY_SAMPLES"
-            :key="c.rule"
+            v-for="p in AGENT_PURPOSES"
+            :key="p.value"
             class="flex items-center gap-3 rounded-md border border-line bg-card px-3 py-2"
           >
-            <AgentGlyph :agent="c.facts as Agent" />
-            <span class="text-[12px] text-fg-soft">{{ agentKind(c.facts as Agent).label }}</span>
-            <code class="ml-auto text-[10px] text-fg-faint">{{ c.rule }}</code>
+            <AgentGlyph :purpose="p.value" />
+            <span class="text-[12px] text-fg-soft">{{ p.label }}</span>
+            <code class="ml-auto text-[10px] text-fg-faint">{{ p.value }}</code>
+          </li>
+        </ul>
+        <p class="max-w-3xl text-[12px] text-fg-mute">
+          How an agent was launched stays a diagnostic fact, in the tooltip of its technical handle:
+        </p>
+        <ul class="flex flex-wrap gap-2" data-testid="sandbox-launch-kinds">
+          <li v-for="c in CATEGORY_SAMPLES" :key="c.rule" class="rounded-md border border-line bg-card px-2 py-1 text-[12px] text-fg-soft">
+            {{ agentKind(c.facts as Agent).label }} <code class="text-[10px] text-fg-faint">{{ c.rule }}</code>
           </li>
         </ul>
       </section>

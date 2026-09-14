@@ -288,7 +288,7 @@ describe('runtimeTopologyTree — visualization (3N)', () => {
   it('marks agents with their category glyph, and draws node types with their own marks', () => {
     const w = mountTree(scenario())
     const node = workspaceNode(w, 'ws_main')
-    expect(node.get('[data-testid="topology-agent"] [data-testid="agent-glyph"]').attributes('aria-label')).toBe('Command-line session')
+    expect(node.get('[data-testid="topology-agent"] [data-testid="agent-glyph"]').attributes('aria-label')).toBe('General agent')
     expect(node.get('[data-testid="topology-processes"] svg').attributes('aria-hidden')).toBe('true')
     expect(node.get('[data-testid="topology-services"] svg').attributes('aria-hidden')).toBe('true')
   })

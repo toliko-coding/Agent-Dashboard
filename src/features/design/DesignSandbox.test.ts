@@ -94,11 +94,11 @@ describe('designSandbox — never a production surface (D)', () => {
   const app = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf8')
 
   // 3N: agent categories and the tool sweep are part of the documented vocabulary.
-  it('shows every agent category with its glyph and the rule that decides it', () => {
+  it('shows every agent icon, and the launch kinds apart from them', () => {
     const section = w().get('[data-testid="sandbox-agent-categories"]')
     const glyphs = section.findAll('[data-testid="agent-glyph"]').map(g => g.attributes('data-category'))
-    expect(glyphs).toEqual(['task', 'internal', 'desktop', 'terminal', 'cli'])
-    expect(section.text()).toContain('Pipeline task agent')
+    expect(glyphs).toEqual(['general', 'development', 'web', 'document', 'research', 'runtime', 'data'])
+    expect(section.get('[data-testid="sandbox-launch-kinds"]').text()).toContain('Pipeline task agent')
   })
 
   it('includes the tool sweep in the motion vocabulary, drawn on an edge', () => {

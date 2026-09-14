@@ -9,7 +9,7 @@ import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
 import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { toast } from '@/composables/useToast'
-import { agentActivity, agentTitle } from '@/utils/agentLabels'
+import { agentActivity, agentTechnical, agentTitle, agentTopic } from '@/utils/agentLabels'
 import { attentionFor } from '@/utils/attention'
 import { formatBurnRate, formatCost, formatRelativeActivity, isAwaitingInput, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
 import { agentDisplayStatus, statusLabel } from '@/utils/statusColors'
@@ -42,6 +42,9 @@ const { resolving, resolveAgent } = usePermissionResolve()
 const expanded = ref(false)
 
 const agentName = computed(() => agentTitle(props.agent))
+// WHAT the session is about, when that is not already its name; the handle beside a human name.
+const topic = computed(() => agentTopic(props.agent))
+const technical = computed(() => agentTechnical(props.agent))
 const displayStatus = computed(() => agentDisplayStatus(props.agent))
 const activity = computed(() => agentActivity(props.agent))
 const relActivity = computed(() => formatRelativeActivity(secondsSince(props.agent.lastActivity, nowMs.value)))
@@ -101,7 +104,7 @@ async function handleResolve(outcome: 'granted' | 'denied') {
         >{{ attentionChip.word }}</span>
 
         <AgentGlyph :agent="agent" size="sm" />
-        <span class="w-[168px] shrink-0 truncate text-ui font-semibold text-fg" data-testid="agent-row-name">{{ agentName }}</span>
+        <span class="w-[168px] shrink-0 truncate text-ui font-semibold text-fg" :title="technical ? `${agentName} · ${technical}` : agentName" data-testid="agent-row-name">{{ agentName }}</span>
 
         <!-- Where: repository and workspace, by identity. Never a folder path. -->
         <span class="flex w-[260px] shrink-0 min-w-0 items-center gap-1.5 text-ui-sm text-fg-mute" data-testid="agent-row-where">
@@ -119,7 +122,7 @@ async function handleResolve(outcome: 'granted' | 'denied') {
           <span v-else class="text-fg-faint" data-testid="agent-row-workspace-unknown">Workspace unknown</span>
         </span>
 
-        <span class="flex-1 min-w-0 truncate text-ui-sm text-fg-soft" data-testid="agent-row-activity">{{ activity }}</span>
+        <span class="flex-1 min-w-0 truncate text-ui-sm text-fg-soft"><span data-testid="agent-row-activity">{{ activity }}</span><span v-if="topic" class="text-fg-mute" data-testid="agent-row-topic"> · {{ topic }}</span></span>
 
         <span class="hidden lg:block shrink-0 w-14 font-mono text-label text-fg-mute">{{ shortModel(agent.model ?? null) }}</span>
         <span class="shrink-0 w-[76px] text-right font-mono text-label text-fg-mute">{{ relActivity }}</span>

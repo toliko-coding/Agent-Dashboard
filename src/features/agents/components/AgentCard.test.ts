@@ -371,19 +371,37 @@ describe('agentCard — semantic motion (3N)', () => {
   })
 })
 
-describe('agentCard — human name (3N)', () => {
-  it('shows the session title with the stable session handle beside it', () => {
+describe('agentCard — identity (3N.1)', () => {
+  it('shows WHO from the given name, WHAT from the session title, and the technical handle', () => {
+    const w = render({ displayName: 'Portfolio', category: 'web', title: 'Refactoring responsive navigation' })
+    expect(w.get('[data-testid="agent-card-title"]').text()).toBe('Portfolio')
+    expect(w.get('[data-testid="agent-card-topic"]').text()).toBe('· Refactoring responsive navigation')
+    expect(w.get('[data-testid="agent-card-technical"]').text()).toBe('Claude · 3f2a1b9c')
+    expect(w.get('[data-testid="agent-glyph"]').attributes('aria-label')).toBe('Web agent')
+    expect(w.get('[data-testid="agent-card-open"]').attributes('aria-label')).toBe('Open details for Portfolio')
+  })
+
+  it('never repeats a session title that already is the name', () => {
     const w = render({ title: 'Fix login redirect', titleSource: 'ai' })
     expect(w.get('[data-testid="agent-card-title"]').text()).toBe('Fix login redirect')
-    expect(w.get('[data-testid="agent-card-handle"]').text()).toBe('Claude session 3f2a1b9c')
-    expect(w.get('[data-testid="agent-card-open"]').attributes('aria-label')).toBe('Open details for Fix login redirect')
+    expect(w.find('[data-testid="agent-card-topic"]').exists()).toBe(false)
+    expect(w.get('[data-testid="agent-card-technical"]').text()).toBe('Claude · 3f2a1b9c')
+    expect(w.text().match(/Fix login redirect/g)).toHaveLength(1)
   })
 
   it('shows no second handle when the name already is the handle', () => {
-    expect(render().find('[data-testid="agent-card-handle"]').exists()).toBe(false)
+    expect(render().find('[data-testid="agent-card-technical"]').exists()).toBe(false)
   })
 
-  it('marks the category with its glyph', () => {
-    expect(render({ liveInjectable: true }).get('[data-testid="agent-glyph"]').attributes('aria-label')).toBe('Terminal session')
+  it('keeps the launch kind as a diagnostic tooltip, not the icon', () => {
+    const w = render({ displayName: 'Research', liveInjectable: true })
+    expect(w.get('[data-testid="agent-card-technical"]').attributes('title')).toBe('Terminal session')
+    expect(w.get('[data-testid="agent-glyph"]').attributes('aria-label')).toBe('General agent')
+  })
+
+  it('n: keeps the current tool separate from who the agent is', () => {
+    const w = render({ displayName: 'Portfolio', working: true, pendingToolUse: { id: 't', tool: 'Edit', pattern: '', patternDisplay: '' } })
+    expect(w.get('[data-testid="agent-card-title"]').text()).toBe('Portfolio')
+    expect(w.get('[data-testid="agent-card-activity"]').text()).toBe('Using Edit')
   })
 })

@@ -15,17 +15,24 @@ import { toast } from '@/composables/useToast'
 import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vue'
 import MetricsPopover from '@/features/agents/components/MetricsPopover.vue'
 import { useMetricsDisclosure } from '@/features/agents/composables/useMetricsDisclosure'
-import { agentActivity, agentSessionLabel, agentTitle, workActivity } from '@/utils/agentLabels'
+import { agentKind } from '@/utils/agentCategory'
+import { agentActivity, agentTechnical, agentTitle, agentTopic, workActivity } from '@/utils/agentLabels'
 import { formatCost, formatRelativeActivity, isAwaitingInput, secondsSince, shortModel } from '@/utils/format'
 import { agentDisplayStatus } from '@/utils/statusColors'
 
 /*
  * An agent as a worker in a grid: a compact tile, not a miniature chat window.
  *
- *   category · name · state, and the session handle when the name is a title
- *   repository and workspace (or "Workspace unknown") · observed services
- *   what it is doing · role, subagents, last activity
- *   model, provider · cost and actions
+ *   WHO        purpose icon · name · state, and the technical handle
+ *              ("Claude · 3f2a1b9c") when the name is not that handle
+ *   WHERE      repository and workspace (or "Workspace unknown") · services
+ *   WHAT       what it is doing (tool) · the session's topic when the name is
+ *              not the topic · role, subagents, last activity
+ *              model, provider · cost and actions
+ *
+ * Identity is utils/agentLabels: a name the user gave it, else a pipeline task,
+ * else the Claude session title, else the session handle. A title that is the
+ * name is never repeated as the topic.
  *
  * The transcript, subagent output, token and health figures, PID and paths are
  * not on the card. The details panel carries the transcript, subagents and
@@ -83,11 +90,11 @@ async function dismiss() {
 const { nowMs } = useNow()
 
 const title = computed(() => agentTitle(props.agent))
-// The stable handle, beside a human name only: two sessions can share a title.
-const handle = computed(() => {
-  const label = agentSessionLabel(props.agent)
-  return label === title.value ? null : label
-})
+// Beside a human name only: two agents can share a name or a title.
+const technical = computed(() => agentTechnical(props.agent))
+// How it was launched, as a diagnostic tooltip on the handle.
+const launch = computed(() => agentKind(props.agent).label)
+const topic = computed(() => agentTopic(props.agent))
 const awaitingInput = computed(() => isAwaitingInput(props.agent))
 
 /*
@@ -203,7 +210,7 @@ const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
           <span class="w-full min-w-0 truncate text-ui font-semibold text-fg" data-testid="agent-card-title" :title="title">{{ title }}</span>
           <span class="flex max-w-full min-w-0 items-center gap-2">
             <AppBadge :variant="displayStatus" :title="statusBadgeTitle" :still="stale" />
-            <span v-if="handle" class="min-w-0 truncate font-mono text-label text-fg-faint" data-testid="agent-card-handle">{{ handle }}</span>
+            <span v-if="technical" class="min-w-0 truncate font-mono text-label text-fg-faint" :title="launch" data-testid="agent-card-technical">{{ technical }}</span>
           </span>
         </button>
         <span class="flex shrink-0 flex-col items-end gap-1">
@@ -258,6 +265,7 @@ const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
           :class="signal === 'working' || signal === 'tool' ? 'text-state-working font-medium' : 'text-fg-soft'"
           data-testid="agent-card-activity"
         >{{ activity }}</span>
+        <span v-if="topic" class="min-w-0 truncate text-fg-soft" :title="topic" data-testid="agent-card-topic">· {{ topic }}</span>
         <span class="min-w-0 truncate" data-testid="agent-card-facts">· {{ facts.join(' · ') }}</span>
       </div>
 

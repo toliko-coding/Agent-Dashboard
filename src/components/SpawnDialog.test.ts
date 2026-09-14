@@ -528,3 +528,66 @@ describe('spawnDialog', () => {
     wrapper.unmount()
   })
 })
+
+describe('spawnDialog — agent name and icon (3N.1)', () => {
+  async function fill(o: { name?: string } = {}) {
+    const wrapper = mount(SpawnDialog, { props: { open: true }, attachTo: document.body })
+    await flushPromises()
+    if (o.name !== undefined)
+      setInputValue(document.querySelector('[data-testid="spawn-name-wrap"]') as HTMLInputElement, o.name)
+    setInputValue(document.querySelector('[data-testid="spawn-folder-input-wrap"]') as HTMLInputElement, '/Users/me/scratch/resume')
+    setInputValue(document.querySelector('[data-testid="spawn-prompt-wrap"]') as HTMLTextAreaElement, 'tidy my CV')
+    await waitForFolderCheck()
+    return wrapper
+  }
+  const spawnBodies = () => (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(c => c[0] === '/api/agents/spawn').map(c => JSON.parse(c[1].body as string) as Record<string, unknown>)
+
+  it('e, H: sends a name and icon for a Project = None agent, and creates no project', async () => {
+    const wrapper = await fill({ name: '  Resume Editor ' })
+    await selectByLabel(document.querySelector('#spawn-category button, [data-testid="spawn-category"]')!, 'Documents')
+    expect(document.querySelector('[data-testid="spawn-identity-section"] [data-testid="agent-glyph"]')!.getAttribute('data-category')).toBe('document')
+    ;(document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement).click()
+    await flushPromises()
+
+    const [body] = spawnBodies()
+    expect(body.displayName).toBe('Resume Editor')
+    expect(body.category).toBe('document')
+    expect(body).not.toHaveProperty('projectId')
+    const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls
+    expect(calls.some(c => c[0] === '/api/projects' && c[1]?.method === 'POST')).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('g, I: sends no name or icon when none were given — never the folder name', async () => {
+    const wrapper = await fill()
+    expect(document.querySelector('[data-testid="spawn-identity-section"] [data-testid="agent-glyph"]')!.getAttribute('data-category')).toBe('general')
+    ;(document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement).click()
+    await flushPromises()
+    const [body] = spawnBodies()
+    expect(body).not.toHaveProperty('displayName')
+    expect(body).not.toHaveProperty('category')
+    expect(JSON.stringify(body)).not.toContain('"resume"')
+    wrapper.unmount()
+  })
+
+  it('keeps Start disabled for a name longer than 60 characters, and says why', async () => {
+    const wrapper = await fill({ name: 'n'.repeat(61) })
+    expect((document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement).disabled).toBe(true)
+    expect(document.querySelector('[data-testid="spawn-name-too-long"]')!.textContent).toContain('at most 60')
+    wrapper.unmount()
+  })
+
+  it('says when the spawner could not keep the name, instead of dropping it silently', async () => {
+    const base = globalThis.fetch as unknown as (url: string, init?: RequestInit) => Promise<unknown>
+    const toastError = vi.spyOn((await import('../composables/useToast')).toast, 'error')
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => url === '/api/agents/spawn'
+      ? Promise.resolve({ ok: true, json: async () => ({ ok: true, pid: 12345, profile: 'unsupported' }) })
+      : base(url, init)))
+    const wrapper = await fill({ name: 'Research' })
+    ;(document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(toastError).toHaveBeenCalledWith(expect.stringContaining('cannot keep a name or icon'))
+    toastError.mockRestore()
+    wrapper.unmount()
+  })
+})

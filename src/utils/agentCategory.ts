@@ -1,21 +1,17 @@
 import type { Agent } from '../types'
 
 /*
- * What kind of worker an agent is, from facts the payload states — never from
- * its folder, and never decoration. This replaced a per-folder random emoji
- * (useAgentIdentity), which looked like a category but meant nothing: two
- * agents in one folder shared it, and it said nothing about either of them.
+ * How an agent was launched — a secondary, diagnostic fact (3N.1). The agent's
+ * icon is what it is FOR (utils/agentPurpose), chosen by the user; this is
+ * shown only as the tooltip on its technical handle.
  *
- * One category per agent, first match wins:
+ * One kind per agent, first match wins, from facts the payload states:
  *
  *   task      runs a pipeline task (pipelineTaskId)
  *   internal  Claude Code's own daemon process, not a session (internalProcess)
  *   desktop   a Claude desktop app session (entrypoint)
  *   terminal  a session whose terminal the dashboard can attach to (liveInjectable)
  *   cli       any other command-line session
- *
- * The category is structure, not state: it never takes a state colour and
- * never moves. State stays on the state indicator beside the name.
  */
 export type AgentCategory = 'task' | 'internal' | 'desktop' | 'terminal' | 'cli'
 
