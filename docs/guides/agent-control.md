@@ -59,6 +59,7 @@ New Agent has two optional fields, **Name** and **Icon**, for who the agent is: 
 - **Unsupported spawners.** A custom-adapter spawner cannot pin a session id. For those, the start response says `"profile": "unsupported"` and the dialog tells you the name was not kept.
 - **No effect on access.** A name or icon never changes which folders are allowed, which flags the agent is started with, or anything else it can do.
 - **Without them.** An agent without a name shows its Claude Code session title, or its provider and short session id. An agent without an icon shows the neutral General icon.
+- **Editing later.** The edit button on an agent card or in the agent workspace opens **Edit agent**, with the same Name and Icon fields. Saving sends `PUT /api/agents/{pid}/profile` with `displayName` and `category`: unknown categories are refused, and clearing both removes the profile. Any session can be edited, including one the dashboard only observes. The change applies immediately on every surface and changes nothing else; the working folder is never renamed.
 
 ### New projectless workspaces
 
@@ -78,7 +79,7 @@ API: `GET`/`PUT /api/agents/projectless`, `POST /api/agents/projectless/preview`
 Stop and Delete are on the card and in the workspace of an agent **the dashboard started**, and both ask for confirmation first.
 
 - **Ownership.** When the dashboard launches an agent it records the Claude session id it pinned or resumed together with the process id it launched (`managed_agent` table). Only an agent matching both is `dashboardOwned` and can be stopped or deleted; a spawn without a session id (a custom adapter) is owned only while this server run tracks it. Nothing else creates ownership: not being in the scan, being a Claude process, sharing a working folder, the provider, a channel or a live terminal, or the session id alone (a dashboard session later resumed in a terminal is a different process).
-- **External sessions.** A session started in a terminal, VS Code or any other application shows **Observe only** and "External session — stop it from the terminal or application that started it." Stop and Delete answer `403` with `"external": true`; no signal is sent and nothing is removed. Its name and icon, which are the dashboard's own data, can be removed with **Remove name & icon** (`DELETE /api/agents/{pid}/profile`), which never touches the process.
+- **External sessions.** A session started in a terminal, VS Code or any other application shows **Observe only** and "External session — stop it from the terminal or application that started it." Stop and Delete answer `403` with `"external": true`; no signal is sent and nothing is removed. Its name and icon, which are the dashboard's own data, can still be edited or cleared (`PUT` or `DELETE /api/agents/{pid}/profile`), which never touches the process.
 - **Pipeline agents** answer `403` with `"managedBy": "pipeline"`: stop or cancel the task instead.
 
 - **Stop** (`POST /api/agents/{pid}/stop`) ends the running Claude process with SIGTERM, then SIGKILL if it has not exited after five seconds. The session can be resumed later.
@@ -86,6 +87,17 @@ Stop and Delete are on the card and in the workspace of an agent **the dashboard
 - **Projectless workspace permission.** When the dashboard created a new projectless workspace for the agent, Delete also removes the one allowed-folder entry it added — only when no other dashboard agent's record uses that folder and the entry is still on the list (`"allowedFolderRemoved"` in the response). Folders are compared by resolved path, never by name; no other entry is changed. Claude Code's own trust record in `~/.claude.json` belongs to Claude and is left as it is.
 - **What is never deleted.** Neither action touches the working folder, the repository, Git, a Dashboard Project or the Claude session history.
 - **Which agents.** Both work only on a PID the dashboard's current scan knows as an agent. Claude Code's internal processes and sessions on another machine are refused.
+
+### Bringing a session under dashboard control
+
+An agent the dashboard started before ownership was recorded has no `managed_agent` row. Its channel and pty discovery files do not prove that the dashboard launched it, because `agent-dashboard live` writes the same files. Such an agent is therefore external, and so is any other session the dashboard did not launch. None of them is ever claimed automatically.
+
+**Resume under Dashboard** in the agent workspace turns such a session into one the dashboard manages. It never takes over the existing process: the dashboard resumes the same conversation (`--resume`) as a new process it launches, and records that new process as owned. `GET /api/agents/{pid}/control` says whether this is possible. The workspace asks it when it opens and when the agent's state changes, never on a timer. `POST /api/agents/{pid}/resume-under-dashboard` does it after the confirmation.
+
+- **Finished session.** It is resumed; no process is touched.
+- **Running session.** Resume is offered only when the process's parent is this server binary's headless pty broker (`<server binary> pty-host`, checked with `ps`) and the session is live-injectable. The dashboard types `/exit` into it, waits up to 20 seconds for it to end, then resumes. If it does not end, the answer is `504` and nothing else changes. No signal is ever sent.
+- **Refused.** A running session in a terminal, VS Code or `agent-dashboard live` gets `403` with `"external": true`: stop it where it runs, then resume it here. Owned agents get `409`; pipeline agents get `403`.
+- **What carries over.** The resumed agent keeps its transcript, name and icon (keyed by session id). It runs in the same folder with the default permission mode; the original model, system prompt and permission mode are not carried over. It does not count as a projectless workspace the dashboard created, so Delete never removes an allowed-folder entry for it.
 
 ## Slash commands
 
