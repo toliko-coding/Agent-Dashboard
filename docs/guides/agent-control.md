@@ -67,17 +67,23 @@ In New Agent, **Workspace → New projectless workspace** creates a plain folder
 - **Folder name.** It is the agent name reduced to ASCII letters, digits, `_`, `.` and `-`, so "Resume Editor" becomes `Resume-Editor`. Path separators, `..`, hidden names and Windows device names cannot get through.
 - **Location.** The folder must end up directly inside the projectless agents folder after symlinks are resolved.
 - **Existing folders.** An existing folder is never reused; the dialog asks for another name.
+- **One request.** The folder is created by the request that starts the agent (`POST /api/agents/spawn` with `"projectless": true` and a name; the client sends no `cwd`). The server records that it created the folder and added its allowed-folder entry, which Delete relies on. If the agent fails to start, the entry is removed again and the folder too when still empty.
 - **Permissions.** Exactly the new folder is added to the allowed working folders, never the projectless agents folder itself. Sensitive locations (`~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config`, `~/.claude`) and your home folder itself are refused. Claude Code's own folder trust question is still asked and answered only by you, in the dialog or in Needs you.
 - **Changing the location.** Changing the projectless agents folder moves nothing that already exists.
 
-API: `GET`/`PUT /api/agents/projectless`, `POST /api/agents/projectless/preview`, `POST /api/agents/projectless/workspaces`.
+API: `GET`/`PUT /api/agents/projectless`, `POST /api/agents/projectless/preview`, and `POST /api/agents/spawn` with `"projectless": true`.
 
 ### Stopping and deleting an agent
 
-Stop and Delete are on each agent card and in the agent workspace, and both ask for confirmation first.
+Stop and Delete are on the card and in the workspace of an agent **the dashboard started**, and both ask for confirmation first.
+
+- **Ownership.** When the dashboard launches an agent it records the Claude session id it pinned or resumed together with the process id it launched (`managed_agent` table). Only an agent matching both is `dashboardOwned` and can be stopped or deleted; a spawn without a session id (a custom adapter) is owned only while this server run tracks it. Nothing else creates ownership: not being in the scan, being a Claude process, sharing a working folder, the provider, a channel or a live terminal, or the session id alone (a dashboard session later resumed in a terminal is a different process).
+- **External sessions.** A session started in a terminal, VS Code or any other application shows **Observe only** and "External session — stop it from the terminal or application that started it." Stop and Delete answer `403` with `"external": true`; no signal is sent and nothing is removed. Its name and icon, which are the dashboard's own data, can be removed with **Remove name & icon** (`DELETE /api/agents/{pid}/profile`), which never touches the process.
+- **Pipeline agents** answer `403` with `"managedBy": "pipeline"`: stop or cancel the task instead.
 
 - **Stop** (`POST /api/agents/{pid}/stop`) ends the running Claude process with SIGTERM, then SIGKILL if it has not exited after five seconds. The session can be resumed later.
-- **Delete** (`DELETE /api/agents/{pid}`) removes the agent from Agent Dashboard: its finished card, the dashboard's channel discovery files for it, and its saved name and icon. A running agent is deleted only with `?stop=true`, which the confirmation sends after telling you it will be stopped. Without it, the request fails with `409` and nothing changes.
+- **Delete** (`DELETE /api/agents/{pid}`) removes the agent from Agent Dashboard: its finished card, the dashboard's channel discovery files for it, its saved name and icon, and its ownership record. A running agent is deleted only with `?stop=true`, which the confirmation sends after telling you it will be stopped. Without it, the request fails with `409` and nothing changes.
+- **Projectless workspace permission.** When the dashboard created a new projectless workspace for the agent, Delete also removes the one allowed-folder entry it added — only when no other dashboard agent's record uses that folder and the entry is still on the list (`"allowedFolderRemoved"` in the response). Folders are compared by resolved path, never by name; no other entry is changed. Claude Code's own trust record in `~/.claude.json` belongs to Claude and is left as it is.
 - **What is never deleted.** Neither action touches the working folder, the repository, Git, a Dashboard Project or the Claude session history.
 - **Which agents.** Both work only on a PID the dashboard's current scan knows as an agent. Claude Code's internal processes and sessions on another machine are refused.
 
