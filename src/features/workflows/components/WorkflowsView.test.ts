@@ -149,7 +149,7 @@ describe('workflowsView', () => {
     expect(dagButton).toBeTruthy()
 
     // DAG tab should be active (has the active class)
-    expect(dagButton!.classes()).toContain('bg-blue-600')
+    expect(dagButton!.classes()).toContain('bg-accent-soft')
   })
 
   it('hides Session DAG tab and returns to Sankey after Reset', async () => {
@@ -180,7 +180,7 @@ describe('workflowsView', () => {
     // Confirm DAG tab is active
     const dagButtonActive = wrapper.findAll('button[role="tab"]').find(b => b.text() === 'Session DAG')
     expect(dagButtonActive).toBeTruthy()
-    expect(dagButtonActive!.classes()).toContain('bg-blue-600')
+    expect(dagButtonActive!.classes()).toContain('bg-accent-soft')
 
     // Click Reset
     const resetButton = wrapper.findAll('button').find(b => b.text() === 'Reset')!
@@ -194,6 +194,6 @@ describe('workflowsView', () => {
     // Sankey tab should be active
     const sankeyButton = wrapper.findAll('button[role="tab"]').find(b => b.text() === 'Sankey')
     expect(sankeyButton).toBeTruthy()
-    expect(sankeyButton!.classes()).toContain('bg-blue-600')
+    expect(sankeyButton!.classes()).toContain('bg-accent-soft')
   })
 })

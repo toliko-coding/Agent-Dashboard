@@ -6,6 +6,7 @@ import { scaleLinear, scalePoint } from 'd3-scale'
 import { select } from 'd3-selection'
 import { curveMonotoneX, line as d3line } from 'd3-shape'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import AppButton from '@/components/ui/AppButton.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import { toast } from '@/composables/useToast'
 import { useEvalMetrics } from '@/features/analytics/composables/useEvalMetrics'
@@ -162,7 +163,7 @@ onUnmounted(() => {
 <template>
   <div class="eval-view p-6 flex flex-col gap-6">
     <header class="flex items-baseline justify-between flex-wrap gap-2">
-      <h2 class="text-lg font-semibold text-fg">
+      <h2 class="text-title font-semibold text-fg">
         Eval / Drift Detection
       </h2>
       <div class="flex items-center gap-3">
@@ -174,14 +175,9 @@ onUnmounted(() => {
           size="compact"
           @update:model-value="setHours"
         />
-        <button
-          type="button"
-          :disabled="isScanning"
-          class="text-xs px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          @click="handleRunScan"
-        >
+        <AppButton variant="primary" size="sm" :disabled="isScanning" @click="handleRunScan">
           {{ isScanning ? 'Scanning…' : 'Run scan now' }}
-        </button>
+        </AppButton>
       </div>
     </header>
 
@@ -202,7 +198,7 @@ onUnmounted(() => {
         <div
           v-for="key in METRIC_KEYS"
           :key="key"
-          class="bg-card border border-line rounded-md p-4"
+          class="bg-card border border-line rounded-panel p-4"
         >
           <h4 class="text-xs font-semibold text-fg-soft mb-2">
             {{ metricLabel(key) }}
@@ -221,10 +217,10 @@ onUnmounted(() => {
     </section>
 
     <!-- Open drift alerts -->
-    <section class="bg-card border border-line rounded-md p-4">
+    <section class="bg-card border border-line rounded-panel p-4">
       <h3 class="text-sm font-semibold mb-3 text-fg-soft">
         Open drift alerts
-        <span v-if="openAlerts.length > 0" class="ml-1.5 text-xs bg-red-600 text-white rounded-full px-1.5 py-0.5">
+        <span v-if="openAlerts.length > 0" class="ml-1.5 text-label font-semibold border border-danger-line text-danger-text bg-card rounded-full px-1.5 py-0.5">
           {{ openAlerts.length }}
         </span>
       </h3>

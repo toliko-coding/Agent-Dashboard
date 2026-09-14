@@ -209,7 +209,7 @@ function isHighlightCol(col: ColumnDef): boolean {
           type="button"
           class="text-xs px-2 py-1 rounded border transition-colors"
           :class="selectedProjectIds.has(p.id)
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'
+            ? 'border-accent bg-accent-soft text-accent'
             : 'border-line-strong text-fg-soft hover:bg-raised'"
           :style="selectedProjectIds.has(p.id) && p.color ? { borderColor: p.color, backgroundColor: `${p.color}22`, color: p.color } : {}"
           :aria-pressed="selectedProjectIds.has(p.id)"
@@ -223,7 +223,7 @@ function isHighlightCol(col: ColumnDef): boolean {
           type="button"
           class="text-xs px-2 py-1 rounded border transition-colors"
           :class="selectedProjectIds.has('__none__')
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400'
+            ? 'border-accent bg-accent-soft text-accent'
             : 'border-line-strong text-fg-soft hover:bg-raised'"
           :aria-pressed="selectedProjectIds.has('__none__')"
           @click="toggleProjectFilter('__none__')"
@@ -233,18 +233,19 @@ function isHighlightCol(col: ColumnDef): boolean {
         <button
           v-if="selectedProjectIds.size > 0"
           type="button"
-          class="text-xs px-2 py-1 rounded text-fg-mute hover:text-slate-700 dark:hover:text-slate-200"
+          class="text-xs px-2 py-1 rounded text-fg-mute hover:text-fg"
           @click="clearProjectFilter"
         >
           Clear
         </button>
       </template>
     </div>
-    <div class="flex gap-3 overflow-x-auto pb-4 flex-1 min-h-0">
+    <!-- Scrolls sideways inside itself; focusable so the columns can be scrolled from the keyboard. -->
+    <div class="flex gap-3 overflow-x-auto pb-4 flex-1 min-h-0 rounded-panel focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent" tabindex="0" role="region" aria-label="Pipeline stages">
       <div
         v-for="{ col, tasks } in columnsWithTasks"
         :key="col.id"
-        class="flex-[1_1_260px] min-w-[240px] rounded-lg flex flex-col"
+        class="flex-[1_1_260px] min-w-[240px] rounded-panel flex flex-col"
         :class="isHighlightCol(col)
           ? 'bg-warning-soft border border-warning-text'
           : col.group === 'terminal'
@@ -265,7 +266,7 @@ function isHighlightCol(col: ColumnDef): boolean {
           >
             <span
               v-if="isHighlightCol(col)"
-              class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-card text-warning-text text-[10px] leading-none border border-warning-text"
+              class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-card text-warning-text text-label leading-none border border-warning-text"
               aria-hidden="true"
             >!</span>
             {{ col.label }}
@@ -281,11 +282,11 @@ function isHighlightCol(col: ColumnDef): boolean {
           <template v-for="epic in epics" :key="epic.parent.id">
             <div
               v-if="tasks.some(t => t.parentTaskId === epic.parent.id)"
-              class="mb-2 border border-blue-200 dark:border-blue-800 rounded-lg overflow-hidden"
+              class="mb-2 border border-line rounded-control overflow-hidden"
             >
               <button
                 type="button"
-                class="w-full flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-950 text-left"
+                class="w-full flex items-center gap-2 px-3 py-2 bg-raised text-left"
                 :aria-expanded="!!epicExpanded[epic.parent.id]"
                 :aria-controls="`epic-children-${epic.parent.id}`"
                 @click="toggleEpic(epic.parent.id)"
@@ -298,10 +299,10 @@ function isHighlightCol(col: ColumnDef): boolean {
                   aria-hidden="true"
                   focusable="false"
                 >
-                  <circle cx="12" cy="12" r="9" fill="none" class="stroke-slate-200 dark:stroke-slate-700" stroke-width="3" />
+                  <circle cx="12" cy="12" r="9" fill="none" class="stroke-line" stroke-width="3" />
                   <circle
                     cx="12" cy="12" r="9" fill="none"
-                    class="stroke-blue-500"
+                    class="stroke-accent"
                     stroke-width="3"
                     stroke-dasharray="56.55"
                     :stroke-dashoffset="56.55 * (1 - epic.completionPct / 100)"
@@ -310,8 +311,8 @@ function isHighlightCol(col: ColumnDef): boolean {
                   />
                 </svg>
                 <span class="text-xs font-semibold text-fg-soft truncate flex-1">{{ epic.parent.title }}</span>
-                <span class="text-[10px] text-slate-400 flex-shrink-0">{{ epic.doneCount }}/{{ epic.totalCount }} ({{ epic.completionPct }}%)</span>
-                <span class="text-xs text-slate-400" aria-hidden="true">{{ epicExpanded[epic.parent.id] ? '▲' : '▼' }}</span>
+                <span class="text-label text-fg-mute flex-shrink-0">{{ epic.doneCount }}/{{ epic.totalCount }} ({{ epic.completionPct }}%)</span>
+                <span class="text-xs text-fg-mute" aria-hidden="true">{{ epicExpanded[epic.parent.id] ? '▲' : '▼' }}</span>
               </button>
               <div
                 v-if="epicExpanded[epic.parent.id]"

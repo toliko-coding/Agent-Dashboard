@@ -278,8 +278,8 @@ const { openSettings } = useSettingsSection()
         type="button"
         role="tab"
         :aria-selected="activeTab === tab.key"
-        class="text-xs px-3 py-1 rounded-md border-none cursor-pointer"
-        :class="activeTab === tab.key ? 'bg-blue-600 text-white' : 'bg-raised text-fg-mute hover:text-fg-soft'"
+        class="text-ui-sm px-3 py-1 rounded-control border-none cursor-pointer focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+        :class="activeTab === tab.key ? 'bg-accent-soft text-accent font-semibold' : 'bg-transparent text-fg-mute hover:bg-raised hover:text-fg'"
         @click="setActiveTab(tab.key)"
       >
         {{ tab.label }}
@@ -289,8 +289,8 @@ const { openSettings } = useSettingsSection()
         type="button"
         role="tab"
         :aria-selected="activeTab === 'dag'"
-        class="text-xs px-3 py-1 rounded-md border-none cursor-pointer"
-        :class="activeTab === 'dag' ? 'bg-blue-600 text-white' : 'bg-raised text-fg-mute hover:text-fg-soft'"
+        class="text-ui-sm px-3 py-1 rounded-control border-none cursor-pointer focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+        :class="activeTab === 'dag' ? 'bg-accent-soft text-accent font-semibold' : 'bg-transparent text-fg-mute hover:bg-raised hover:text-fg'"
         @click="setActiveTab('dag')"
       >
         Session DAG

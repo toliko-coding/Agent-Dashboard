@@ -25,7 +25,7 @@ function manualReload() {
         </p>
         <button
           type="button"
-          class="mt-1 rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+          class="mt-1 rounded-control bg-accent px-4 py-1.5 text-sm font-medium text-accent-contrast hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
           @click="manualReload"
         >
           Reload

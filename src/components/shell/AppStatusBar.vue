@@ -120,7 +120,7 @@ function formatDelta(d: number | null): string {
       </div>
     </div>
     <div v-if="openSegment === 'cost'" data-testid="panel-cost" class="px-4 py-3 border-b border-line text-[12px] text-fg-mute font-mono flex flex-col gap-1">
-      <span>Today's spend: {{ todayCostLabel }}</span>
+      <span data-testid="panel-cost-day">Spend since 00:00 UTC: {{ todayCostLabel }}</span>
       <span>Burn rate (last 5 min): {{ formatDelta(costDelta) }}</span>
     </div>
     <div v-if="openSegment === 'usage'" data-testid="panel-usage" class="px-4 py-3 border-b border-line text-[12px] text-fg-mute font-mono">
@@ -191,9 +191,9 @@ function formatDelta(d: number | null): string {
         aria-label="Toggle cost trend detail"
         @click="toggleSegment('cost')"
       >
-        TODAY <span class="text-fg">{{ todayCostLabel }}</span>
+        <span title="Spend for the current UTC calendar day">UTC DAY</span> <span class="text-fg">{{ todayCostLabel }}</span>
         <span class="text-fg-faint">·</span>
-        5m <span :class="(costDelta ?? 0) > 0 ? 'text-green-500' : 'text-fg-faint'">{{ formatDelta(costDelta) }}</span>
+        5m <span :class="(costDelta ?? 0) > 0 ? 'text-fg' : 'text-fg-faint'">{{ formatDelta(costDelta) }}</span>
       </button>
       <button
         type="button"

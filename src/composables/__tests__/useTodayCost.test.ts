@@ -43,13 +43,14 @@ describe('useTodayCost', () => {
     wrapper.unmount()
   })
 
-  it('defaults to 0 when totalUsd is absent from the response', async () => {
+  // A missing total is unknown, not zero spend (3L).
+  it('is unknown, not 0, when totalUsd is absent from the response', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) }))
     const { result, wrapper } = withSetup(() => useTodayCost())
     result.start()
     await flushPromises()
 
-    expect(result.todayUsd.value).toBe(0)
+    expect(result.todayUsd.value).toBeNull()
     wrapper.unmount()
   })
 

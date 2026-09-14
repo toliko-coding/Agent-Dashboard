@@ -29,8 +29,8 @@ const showStepper = computed(() => props.status === 'refining' || done.value.siz
 
 const badge = computed(() => {
   switch (props.status) {
-    case 'refining': return { text: 'Refining…', cls: 'text-blue-600 dark:text-blue-300' }
-    case 'draft_ready': return { text: 'Ready', cls: 'text-green-600 dark:text-green-400' }
+    case 'refining': return { text: 'Refining…', cls: 'text-state-working' }
+    case 'draft_ready': return { text: 'Ready', cls: 'text-success-text' }
     case 'failed': return { text: 'Failed', cls: 'text-danger-text' }
     default: return { text: '', cls: '' }
   }
@@ -40,7 +40,8 @@ const badge = computed(() => {
 <template>
   <div v-if="show" class="rounded-md border border-line bg-surface px-3.5 py-2.5 text-sm">
     <button type="button" class="flex items-center gap-2 w-full text-left" @click="expanded = !expanded">
-      <span v-if="status === 'refining'" class="inline-block h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+      <!-- Moves only while refinement is actually running, like every working state. -->
+      <span v-if="status === 'refining'" class="inline-block h-2 w-2 rounded-full bg-state-working motion-working" aria-hidden="true" />
       <span class="font-semibold" :class="badge.cls">Refinement: {{ badge.text }}</span>
     </button>
     <ol v-if="showStepper" class="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px]">
@@ -50,9 +51,9 @@ const badge = computed(() => {
         :data-phase-state="phaseState(p)"
         class="flex items-center gap-1"
         :class="{
-          'text-green-600 dark:text-green-400': phaseState(p) === 'done',
-          'text-blue-600 dark:text-blue-300 font-semibold': phaseState(p) === 'current',
-          'text-muted': phaseState(p) === 'pending',
+          'text-success-text': phaseState(p) === 'done',
+          'text-state-working font-semibold': phaseState(p) === 'current',
+          'text-fg-mute': phaseState(p) === 'pending',
         }"
       >
         <span>{{ phaseState(p) === 'done' ? '✓' : phaseState(p) === 'current' ? '◷' : '○' }}</span>

@@ -72,43 +72,43 @@ async function onDelete(s: ScheduleView) {
 
 <template>
   <div class="flex flex-col gap-4 p-4 max-w-5xl mx-auto">
+    <!-- The topbar carries the page's h1; this names the region for assistive tech. -->
     <div class="flex items-center justify-between">
-      <h1 class="text-lg font-semibold text-fg">
+      <h2 class="sr-only">
         Schedules
-      </h1>
+      </h2>
+      <span aria-hidden="true" />
       <AppButton variant="primary" @click="openCreate">
         + New Schedule
       </AppButton>
     </div>
 
-    <div v-if="isLoading" class="text-fg-faint text-sm">
+    <div v-if="isLoading" class="text-fg-mute text-ui">
       Loading schedules…
     </div>
 
-    <div v-else-if="schedules.length === 0" class="text-fg-faint text-sm">
-      No schedules yet. Create one to get started.
-    </div>
+    <p v-else-if="schedules.length === 0" class="m-0 text-ui text-fg-mute" data-testid="schedules-empty">
+      No schedules yet. New Schedule runs a task on a cron timetable.
+    </p>
 
     <div v-else class="flex flex-col gap-2">
       <div
         v-for="s in schedules"
         :key="s.id"
-        class="bg-card border border-line rounded-lg px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3"
+        class="bg-card border border-line rounded-panel px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3"
       >
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="font-semibold text-fg truncate">{{ s.name }}</span>
-            <span
-              class="text-[11px] px-1.5 py-0.5 rounded-full font-medium shrink-0"
-              :class="s.enabled ? 'bg-green-900/40 text-green-400' : 'bg-raised text-fg-faint'"
-            >
-              {{ s.enabled ? 'enabled' : 'disabled' }}
+            <span class="inline-flex items-center gap-1.5 text-ui-sm shrink-0" data-testid="schedule-enabled" :data-enabled="s.enabled">
+              <span class="size-1.5 rounded-full" :class="s.enabled ? 'bg-state-success' : 'bg-state-idle'" aria-hidden="true" />
+              <span :class="s.enabled ? 'text-success-text' : 'text-fg-mute'">{{ s.enabled ? 'Enabled' : 'Disabled' }}</span>
             </span>
           </div>
           <div class="text-fg-mute text-sm mt-0.5">
             {{ s.human }}
           </div>
-          <div class="flex gap-4 mt-1 text-xs text-fg-faint flex-wrap">
+          <div class="flex gap-4 mt-1 text-ui-sm text-fg-mute flex-wrap">
             <span class="font-mono">{{ s.cronExpr }}</span>
             <span>Next: {{ formatDateTime(s.nextRunAt) }}</span>
             <span v-if="s.lastRunAt">Last: {{ formatDateTime(s.lastRunAt) }}</span>

@@ -298,7 +298,7 @@ watch([summary, theme], () => {
 <template>
   <div class="cost-analytics-view p-6 flex flex-col gap-6">
     <header class="flex items-baseline justify-between flex-wrap gap-2">
-      <h2 class="text-lg font-semibold text-fg">
+      <h2 class="text-title font-semibold text-fg">
         Cost Analytics
       </h2>
       <div class="text-xs text-fg-mute flex items-center gap-3">

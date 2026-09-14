@@ -9,6 +9,9 @@ function todayStr(): string {
 }
 
 /**
+ * The day is the UTC calendar day: the client sends the UTC date and the server
+ * buckets cost by UTC day, so surfaces must not call this figure "today".
+ *
  * Fetches today's total spend from the shared /api/cost/summary endpoint
  * (from=to=today) so the dashboard footer/status bar reuse the same historical
  * cost logic as the Cost Analytics view, rather than a separate calculation.
@@ -30,7 +33,8 @@ export function useTodayCost() {
       if (!res.ok)
         return
       const data = await res.json() as { totalUsd?: number }
-      todayUsd.value = data.totalUsd ?? 0
+      // A missing total is unknown, not zero spend.
+      todayUsd.value = typeof data.totalUsd === 'number' ? data.totalUsd : null
     }
     catch {
       // AbortError and transient failures: leave the last known value in place.

@@ -144,3 +144,17 @@ describe('appStatusBar', () => {
     expect(w.text()).toContain('—')
   })
 })
+
+// F (3L): the figure is the UTC calendar day — the server buckets cost by UTC day — so it is not called "today".
+describe('appStatusBar — cost day label', () => {
+  it('names the UTC day in the strip and the panel, and never says TODAY', async () => {
+    const Bar = await load()
+    const w = mount(Bar, { props: { costDelta: 0.42, todayCostLabel: '$5.00', usageData: null } })
+    const seg = w.get('[data-testid="seg-cost"]')
+    expect(seg.text()).toContain('UTC DAY')
+    expect(seg.text()).not.toMatch(/\bTODAY\b/)
+    await seg.trigger('click')
+    expect(w.get('[data-testid="panel-cost-day"]').text()).toBe('Spend since 00:00 UTC: $5.00')
+    expect(w.text()).not.toContain('Today\'s spend')
+  })
+})
