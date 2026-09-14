@@ -75,6 +75,10 @@ describe('claudeUsagePanel', () => {
     expect(running).toContain('3 sessions')
     expect(running).toContain('$3.75')
     expect(running).toContain('1 without pricing')
+    // O: a lifetime total is labelled as one and kept out of the window grid.
+    expect(w.get('[data-testid="usage-running-label"]').text()).toBe('Active sessions · lifetime')
+    expect(w.get('[data-testid="usage-running-note"]').text()).toContain('not a 5-hour or 7-day figure')
+    expect(w.get('[data-testid="usage-windows"]').find('[data-testid="usage-running"]').exists()).toBe(false)
   })
 
   it('does not report running sessions before agents are observed', async () => {
@@ -86,8 +90,18 @@ describe('claudeUsagePanel', () => {
   it('names its source and does not claim the plan\'s limits or a day', async () => {
     data.value = NO_BUDGET
     const w = await render()
-    expect(w.get('[data-testid="usage-source"]').text()).toContain('Not your plan\'s rate limits')
-    expect(w.text()).not.toMatch(/\btoday\b|remaining|quota/i)
+    const source = w.get('[data-testid="usage-source"]').text()
+    expect(source).toContain('not an Anthropic bill')
+    expect(source).toContain('not your plan\'s usage limits')
+    // Q: nothing about subscription quota is claimed.
+    expect(w.text()).not.toMatch(/\btoday\b|remaining|quota|resets?\b|\bMax\b|\bPro\b|% (?:of|left)/i)
+  })
+
+  it('o: states the span of each window for assistive technology', async () => {
+    data.value = NO_BUDGET
+    const w = await render()
+    expect(w.get('[data-testid="usage-window-5h"] [data-testid="usage-cost"] .sr-only').text()).toContain('the last 5 hours')
+    expect(w.get('[data-testid="usage-window-7d"] [data-testid="usage-cost"] .sr-only').text()).toContain('the last 7 days')
   })
 
   it('reads the shared usage response and starts no poll of its own', () => {

@@ -15,8 +15,12 @@ import CockpitPanel from './CockpitPanel.vue'
  *                    Claude session logs on this machine over the last 5 hours
  *                    and 7 days. A budget share appears only when a budget is
  *                    configured; otherwise the panel says there is none.
- *   Running now      the estimated cost of the sessions running now, from the
- *                    agent stream — session totals, not spend in a period.
+ *   Active sessions  how many sessions are running, and the estimated cost of
+ *                    each session over its whole life, from the agent stream.
+ *                    A lifetime total is not a window: a session started last
+ *                    week counts every token it ever used, so this can exceed
+ *                    the 7-day figure. It is labelled apart and never placed in
+ *                    the window grid, so the two are not read as comparable.
  *
  * Deliberately not claimed: the plan's own rate limits or remaining quota
  * (Anthropic's figures are not available locally), and any per-day figure.
@@ -37,6 +41,7 @@ const state = computed<PanelState>(() => {
 })
 
 const WINDOW_LABEL: Record<string, string> = { '5h': 'Last 5 hours', '7d': 'Last 7 days' }
+const WINDOW_SPOKEN: Record<string, string> = { '5h': 'the last 5 hours', '7d': 'the last 7 days' }
 
 function tokenLabel(n: number): string {
   if (!Number.isFinite(n) || n <= 0)
@@ -57,6 +62,7 @@ const windows = computed(() => (data.value?.windows ?? []).map((w: WindowData) =
   return {
     key: w.key,
     label: WINDOW_LABEL[w.key] ?? w.key,
+    spoken: WINDOW_SPOKEN[w.key] ?? w.key,
     tokens: tokenLabel(w.tokens),
     cost: costLabel(w.costCents),
     pct,
@@ -97,7 +103,7 @@ const running = computed(() => {
             <span class="text-ui-sm text-fg-mute">tokens</span>
           </dd>
           <dd class="m-0 text-ui-sm text-fg-mute" data-testid="usage-cost">
-            ≈ <span class="font-mono tabular-nums text-fg-soft">{{ w.cost }}</span> estimated
+            ≈ <span class="font-mono tabular-nums text-fg-soft">{{ w.cost }}</span> estimated<span class="sr-only">, API-equivalent cost of tokens used in {{ w.spoken }}</span>
           </dd>
           <dd v-if="w.pct !== null && w.level" class="m-0 flex flex-col gap-1" data-testid="usage-budget" :data-level="w.level">
             <span class="h-1 overflow-hidden rounded-full bg-raised" aria-hidden="true">
@@ -120,18 +126,27 @@ const running = computed(() => {
         </li>
       </ul>
 
-      <p v-if="running" class="m-0 flex flex-wrap items-baseline gap-x-1.5 border-t border-line pt-2 text-ui-sm text-fg-mute" data-testid="usage-running">
-        <span class="text-label uppercase tracking-wider text-fg-faint">Running now</span>{{ ' ' }}
-        <span>{{ running.count }} {{ running.count === 1 ? 'session' : 'sessions' }}</span>{{ ' ' }}
-        <template v-if="running.count > 0">
-          <span aria-hidden="true">·</span>{{ ' ' }}
-          <span>≈ <span class="font-mono tabular-nums text-fg-soft">{{ running.total > 0 ? formatCost(running.total) : '$0.00' }}</span> estimated so far</span>{{ ' ' }}
-          <span v-if="running.unpriced > 0" class="text-fg-faint">({{ running.unpriced }} without pricing)</span>
-        </template>
-      </p>
+      <!--
+        Not a window: each session's whole-life estimate, so it can exceed the
+        7-day figure. Kept out of the window grid and named for what it is.
+      -->
+      <div v-if="running" class="flex flex-col gap-0.5 border-t border-line pt-2" data-testid="usage-running">
+        <p class="m-0 flex flex-wrap items-baseline gap-x-1.5 text-ui-sm text-fg-mute">
+          <span class="text-label uppercase tracking-wider text-fg-faint" data-testid="usage-running-label">Active sessions · lifetime</span>{{ ' ' }}
+          <span>{{ running.count }} {{ running.count === 1 ? 'session' : 'sessions' }}</span>{{ ' ' }}
+          <template v-if="running.count > 0">
+            <span aria-hidden="true">·</span>{{ ' ' }}
+            <span>≈ <span class="font-mono tabular-nums text-fg-soft">{{ running.total > 0 ? formatCost(running.total) : '$0.00' }}</span> estimated</span>{{ ' ' }}
+            <span v-if="running.unpriced > 0" class="text-fg-faint">({{ running.unpriced }} without pricing)</span>
+          </template>
+        </p>
+        <p v-if="running.count > 0" class="m-0 text-label text-fg-faint" data-testid="usage-running-note">
+          Each running session's cost since it started, however long ago — not a 5-hour or 7-day figure.
+        </p>
+      </div>
 
       <p class="m-0 text-label text-fg-faint" data-testid="usage-source">
-        Estimated from Claude session logs on this machine. Not your plan's rate limits.
+        Estimated API-equivalent cost from Claude session logs on this machine — not an Anthropic bill, and not your plan's usage limits.
       </p>
     </div>
   </CockpitPanel>
