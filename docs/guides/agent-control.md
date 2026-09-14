@@ -60,6 +60,27 @@ New Agent has two optional fields, **Name** and **Icon**, for who the agent is: 
 - **No effect on access.** A name or icon never changes which folders are allowed, which flags the agent is started with, or anything else it can do.
 - **Without them.** An agent without a name shows its Claude Code session title, or its provider and short session id. An agent without an icon shows the neutral General icon.
 
+### New projectless workspaces
+
+In New Agent, **Workspace → New projectless workspace** creates a plain folder for the agent: `<projectless agents folder>/<folder name>`. The projectless agents folder defaults to `~/Documents/AI-Agents` and can be changed in Settings → Agent folders (`agents.projectlessRoot`).
+
+- **Folder name.** It is the agent name reduced to ASCII letters, digits, `_`, `.` and `-`, so "Resume Editor" becomes `Resume-Editor`. Path separators, `..`, hidden names and Windows device names cannot get through.
+- **Location.** The folder must end up directly inside the projectless agents folder after symlinks are resolved.
+- **Existing folders.** An existing folder is never reused; the dialog asks for another name.
+- **Permissions.** Exactly the new folder is added to the allowed working folders, never the projectless agents folder itself. Sensitive locations (`~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config`, `~/.claude`) and your home folder itself are refused. Claude Code's own folder trust question is still asked and answered only by you, in the dialog or in Needs you.
+- **Changing the location.** Changing the projectless agents folder moves nothing that already exists.
+
+API: `GET`/`PUT /api/agents/projectless`, `POST /api/agents/projectless/preview`, `POST /api/agents/projectless/workspaces`.
+
+### Stopping and deleting an agent
+
+Stop and Delete are on each agent card and in the agent workspace, and both ask for confirmation first.
+
+- **Stop** (`POST /api/agents/{pid}/stop`) ends the running Claude process with SIGTERM, then SIGKILL if it has not exited after five seconds. The session can be resumed later.
+- **Delete** (`DELETE /api/agents/{pid}`) removes the agent from Agent Dashboard: its finished card, the dashboard's channel discovery files for it, and its saved name and icon. A running agent is deleted only with `?stop=true`, which the confirmation sends after telling you it will be stopped. Without it, the request fails with `409` and nothing changes.
+- **What is never deleted.** Neither action touches the working folder, the repository, Git, a Dashboard Project or the Claude session history.
+- **Which agents.** Both work only on a PID the dashboard's current scan knows as an agent. Claude Code's internal processes and sessions on another machine are refused.
+
 ## Slash commands
 
 Typing `/` in the prompt input opens a menu with two kinds of command.
