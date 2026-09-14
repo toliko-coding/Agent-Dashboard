@@ -616,10 +616,11 @@ html, body {
 }
 .motion-rail { animation: rail-flow 2600ms linear infinite; }
 .cc-glyph-lg {
-  border-color: color-mix(in oklch, var(--accent) 35%, var(--line));
+  border-color: color-mix(in oklch, var(--accent) 50%, var(--line));
   background:
-    radial-gradient(120% 120% at 30% 0%, color-mix(in oklch, var(--accent) 26%, transparent), transparent 60%),
-    color-mix(in oklch, var(--raised) 85%, var(--live) 15%);
+    radial-gradient(120% 120% at 25% 0%, color-mix(in oklch, var(--accent) 38%, transparent), transparent 62%),
+    radial-gradient(90% 90% at 100% 100%, color-mix(in oklch, var(--live) 22%, transparent), transparent 60%),
+    var(--raised);
   color: var(--fg);
   box-shadow: inset 0 1px 0 color-mix(in oklch, var(--fg) 12%, transparent);
 }

@@ -16,7 +16,7 @@ import MetricsPopover from '@/features/agents/components/MetricsPopover.vue'
 import { useMetricsDisclosure } from '@/features/agents/composables/useMetricsDisclosure'
 import { agentKind } from '@/utils/agentCategory'
 import { agentActivity, agentTechnical, agentTitle, agentTopic, workActivity } from '@/utils/agentLabels'
-import { formatCost, formatRelativeActivity, formatTokens, formatUptime, isAwaitingInput, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
+import { formatCost, formatRelativeActivity, formatUptime, isAwaitingInput, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
 import { agentDisplayStatus } from '@/utils/statusColors'
 
 /*
@@ -79,6 +79,18 @@ const awaitingInput = computed(() => isAwaitingInput(props.agent))
 const since = computed(() => formatRelativeActivity(secondsSince(props.agent.lastActivity, nowMs.value)))
 
 /* Instruments: each shown only from a real value. */
+// Sessions reach billions of tokens (cache reads count); "1977.25M" is unreadable.
+function tokenLabel(n: number): string {
+  if (!Number.isFinite(n) || n <= 0)
+    return '—'
+  if (n >= 1e9)
+    return `${(n / 1e9).toFixed(2)}B`
+  if (n >= 1e6)
+    return `${(n / 1e6).toFixed(1)}M`
+  if (n >= 1e3)
+    return `${(n / 1e3).toFixed(1)}k`
+  return String(n)
+}
 const toolCalls = computed(() => Object.values(props.agent.toolCounts ?? {}).reduce((n, c) => n + (Number.isFinite(c) ? c : 0), 0))
 const instruments = computed(() => [
   {
@@ -96,7 +108,7 @@ const instruments = computed(() => [
   {
     key: 'tokens',
     label: 'Tokens',
-    value: formatTokens(totalTokenCount(props.agent.tokenUsage)),
+    value: tokenLabel(totalTokenCount(props.agent.tokenUsage)),
     title: 'Tokens used by the whole session',
   },
   {
@@ -107,12 +119,16 @@ const instruments = computed(() => [
   },
 ])
 
-/* The recent tool calls by tool: a bar, with the same numbers in words. */
-const MIX_SHADES = ['bg-fg-soft', 'bg-fg-mute', 'bg-fg-faint', 'bg-line-strong']
+/*
+ * The recent tool calls by tool: a bar, with the same numbers in words. Only
+ * when there are at least two tools — a one-segment bar is a full stripe that
+ * says nothing the number beside it does not.
+ */
+const MIX_SHADES = ['bg-fg-mute/80', 'bg-fg-faint/70', 'bg-line-strong', 'bg-raised']
 const toolMix = computed(() => {
   const entries = Object.entries(props.agent.toolCounts ?? {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])
   const total = toolCalls.value
-  if (entries.length === 0 || total === 0)
+  if (entries.length < 2 || total === 0)
     return null
   const top = entries.slice(0, 3)
   const rest = entries.slice(3).reduce((n, [, c]) => n + c, 0)
@@ -323,7 +339,7 @@ const ICON_BUTTON = 'inline-flex size-8 shrink-0 items-center justify-center rou
 
       <!-- TOOL MIX -->
       <div v-if="toolMix" class="flex flex-col gap-1" data-testid="agent-card-tool-mix">
-        <span class="h-1.5 w-full overflow-hidden rounded-full bg-raised" aria-hidden="true">
+        <span class="h-1 w-full overflow-hidden rounded-full bg-raised/60" aria-hidden="true">
           <span class="flex h-full w-full">
             <span v-for="s in toolMix.segments" :key="s.name" class="h-full" :class="s.shade" :style="{ width: `${s.pct}%` }" />
           </span>

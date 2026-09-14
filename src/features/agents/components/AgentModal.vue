@@ -158,13 +158,15 @@ watch(() => props.agent?.sessionId, (sessionId) => {
       class="cc-card flex h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-line shadow-modal min-[1024px]:h-[min(940px,calc(100dvh-3rem))] min-[1024px]:w-[min(1480px,calc(100vw-4rem))]"
     >
       <!-- Header spans the full width -->
-      <header class="flex flex-shrink-0 flex-col gap-3 border-b border-line bg-raised/40 px-5 py-4">
+      <div class="flex flex-shrink-0 flex-col gap-3 border-b border-line bg-raised/40 px-5 py-4" data-testid="agent-modal-header">
         <div class="flex items-center gap-3 min-w-0">
           <AgentGlyph :agent="agent" size="lg" />
           <div class="flex min-w-0 flex-1 flex-col gap-1">
             <div class="flex min-w-0 items-center gap-2.5">
               <!-- The same name the cards, Needs you and Command use; the working folder is a diagnostic in the column beside the chat. -->
-              <span :id="`agent-modal-title-${agent.pid}`" class="truncate text-title font-semibold text-fg" data-testid="agent-modal-title">{{ agentTitle(agent) }}</span>
+              <h2 :id="`agent-modal-title-${agent.pid}`" class="m-0 truncate text-title font-semibold text-fg" data-testid="agent-modal-title">
+                {{ agentTitle(agent) }}
+              </h2>
               <span v-if="technical" class="shrink-0 rounded-md border border-line bg-raised/60 px-1.5 py-0.5 font-mono text-label text-fg-mute" data-testid="agent-modal-technical">{{ technical }}</span>
             </div>
             <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-ui-sm text-fg-mute">
@@ -285,7 +287,7 @@ watch(() => props.agent?.sessionId, (sessionId) => {
             </dd>
           </div>
         </dl>
-      </header>
+      </div>
 
       <CrossLinkBanner
         v-if="agent.pipelineTaskId"

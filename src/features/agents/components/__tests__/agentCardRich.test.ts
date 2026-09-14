@@ -81,6 +81,17 @@ describe('rich agent card — instruments from real values only', () => {
     expect(mix.text()).toContain('Bash 12 · Edit 8 · Read 5 · other 2')
   })
 
+  it('draws no tool mix for a single tool — a one-segment bar says nothing', async () => {
+    const w = await render({ toolCounts: { Bash: 3 } })
+    expect(w.find('[data-testid="agent-card-tool-mix"]').exists()).toBe(false)
+    expect(w.get('[data-testid="agent-card-tools"]').text()).toBe('3')
+  })
+
+  it('reads a session\'s billions of tokens as billions', async () => {
+    const w = await render({ tokenUsage: { inputTokens: 1_000_000_000, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 977_250_000 } })
+    expect(w.get('[data-testid="agent-card-tokens"]').text()).toBe('1.98B')
+  })
+
   it('shows files and lines changed only when Claude wrote session meta', async () => {
     expect((await render({ meta: undefined })).text()).not.toMatch(/files? changed/)
     const w = await render({ meta: { inputTokens: 0, outputTokens: 0, linesAdded: 40, linesRemoved: 12, filesModified: 5, gitCommits: 0, toolErrors: 0, usesMcp: false, firstPrompt: 'SECRET PROMPT' } })
