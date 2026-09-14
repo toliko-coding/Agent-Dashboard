@@ -1,12 +1,10 @@
 package agents
 
 import (
+	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"syscall"
-
-	"github.com/lx-wnk/agent-dashboard/server/internal/channelconfig"
 )
 
 // DismissChannel handles DELETE /api/agents/{pid}/channel. It forgets a FINISHED
@@ -30,20 +28,9 @@ func (h *SpawnHandler) DismissChannel(w http.ResponseWriter, r *http.Request) {
 		h.dismisser.DismissAgent(pid)
 	}
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		http.Error(w, `{"error":"cannot resolve home"}`, http.StatusInternalServerError)
+	if err := removeDiscoveryFiles(pid); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusInternalServerError)
 		return
-	}
-	files := []string{
-		channelconfig.DiscoveryFile(home, pid),
-		channelconfig.DiscoveryPtyFile(home, pid),
-	}
-	for _, path := range files {
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			http.Error(w, `{"error":"failed to remove discovery file"}`, http.StatusInternalServerError)
-			return
-		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)

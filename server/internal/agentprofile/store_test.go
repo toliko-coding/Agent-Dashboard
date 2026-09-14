@@ -21,6 +21,11 @@ func (m *memRepo) Upsert(_ context.Context, row repo.AgentProfileRow) error {
 	return nil
 }
 
+func (m *memRepo) Delete(_ context.Context, id string) error {
+	delete(m.rows, id)
+	return nil
+}
+
 func (m *memRepo) List(context.Context) ([]repo.AgentProfileRow, error) {
 	out := make([]repo.AgentProfileRow, 0, len(m.rows))
 	for _, r := range m.rows {
@@ -75,4 +80,17 @@ func TestStore_EmptyProfileNeverErasesAndNeedsNoSession(t *testing.T) {
 	require.Equal(t, "Research", got.DisplayName)
 
 	require.ErrorIs(t, s.Save(ctx, "", Profile{DisplayName: "Orphan"}), ErrNoSession)
+}
+
+func TestStore_DeleteForgetsTheProfile(t *testing.T) {
+	ctx := context.Background()
+	m := &memRepo{rows: map[string]repo.AgentProfileRow{}}
+	s := New(m)
+	require.NoError(t, s.Save(ctx, "sess-a", Profile{DisplayName: "Portfolio"}))
+	require.NoError(t, s.Delete(ctx, "sess-a"))
+	_, ok := s.Lookup("sess-a")
+	require.False(t, ok)
+	require.Empty(t, m.rows)
+	require.NoError(t, s.Delete(ctx, "sess-never-saved"))
+	require.ErrorIs(t, s.Delete(ctx, ""), ErrNoSession)
 }

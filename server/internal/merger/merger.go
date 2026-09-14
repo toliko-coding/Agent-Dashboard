@@ -282,6 +282,14 @@ type Merger struct {
 	// at spawn, by session id (3N.1). Nil: no agent carries either.
 	profiles ProfileLookup
 
+	// latest is the most recent GetAgents result by pid, for routes that must
+	// act only on a PID the scan knows as an agent (stop, delete).
+	latestMu sync.RWMutex
+	latest   map[int]sdk.Agent
+	// forgotten holds session ids of deleted agents whose finished cards must not
+	// return (a scan tick already in flight could otherwise record them again).
+	forgotten map[string]time.Time
+
 	// Pending folder trust: Claude processes with no session yet that show
 	// Claude Code's trust question (3M.1). Rebuilt on every scan.
 	trustMu   sync.Mutex
@@ -471,11 +479,74 @@ func (m *Merger) GetAgents(ctx context.Context, opts GetAgentsOpts) ([]sdk.Agent
 	}
 
 	m.applyProfiles(result)
+	result = m.withoutForgotten(result, liveSessions)
+	m.rememberLatest(result)
 
 	if opts.Enricher != nil {
 		opts.Enricher(ctx, result)
 	}
 	return result, nil
+}
+
+// forgetFor is how long a deleted agent's finished card stays suppressed.
+const forgetFor = 10 * time.Minute
+
+// AgentByPID returns the agent with pid from the most recent scan.
+func (m *Merger) AgentByPID(pid int) (sdk.Agent, bool) {
+	m.latestMu.RLock()
+	defer m.latestMu.RUnlock()
+	a, ok := m.latest[pid]
+	return a, ok
+}
+
+// ForgetAgent removes a deleted agent's finished card and keeps its session from
+// surfacing as a finished card again. A live process for that session (resumed
+// later) still appears: forgetting is about the dashboard's card, not the session.
+func (m *Merger) ForgetAgent(pid int, sessionID string) {
+	m.tracker.dismiss(pid)
+	m.latestMu.Lock()
+	defer m.latestMu.Unlock()
+	delete(m.latest, pid)
+	if sessionID == "" {
+		return
+	}
+	if m.forgotten == nil {
+		m.forgotten = make(map[string]time.Time)
+	}
+	m.forgotten[sessionID] = time.Now()
+}
+
+func (m *Merger) rememberLatest(agents []sdk.Agent) {
+	next := make(map[int]sdk.Agent, len(agents))
+	for _, a := range agents {
+		next[a.PID] = a
+	}
+	m.latestMu.Lock()
+	m.latest = next
+	m.latestMu.Unlock()
+}
+
+// withoutForgotten drops finished cards of deleted agents; live ones stay.
+func (m *Merger) withoutForgotten(agents []sdk.Agent, live map[string]bool) []sdk.Agent {
+	m.latestMu.Lock()
+	defer m.latestMu.Unlock()
+	if len(m.forgotten) == 0 {
+		return agents
+	}
+	now := time.Now()
+	for id, at := range m.forgotten {
+		if now.Sub(at) > forgetFor {
+			delete(m.forgotten, id)
+		}
+	}
+	out := agents[:0]
+	for _, a := range agents {
+		if _, gone := m.forgotten[a.SessionID]; gone && !live[a.SessionID] {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
 }
 
 // DismissAgent removes a finished agent from the in-memory tracker so its card

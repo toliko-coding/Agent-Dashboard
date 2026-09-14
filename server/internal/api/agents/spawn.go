@@ -927,6 +927,13 @@ type SpawnHandler struct {
 	workingFolders services.WorkingFolderSettings
 	// pendingTrust is the server's scan-derived pending folder trust state.
 	pendingTrust PendingFolderTrustSource
+	// Stop and delete (3N.2): the scan PIDs are validated against, the finished
+	// card tracker and profile store delete clears. Tests swap terminate/alive.
+	agentLookup    AgentLookup
+	forgetter      AgentForgetter
+	profileDeleter ProfileDeleter
+	terminate      func(pid int) error
+	alive          func(pid int) bool
 }
 
 // NewSpawnHandler creates a SpawnHandler backed by the given manager.

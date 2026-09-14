@@ -85,6 +85,25 @@ func (d Definition) Validate(raw string) error {
 // would split a path that contains a comma. Read by services.WorkingFolders.
 const SpawnWorkingFoldersKey = "spawn.workingFolders"
 
+// ProjectlessRootKey holds the folder the dashboard creates projectless agent
+// workspaces in (3N.2): a clean absolute path, or "" for the default
+// ~/Documents/AI-Agents. Sensitive locations are refused by the service that
+// writes it (services.SetProjectlessRoot), which this package cannot import.
+const ProjectlessRootKey = "agents.projectlessRoot"
+
+// optionalAbsolutePath accepts "" or a clean absolute path.
+func optionalAbsolutePath(key string) func(string) error {
+	return func(raw string) error {
+		if raw == "" {
+			return nil
+		}
+		if !filepath.IsAbs(raw) || filepath.Clean(raw) != raw {
+			return fmt.Errorf("%s: must be a clean absolute path", key)
+		}
+		return nil
+	}
+}
+
 // absolutePathList accepts a JSON array of clean absolute paths.
 func absolutePathList(key string) func(string) error {
 	return func(raw string) error {
@@ -146,6 +165,8 @@ var definitions = func() map[string]Definition {
 		{Key: "spawn.allowedCommands", Type: TypeStringSlice, Default: "", Apply: ApplyRestart, Category: "spawn"},
 		// Folders a user explicitly allowed agents to start in, apart from any Project.
 		{Key: SpawnWorkingFoldersKey, Type: TypeString, Default: "[]", Apply: ApplyLive, Category: "spawn", validate: absolutePathList(SpawnWorkingFoldersKey)},
+		// Where the dashboard creates workspaces for agents that have no repository (3N.2).
+		{Key: ProjectlessRootKey, Type: TypeString, Default: "", Apply: ApplyLive, Category: "spawn", validate: optionalAbsolutePath(ProjectlessRootKey)},
 		{Key: "spawn.rateWindowMs", Type: TypeInt, Default: "60000", Apply: ApplyRestart, Category: "spawn", validate: positiveInt("spawn.rateWindowMs")},
 		{Key: "inject.rateLimit", Type: TypeInt, Default: "30", Apply: ApplyRestart, Category: "inject"},
 		{Key: "inject.rateWindowMs", Type: TypeInt, Default: "60000", Apply: ApplyRestart, Category: "inject", validate: positiveInt("inject.rateWindowMs")},

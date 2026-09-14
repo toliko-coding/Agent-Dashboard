@@ -2,6 +2,7 @@ CONNECT /*
 CONNECT /api/plugins/{id}/proxy/*
 DELETE /*
 DELETE /api/agents/working-folders
+DELETE /api/agents/{pid}
 DELETE /api/agents/{pid}/channel
 DELETE /api/grants/{id}
 DELETE /api/me
@@ -20,6 +21,7 @@ DELETE /api/tasks/{id}/permissions/{permID}
 DELETE /api/tasks/{id}/worktree
 GET /*
 GET /api/agents
+GET /api/agents/projectless
 GET /api/agents/spawn/{pid}/status
 GET /api/agents/stream
 GET /api/agents/working-folders
@@ -112,12 +114,15 @@ PATCH /api/projects/{id}/folders/{folderId}
 PATCH /api/spawners/{id}
 PATCH /api/tasks/{id}
 POST /*
+POST /api/agents/projectless/preview
+POST /api/agents/projectless/workspaces
 POST /api/agents/spawn
 POST /api/agents/spawn/preflight
 POST /api/agents/spawn/{pid}/folder-trust
 POST /api/agents/working-folders
 POST /api/agents/{pid}/answer-question
 POST /api/agents/{pid}/message
+POST /api/agents/{pid}/stop
 POST /api/agents/{pid}/upload-image
 POST /api/analytics/patterns/refresh
 POST /api/auth/logout
@@ -172,6 +177,7 @@ POST /api/tasks/{id}/retry
 POST /api/tasks/{id}/run
 POST /api/tasks/{id}/worktree
 PUT /*
+PUT /api/agents/projectless
 PUT /api/config/file
 PUT /api/notifications/config
 PUT /api/notifications/preferences/{eventType}

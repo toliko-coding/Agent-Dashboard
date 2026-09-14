@@ -583,6 +583,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 		spawnMgr.SetScreenProbe(merger.RealScreenProbe)
 		go spawnMgr.StartPruner(serverCtx)
 		spawnHandler := agents.NewSpawnHandler(spawnMgr)
+		if deps.AgentProfiles != nil {
+			spawnHandler.SetProfileDeleter(deps.AgentProfiles)
+		}
 		if deps.AuditEventRepo != nil {
 			spawnHandler.SetAuditRepo(deps.AuditEventRepo)
 		}
@@ -591,6 +594,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 			// Folder trust questions the server's own scan found, so an answer
 			// can reach a spawn this instance did not start (after a restart).
 			spawnHandler.SetPendingFolderTrustSource(deps.Merger)
+			// Stop and delete act only on PIDs this scan knows as agents (3N.2).
+			spawnHandler.SetAgentLookup(deps.Merger)
+			spawnHandler.SetAgentForgetter(deps.Merger)
 		}
 		r.Post("/api/agents/spawn", spawnHandler.Spawn)
 		r.Get("/api/agents/spawn/{pid}/status", spawnHandler.Status)
@@ -604,6 +610,12 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Delete("/api/agents/working-folders", spawnHandler.RemoveWorkingFolder)
 		r.Post("/api/agents/{pid}/message", spawnHandler.Message)
 		r.Delete("/api/agents/{pid}/channel", spawnHandler.DismissChannel)
+		r.Post("/api/agents/{pid}/stop", spawnHandler.StopAgent)
+		r.Delete("/api/agents/{pid}", spawnHandler.DeleteAgent)
+		r.Get("/api/agents/projectless", spawnHandler.GetProjectlessRoot)
+		r.Put("/api/agents/projectless", spawnHandler.SetProjectlessRoot)
+		r.Post("/api/agents/projectless/preview", spawnHandler.PreviewProjectlessWorkspace)
+		r.Post("/api/agents/projectless/workspaces", spawnHandler.CreateProjectlessWorkspace)
 		uploadImageHandler := agents.NewUploadImageHandler()
 		r.Post("/api/agents/{pid}/upload-image", uploadImageHandler.UploadImage)
 		// WebSocket proxy — registered raw specifically because the upgrade

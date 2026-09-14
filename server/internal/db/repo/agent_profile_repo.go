@@ -21,6 +21,8 @@ type AgentProfileRepo interface {
 	Upsert(ctx context.Context, row AgentProfileRow) error
 	// List returns every stored profile.
 	List(ctx context.Context) ([]AgentProfileRow, error)
+	// Delete removes a session's profile; a missing one is not an error.
+	Delete(ctx context.Context, sessionID string) error
 }
 
 type entAgentProfileRepo struct{ client *ent.Client }
@@ -56,4 +58,11 @@ func (r *entAgentProfileRepo) List(ctx context.Context) ([]AgentProfileRow, erro
 		out = append(out, AgentProfileRow{SessionID: p.ID, DisplayName: p.DisplayName, Category: p.Category})
 	}
 	return out, nil
+}
+
+func (r *entAgentProfileRepo) Delete(ctx context.Context, sessionID string) error {
+	if err := r.client.AgentProfile.DeleteOneID(sessionID).Exec(ctx); err != nil && !ent.IsNotFound(err) {
+		return fmt.Errorf("agentprofile.Delete: %w", err)
+	}
+	return nil
 }

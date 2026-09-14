@@ -112,3 +112,17 @@ func (s *Store) Save(ctx context.Context, sessionID string, p Profile) error {
 	s.mu.Unlock()
 	return nil
 }
+
+// Delete removes a session's profile from the table and the cache.
+func (s *Store) Delete(ctx context.Context, sessionID string) error {
+	if sessionID == "" {
+		return ErrNoSession
+	}
+	if err := s.repo.Delete(ctx, sessionID); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	delete(s.byID, sessionID)
+	s.mu.Unlock()
+	return nil
+}
