@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import type { TopologyWorkspace } from '../runtimeTopology'
+import type { MachineService } from '@/features/localscope'
 import type { Agent } from '@/types'
 import { computed } from 'vue'
 import AgentGlyph from '@/components/ui/AgentGlyph.vue'
+import LocalServicePort from '@/components/ui/LocalServicePort.vue'
 import { workspaceDisplay } from '@/utils/agentGroup'
 import { agentTitle } from '@/utils/agentLabels'
 import { shortModel } from '@/utils/format'
+import { localServiceUrl } from '@/utils/localServiceUrl'
 import { agentDisplayStatus, statusLabel } from '@/utils/statusColors'
 
 /*
@@ -70,8 +73,20 @@ function stateDot(agent: Agent): string {
   return STATE_DOT[agentDisplayStatus(agent)] ?? 'bg-state-idle'
 }
 
-const sortedPorts = computed(() =>
-  [...new Set(props.node.services.map(s => s.port))].sort((a, b) => a - b))
+/*
+ * One pill per port (a service can listen on IPv4 and IPv6 at once). When one
+ * of a port's observations has a local address, that one is drawn, so the pill
+ * opens the service (3N.2.3) exactly as Runtime → Services does.
+ */
+const portServices = computed(() => {
+  const byPort = new Map<number, MachineService>()
+  for (const s of props.node.services) {
+    const seen = byPort.get(s.port)
+    if (!seen || (!localServiceUrl(seen) && localServiceUrl(s)))
+      byPort.set(s.port, s)
+  }
+  return [...byPort.values()].sort((a, b) => a.port - b.port)
+})
 
 const listLabel = computed(() => isPlain.value
   ? `Local workspace ${props.node.workspace.name}, not in a Git repository`
@@ -139,10 +154,10 @@ const BRANCH = 'relative before:absolute before:-left-3 before:top-[0.7rem] befo
           <path d="M4.5 5.5h7v2.5a3.5 3.5 0 0 1-7 0z" />
           <path d="M8 11.5v2" />
         </svg>
-        <!-- Port pills, neutral: a listening port is structure here, not success or liveness. -->
-        <ul v-if="sortedPorts.length > 0" class="m-0 p-0 list-none flex flex-wrap gap-1 min-w-0" :aria-label="`Listening ports in ${listLabel}`">
-          <li v-for="port in sortedPorts" :key="port" class="contents">
-            <span class="rounded-full border border-line px-1.5 font-mono text-label tabular-nums text-fg-soft" data-testid="topology-port">:{{ port }}</span>{{ ' ' }}
+        <!-- Port pills, neutral: a listening port is structure, not success or liveness; a local one is a link. -->
+        <ul v-if="portServices.length > 0" class="m-0 p-0 list-none flex flex-wrap gap-1 min-w-0" :aria-label="`Listening ports in ${listLabel}`">
+          <li v-for="s in portServices" :key="s.port" class="contents">
+            <LocalServicePort :service="s" size="sm" testid="topology-port" />{{ ' ' }}
           </li>
         </ul>
         <span v-else class="text-fg-faint">none observed</span>

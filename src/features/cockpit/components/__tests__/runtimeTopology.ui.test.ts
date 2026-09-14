@@ -83,6 +83,27 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('runtimeTopologyTree', () => {
+  // 3N.2.3: workspace ports open the service exactly as Runtime → Services does.
+  it('links each local TCP port once, through the canonical helper, and keeps the rest plain', () => {
+    servicesState = list([
+      { ...svc(MAIN, 5173), protocol: 'tcp', bindScope: 'loopback', address: '127.0.0.1' },
+      { ...svc(MAIN, 5173), id: 'svc-5173-v6', protocol: 'tcp', bindScope: 'all', address: '::' },
+      { ...svc(MAIN, 3000), protocol: 'tcp', bindScope: 'all', address: '0.0.0.0' },
+      { ...svc(MAIN, 5353), protocol: 'udp', bindScope: 'all', address: '0.0.0.0' },
+    ])
+    processesState = list([])
+    const node = workspaceNode(mountTree([agent(MAIN)]), 'ws_main')
+    const ports = node.findAll('[data-testid="topology-port"]')
+    expect(ports.map(p => [p.element.tagName, p.text(), p.attributes('href') ?? null])).toEqual([
+      ['A', ':3000', 'http://localhost:3000'],
+      ['A', ':5173', 'http://localhost:5173'],
+      ['SPAN', ':5353', null],
+    ])
+    expect(ports[1].attributes('aria-label')).toBe('Open localhost port 5173')
+    expect(ports[1].attributes('rel')).toBe('noopener noreferrer')
+    expect(node.html()).not.toContain('secret-path')
+  })
+
   it('shows one Agent-Dashboard repository with two workspaces', () => {
     const w = mountTree(scenario())
     const repos = w.findAll('[data-testid="topology-repository"]')
