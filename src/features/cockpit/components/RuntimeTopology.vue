@@ -4,7 +4,8 @@ import { ref, watch } from 'vue'
 import RuntimeTopologyTree from './RuntimeTopologyTree.vue'
 
 /*
- * The runtime identity graph, beneath the machine overview in the System Map.
+ * The runtime identity graph, beneath Command's Runtime summary. The Runtime
+ * page shows the same tree, always open, as its Workspaces section.
  *
  * Added beside the existing diagram rather than replacing it. That diagram is a
  * hand-placed, fixed-size SVG of machine-level counts; it cannot hold a variable

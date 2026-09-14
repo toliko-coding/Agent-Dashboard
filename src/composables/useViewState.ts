@@ -3,17 +3,19 @@ import type { AgentStatusFilter } from '../utils/agentStatusFilter'
 import { ref, watch } from 'vue'
 import { AGENT_GROUP_OPTIONS, AGENT_SORT_OPTIONS, resolveGroup } from '../utils/agentGroup'
 import { AGENT_STATUS_FILTERS } from '../utils/agentStatusFilter'
+import { RUNTIME_SECTION_STORAGE_KEY } from '../utils/runtimeSections'
 
 /*
  * View ids are storage keys (localStorage 'agent-active-view'), so the two
  * renamed destinations keep their original ids: 'cockpit' is presented as
- * "Overview" and 'dashboard' as "Agents". Renaming the ids instead would strand
- * every existing user on the readInitial() fallback below.
+ * "Command" and 'dashboard' as "Agents". Renaming the ids instead would strand
+ * every existing user on the readInitial() fallback below. 'localscope' is
+ * presented as "Runtime", the one page for this machine.
  */
 export type ActiveView
   = | 'cockpit' | 'dashboard' | 'projects' | 'localscope'
     | 'pipeline' | 'schedules' | 'workflows'
-    | 'terminal' | 'system' | 'settings'
+    | 'terminal' | 'settings'
     | 'cost' | 'eval'
 export type DashboardLayout = 'cards' | 'list'
 
@@ -27,7 +29,6 @@ export const ACTIVE_VIEWS: ActiveView[] = [
   'schedules',
   'workflows',
   'terminal',
-  'system',
   // Settings became a page (3J); before, it was a modal and never a stored view.
   'settings',
   'cost',
@@ -46,7 +47,16 @@ function readInitial(): { view: ActiveView, layout: DashboardLayout } {
   let view: ActiveView
   let layout: DashboardLayout = storedLayout === 'list' ? 'list' : 'cards'
 
-  if (stored && ACTIVE_VIEWS.includes(stored as ActiveView)) {
+  if (stored === 'system') {
+    /*
+     * The System view merged into Runtime (3K); its machine resources are on
+     * the Runtime Overview. A saved System view opens exactly there.
+     */
+    view = 'localscope'
+    ls?.setItem('agent-active-view', 'localscope')
+    ls?.setItem(RUNTIME_SECTION_STORAGE_KEY, 'overview')
+  }
+  else if (stored && ACTIVE_VIEWS.includes(stored as ActiveView)) {
     view = stored as ActiveView
   }
   else {

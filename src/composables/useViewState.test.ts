@@ -59,6 +59,22 @@ describe('useViewState', () => {
     expect(localStorage.getItem('agent-dashboard-layout')).toBe('list')
   })
 
+  // 3K: System merged into Runtime; a saved System view opens the Runtime Overview.
+  it('opens a saved System view as the Runtime Overview', async () => {
+    localStorage.setItem('agent-active-view', 'system')
+    localStorage.setItem('runtime-active-section', 'devices')
+    const { useViewState } = await freshModule()
+    expect(useViewState().activeView.value).toBe('localscope')
+    expect(localStorage.getItem('agent-active-view')).toBe('localscope')
+    expect(localStorage.getItem('runtime-active-section')).toBe('overview')
+  })
+
+  it('keeps a saved LocalScope view, now presented as Runtime', async () => {
+    localStorage.setItem('agent-active-view', 'localscope')
+    const { useViewState } = await freshModule()
+    expect(useViewState().activeView.value).toBe('localscope')
+  })
+
   it('ignores an unknown stored activeView and falls back to cockpit', async () => {
     localStorage.setItem('agent-active-view', 'kanban')
     const { useViewState } = await freshModule()

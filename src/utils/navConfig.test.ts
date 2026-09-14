@@ -9,7 +9,7 @@ describe('navConfig — destinations', () => {
     expect(navSections().map(s => [s.group, s.items.map(i => i.view)])).toEqual([
       ['Command', ['cockpit']],
       ['Agents', ['dashboard']],
-      ['Runtime', ['localscope', 'system']],
+      ['Runtime', ['localscope']],
       ['Work', ['pipeline', 'schedules', 'workflows']],
       ['Projects', ['projects']],
       ['Insights', ['cost', 'eval']],
@@ -28,13 +28,14 @@ describe('navConfig — destinations', () => {
     expect(viewSection('projects')).toBeNull()
   })
 
-  // Settings is a modal, not a view; AppSidebar renders it as the trailing entry.
+  // Settings is a view, but AppSidebar renders it as the trailing entry, apart from the destinations.
   it('contains no Settings entry', () => {
     expect(NAV_ITEMS.some(i => i.label === 'Settings')).toBe(false)
   })
 
   it('names the section of a view inside a multi-view destination only', () => {
-    expect(viewSection('localscope')).toBe('Runtime')
+    // Runtime is one page since 3K; its sections are its own, not navigation groups.
+    expect(viewSection('localscope')).toBeNull()
     expect(viewSection('workflows')).toBe('Work')
     expect(viewSection('eval')).toBe('Insights')
     expect(viewSection('cockpit')).toBeNull()
@@ -58,6 +59,15 @@ describe('navConfig — saved state and retired entries', () => {
 
   it('viewTitle returns the label for a view', () => {
     expect(viewTitle('cost')).toBe('Cost')
-    expect(viewTitle('localscope')).toBe('LocalScope')
+    expect(viewTitle('localscope')).toBe('Runtime')
+  })
+})
+
+describe('navConfig — Runtime is one destination (3K)', () => {
+  it('has a single Runtime entry, and no LocalScope or System entry', () => {
+    const runtime = NAV_ITEMS.filter(i => i.group === 'Runtime')
+    expect(runtime.map(i => [i.view, i.label])).toEqual([['localscope', 'Runtime']])
+    expect(NAV_ITEMS.some(i => i.label === 'LocalScope' || i.label === 'System')).toBe(false)
+    expect(ACTIVE_VIEWS as string[]).not.toContain('system')
   })
 })

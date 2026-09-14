@@ -12,10 +12,11 @@
  * phrasings of "stale" read as three different states.
  */
 export { default as DataFreshnessIndicator } from './components/DataFreshnessIndicator.vue'
-export { default as LocalScopeView } from './components/LocalScopeView.vue'
-export { default as ServiceCard } from './components/ServiceCard.vue'
 export { useLocalMachine } from './composables/useLocalMachine'
 export { useMachineDevices, useMachineProcesses, useMachineServices } from './composables/useMachineLists'
+// The explicit all-processes diagnostic: one request per ask, never polled.
+export { scanAllProcesses } from './processScan'
+export type { ProcessScan } from './processScan'
 export {
   EMPTY_DEVICES,
   EMPTY_PROCESSES,

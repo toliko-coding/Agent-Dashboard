@@ -3,7 +3,7 @@ import type { CollectorResult, ProcessSnapshot } from './types'
 /*
  * The single place that knows how to reach LocalScope directly.
  *
- * It has exactly one consumer left: the LocalScope page's "show all processes"
+ * It has exactly one consumer left: the Runtime page's "Scan all processes"
  * opt-in. Everything else — the machine snapshot, services, processes and
  * devices — goes through the dashboard's own normalized endpoints, which
  * translate the collector's envelope in the backend so no component ever sees

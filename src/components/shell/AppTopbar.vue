@@ -2,8 +2,10 @@
 import type { ActiveView } from '../../composables/useViewState'
 import { computed } from 'vue'
 import { useNow } from '../../composables/useNow'
+import { useRuntimeSection } from '../../composables/useRuntimeSection'
 import { useSettingsSection } from '../../composables/useSettingsSection'
 import { viewSection, viewTitle } from '../../utils/navConfig'
+import { runtimeSectionMeta } from '../../utils/runtimeSections'
 import { settingsSectionMeta } from '../../utils/settingsSections'
 import OfflineBadge from '../OfflineBadge.vue'
 
@@ -21,11 +23,21 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ openSearch: [] }>()
 
 const title = computed(() => viewTitle(props.activeView))
-// Runtime, Work or Insights for a view inside one of them; nothing for a single-view destination.
+// Work or Insights for a view inside one of them; nothing for a single-view destination.
 const section = computed(() => viewSection(props.activeView))
-// On the Settings page, the open section: "Settings / Appearance". Real state, not a breadcrumb trail.
+/*
+ * On a page with its own sections, the open one: "Settings / Appearance",
+ * "Runtime / Services". Real state, not a breadcrumb trail.
+ */
 const { activeSection: settingsSection } = useSettingsSection()
-const settingsSubsection = computed(() => props.activeView === 'settings' ? settingsSectionMeta(settingsSection.value).label : null)
+const { activeSection: runtimeSection } = useRuntimeSection()
+const subsection = computed(() => {
+  if (props.activeView === 'settings')
+    return settingsSectionMeta(settingsSection.value).label
+  if (props.activeView === 'localscope')
+    return runtimeSectionMeta(runtimeSection.value).label
+  return null
+})
 
 const { nowMs } = useNow()
 // Ticks on the shared 30s clock, so the minute display can lag by up to 30s —
@@ -67,7 +79,7 @@ const initials = computed(() => (props.userLabel ?? '').trim().slice(0, 2).toUpp
     <h1 class="text-[15px] font-semibold text-fg shrink-0">
       {{ title }}
     </h1>
-    <span v-if="settingsSubsection" class="text-[13px] text-fg-mute shrink-0" data-testid="topbar-subsection"><span aria-hidden="true">/</span> {{ settingsSubsection }}</span>
+    <span v-if="subsection" class="text-[13px] text-fg-mute shrink-0" data-testid="topbar-subsection"><span aria-hidden="true">/</span> {{ subsection }}</span>
 
     <!--
       A button, not an input. It opens the existing global Spotlight (⌘K), which

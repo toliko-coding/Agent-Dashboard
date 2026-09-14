@@ -6,12 +6,12 @@ import type { ActiveView } from '../composables/useViewState'
  *   Command · Agents · Runtime · Work · Projects · Insights · Settings
  *
  * A destination with one view is a single entry. A destination with several —
- * Runtime (LocalScope, System), Work (Pipeline, Schedules, Workflows) and
- * Insights (Cost, Eval) — is a captioned group of them.
+ * Work (Pipeline, Schedules, Workflows) and Insights (Cost, Eval) — is a
+ * captioned group of them. Runtime was LocalScope and System until 3K; it is
+ * now one page with its own sections (utils/runtimeSections).
  *
- * Settings is intentionally absent: it opens a modal rather than switching the
- * active view, so it cannot be a NAV_ITEMS entry (those are typed to
- * ActiveView). AppSidebar renders it as the trailing entry.
+ * Settings is a view, but not a NAV_ITEMS entry: AppSidebar renders it as the
+ * trailing entry, apart from the destinations.
  *
  * Projects is the user-curated Dashboard Project and nothing else — not a
  * repository and not a workspace, which live under Runtime and Agents.
@@ -36,8 +36,8 @@ export const NAV_ITEMS: NavItemConfig[] = [
   { view: 'cockpit', label: 'Command', icon: '◈', group: 'Command' },
   { view: 'dashboard', label: 'Agents', icon: '▦', group: 'Agents' },
 
-  { view: 'localscope', label: 'LocalScope', icon: '◉', group: 'Runtime' },
-  { view: 'system', label: 'System', icon: '⬢', group: 'Runtime' },
+  // 'localscope' is the persisted id of the page now presented as Runtime.
+  { view: 'localscope', label: 'Runtime', icon: '◉', group: 'Runtime' },
 
   { view: 'pipeline', label: 'Pipeline', icon: '▤', group: 'Work' },
   { view: 'schedules', label: 'Schedules', icon: '⏱', group: 'Work' },
@@ -72,7 +72,7 @@ export function navSections(): { group: NavGroup, items: NavItemConfig[] }[] {
 
 /**
  * The destination a view sits under, when that destination is a group of
- * several views (Runtime, Work, Insights). Null for single-view destinations,
+ * several views (Work, Insights). Null for single-view destinations,
  * whose own label already names them, and for unlisted views.
  */
 export function viewSection(view: ActiveView): NavGroup | null {

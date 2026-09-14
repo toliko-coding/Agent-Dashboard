@@ -105,10 +105,9 @@ describe('appTopbar — 3F navigation', () => {
   })
 
   it('names the destination a grouped view belongs to, beside an unchanged heading', () => {
-    const w = mount(AppTopbar, { props: { activeView: 'localscope' } })
-    expect(w.get('[data-testid="topbar-section"]').text()).toContain('Runtime')
-    expect(w.get('h1').text()).toBe('LocalScope')
-    expect(mount(AppTopbar, { props: { activeView: 'workflows' } }).get('[data-testid="topbar-section"]').text()).toContain('Work')
+    const w = mount(AppTopbar, { props: { activeView: 'workflows' } })
+    expect(w.get('[data-testid="topbar-section"]').text()).toContain('Work')
+    expect(w.get('h1').text()).toBe('Workflows')
   })
 
   it('still titles a saved Terminal view that left the navigation', () => {
@@ -130,5 +129,19 @@ describe('appTopbar — Settings page (3J)', () => {
 
   it('shows no Settings section on other views', () => {
     expect(mount(AppTopbar, { props: { activeView: 'cockpit' } }).find('[data-testid="topbar-subsection"]').exists()).toBe(false)
+  })
+})
+
+describe('appTopbar — Runtime page (3K)', () => {
+  it('titles the Runtime page and names its open section', async () => {
+    const { useRuntimeSection } = await import('../../composables/useRuntimeSection')
+    useRuntimeSection().activeSection.value = 'overview'
+    const w = mount(AppTopbar, { props: { activeView: 'localscope' } })
+    expect(w.get('h1').text()).toBe('Runtime')
+    expect(w.find('[data-testid="topbar-section"]').exists()).toBe(false)
+    expect(w.get('[data-testid="topbar-subsection"]').text()).toContain('Overview')
+    useRuntimeSection().activeSection.value = 'services'
+    await w.vm.$nextTick()
+    expect(w.get('[data-testid="topbar-subsection"]').text()).toContain('Services')
   })
 })

@@ -108,17 +108,18 @@ describe('appSidebar', () => {
   it('separates the nav groups with a rule when collapsed', async () => {
     const { AppSidebar } = await load()
     const w = mount(AppSidebar, { props })
-    // Breaks before Runtime, Work, Projects (after the Work group) and Insights,
-    // plus the one before Settings. Command and Agents run together.
-    expect(w.findAll('[data-testid="nav-group-divider"]')).toHaveLength(5)
-    expect(w.text()).not.toContain('Runtime')
+    // Breaks before Work, Projects (after the Work group) and Insights, plus the
+    // one before Settings. Command, Agents and Runtime run together.
+    expect(w.findAll('[data-testid="nav-group-divider"]')).toHaveLength(4)
+    // Collapsed, the rail shows no group captions.
+    expect(w.text()).not.toContain('Insights')
   })
 
   it('keeps rules only where no caption separates the next destination', async () => {
     const { AppSidebar, useSidebar } = await load()
     useSidebar().togglePinned()
     const w = mount(AppSidebar, { props })
-    // Captions carry Runtime, Work and Insights; Projects and Settings keep a rule.
+    // Captions carry Work and Insights; Projects and Settings keep a rule.
     expect(w.findAll('[data-testid="nav-group-divider"]')).toHaveLength(2)
     expect(w.find('[data-testid="nav-section-projects"] [data-testid="nav-group-divider"]').exists()).toBe(true)
   })
@@ -290,10 +291,10 @@ describe('appSidebar — 3F navigation', () => {
     const { AppSidebar, useSidebar } = await load()
     useSidebar().togglePinned()
     const w = mount(AppSidebar, { props })
-    const order = ['Command', 'Agents', 'LocalScope', 'System', 'Pipeline', 'Schedules', 'Workflows', 'Projects', 'Cost', 'Eval', 'Settings']
+    const order = ['Command', 'Agents', 'Runtime', 'Pipeline', 'Schedules', 'Workflows', 'Projects', 'Cost', 'Eval', 'Settings']
     // Each nav button also carries its icon glyph and any badge, so match by the label it contains.
     const labels = w.findAll('nav button')
-      .map(b => [...order, 'Terminal', 'Overview'].find(label => b.text().includes(label)))
+      .map(b => [...order, 'Terminal', 'Overview', 'LocalScope', 'System'].find(label => b.text().includes(label)))
       .filter((label): label is string => Boolean(label))
     expect(labels).toEqual(order)
   })

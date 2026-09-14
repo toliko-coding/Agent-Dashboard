@@ -8,7 +8,7 @@ import { useAgentServices } from '../composables/useAgentServices'
  * observed inside this agent's project.
  *
  * Rendering rules:
- *   - source-unavailable → render nothing. The Overview and the LocalScope view
+ *   - source-unavailable → render nothing. Command and the Runtime page
  *     already say the collector is down; an error badge on every card would
  *     repeat it once per agent for no added information.
  *   - agent-unresolved → a small NEUTRAL marker. A list exists but this agent

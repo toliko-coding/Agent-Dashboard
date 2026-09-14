@@ -270,8 +270,8 @@ export function hasItems(r: { items: unknown[] | null }): boolean {
  * the machine". Null means the reading is current and complete, and needs no
  * qualifier at all.
  *
- * Shared because the Overview cards, the System Map and every section of the
- * LocalScope page ask the same question, and three phrasings of "stale" would
+ * Shared because Command's runtime summary, the topology and every section of
+ * the Runtime page ask the same question, and three phrasings of "stale" would
  * read as three different states.
  */
 export function freshnessNote(reading: Freshness): string | null {

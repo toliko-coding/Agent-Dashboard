@@ -50,9 +50,8 @@ const WorkflowsView = defineAsyncComponent(() => import('@/features/workflows/co
 const SchedulesView = defineAsyncComponent(() => import('./components/SchedulesView.vue'))
 // New Phase 2 destinations. Async for the same entry-chunk budget reason as above.
 const ProjectsView = defineAsyncComponent(() => import('@/features/projects/components/ProjectsView.vue'))
-const LocalScopeView = defineAsyncComponent(() => import('@/features/localscope/components/LocalScopeView.vue'))
+const RuntimeView = defineAsyncComponent(() => import('@/features/runtime/components/RuntimeView.vue'))
 const TerminalView = defineAsyncComponent(() => import('@/features/terminal/components/TerminalView.vue'))
-const SystemView = defineAsyncComponent(() => import('@/features/system/components/SystemView.vue'))
 // Settings is a page in the shell, not an overlay; lazy like every other view.
 const SettingsView = defineAsyncComponent(() => import('@/features/settings/components/SettingsView.vue'))
 /*
@@ -395,9 +394,8 @@ onMounted(() => usageComposable.start())
         <SchedulesView v-else-if="activeView === 'schedules'" />
         <EvalView v-else-if="activeView === 'eval'" />
         <ProjectsView v-else-if="activeView === 'projects'" />
-        <LocalScopeView v-else-if="activeView === 'localscope'" />
+        <RuntimeView v-else-if="activeView === 'localscope'" />
         <TerminalView v-else-if="activeView === 'terminal'" />
-        <SystemView v-else-if="activeView === 'system'" />
         <SettingsView v-else-if="activeView === 'settings'" />
         <WorkflowsView
           v-else-if="activeView === 'workflows'"
