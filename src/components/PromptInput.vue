@@ -7,6 +7,8 @@ import { emptyCommandSet, fetchDynamicCommands, SLASH_COMMAND_DEFS } from '../co
 import TemplatePicker from './TemplatePicker.vue'
 
 const props = withDefaults(defineProps<{
+  /** The agent workspace explains resuming itself; hide the generic line there. */
+  hideResumeHint?: boolean
   agent: Agent | null
   variant?: 'compact' | 'full'
   /** When provided and agent has a pending permission, a green ✓ button appears. */
@@ -465,7 +467,7 @@ defineExpose({ focus })
       </div>
     </div>
     <p
-      v-if="isResumeMode && !sendStatus"
+      v-if="isResumeMode && !sendStatus && !(hideResumeHint && resumeReason !== 'internal' && resumeReason !== 'disconnected')"
       data-testid="resume-hint"
       class="text-[11px] text-amber-700 dark:text-amber-400"
       :class="variant === 'full' ? 'px-4 pb-2' : 'px-3 pb-1.5 pt-0.5'"

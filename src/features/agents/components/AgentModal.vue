@@ -12,7 +12,7 @@ import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
-import { agentIsDashboardOwned, agentIsRunning, editorLabel, getAgentControl, lifecycleNote, openInEditor, useAgentLifecycle, useAgentProfileEditor } from '@/composables/useAgentLifecycle'
+import { agentIsDashboardOwned, agentIsRunning, editorLabel, getAgentControl, lifecyclePresentation, openInEditor, useAgentLifecycle, useAgentProfileEditor } from '@/composables/useAgentLifecycle'
 import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { toast } from '@/composables/useToast'
@@ -49,7 +49,15 @@ const canAct = computed(() => !!props.agent && !props.agent.machine && !props.ag
 // session is observed, and says where it can be stopped.
 const owned = computed(() => !!props.agent && agentIsDashboardOwned(props.agent))
 const running = computed(() => owned.value && agentIsRunning(props.agent!))
-const observeNote = computed(() => props.agent ? lifecycleNote(props.agent) : null)
+const presentation = computed(() => props.agent ? lifecyclePresentation(props.agent) : null)
+// What sending a message does when there is no live input path.
+const composerNote = computed(() => {
+  if (!props.agent)
+    return ''
+  return agentIsRunning(props.agent)
+    ? 'No live input path to the running process: sending starts a new Claude process that resumes this conversation, managed by Agent Dashboard. The running process is not touched.'
+    : 'This session has ended: sending resumes the conversation as a new process managed by Agent Dashboard. Its history is kept.'
+})
 // Whether an observed session can be resumed under Dashboard control (3N.2.2):
 // asked once per agent and state change, never polled. Owned and pipeline
 // agents are never asked.
@@ -72,6 +80,18 @@ watch(
   { immediate: true },
 )
 const resumable = computed(() => !owned.value && control.value?.resume.available === true)
+// What resuming would do, in the user's terms; only once the server has said it can.
+const resumeHelp = computed(() => {
+  const resume = control.value?.resume
+  if (!resume || owned.value)
+    return null
+  if (resume.available) {
+    return resume.endsRunningSession
+      ? 'Agent Dashboard can end it with /exit and resume the conversation as a process it manages.'
+      : 'Resume this Claude conversation as a new Dashboard-managed process.'
+  }
+  return presentation.value?.kind === 'ended-unmanaged' ? (resume.reason ?? null) : null
+})
 
 /*
  * The workspace supersedes the Overview/Transcript tabs of the previous drawer.
@@ -251,23 +271,6 @@ watch(() => props.agent?.sessionId, (sessionId) => {
             >
               Open in {{ editor }}
             </button>
-            <p
-              v-if="observeNote"
-              class="m-0 inline-flex max-w-[26rem] items-center gap-1.5 text-ui-sm text-fg-mute"
-              data-testid="agent-modal-observe-only"
-            >
-              <svg viewBox="0 0 16 16" class="size-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z" /><circle cx="8" cy="8" r="1.8" /></svg><span>{{ observeNote }}</span>
-            </p>
-            <button
-              v-if="resumable && control"
-              type="button"
-              class="inline-flex h-8 cursor-pointer items-center rounded-lg border border-accent/50 px-3 text-ui-sm font-medium text-accent hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
-              data-testid="agent-modal-resume"
-              title="Resume this conversation as a process Agent Dashboard manages, so it can be stopped and deleted here"
-              @click="requestResume(agent, control.resume)"
-            >
-              Resume under Dashboard
-            </button>
             <button
               v-if="running"
               type="button"
@@ -294,6 +297,38 @@ watch(() => props.agent?.sessionId, (sessionId) => {
             @click="emit('close')"
           >
             ✕
+          </button>
+        </div>
+
+        <!--
+          Lifecycle (3N.2.3): what the dashboard can and cannot do with this
+          session, said once, with the one action that changes it.
+        -->
+        <div
+          v-if="presentation?.note"
+          class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-line bg-app/40 px-3 py-2 text-ui-sm"
+          data-testid="agent-modal-lifecycle"
+          :data-kind="presentation.kind"
+        >
+          <span class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-line bg-raised/60 px-2 py-0.5 font-medium text-fg-soft" data-testid="agent-modal-lifecycle-badge">
+            <svg viewBox="0 0 16 16" class="size-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <g v-if="presentation.kind === 'ended-unmanaged'"><circle cx="8" cy="8" r="6" /><path d="M6.25 6.25h3.5v3.5h-3.5z" /></g>
+              <g v-else><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z" /><circle cx="8" cy="8" r="1.8" /></g>
+            </svg>
+            {{ presentation.badge }}
+          </span>
+          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span class="text-fg-mute" data-testid="agent-modal-observe-only">{{ presentation.note }}</span>
+            <span v-if="resumeHelp" class="text-fg-soft" data-testid="agent-modal-resume-help">{{ resumeHelp }}</span>
+          </span>
+          <button
+            v-if="resumable && control"
+            type="button"
+            class="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-accent/50 bg-accent-soft/40 px-3 text-ui-sm font-medium text-accent hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+            data-testid="agent-modal-resume"
+            @click="requestResume(agent, control.resume)"
+          >
+            Resume under Dashboard
           </button>
         </div>
 
@@ -420,6 +455,7 @@ watch(() => props.agent?.sessionId, (sessionId) => {
             variant="full"
             class="[&_textarea]:min-h-[3.5rem] [&_textarea]:text-[14px]"
             :approve-handler="approveHandler"
+            hide-resume-hint
             @message-sent="onMessageSent"
           />
           <p
@@ -432,9 +468,9 @@ watch(() => props.agent?.sessionId, (sessionId) => {
           <p
             v-if="canMessage && !agent.liveInjectable"
             data-testid="agent-resume-note"
-            class="flex-shrink-0 px-4 pb-2 text-[10px] text-fg-faint"
+            class="flex-shrink-0 px-4 pb-2 text-ui-sm text-fg-mute"
           >
-            Not started by the dashboard — sending resumes the session in a new process rather than typing into the running one.
+            <span aria-hidden="true">⤳ </span>{{ composerNote }}
           </p>
           <PluginSlot name="agent-modal-footer" :ctx="{ agent }" />
         </section>

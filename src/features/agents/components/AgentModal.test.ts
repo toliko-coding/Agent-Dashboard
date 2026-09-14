@@ -226,6 +226,37 @@ describe('agentModal — workspace', () => {
     vi.unstubAllGlobals()
   })
 
+  // 3N.2.3: the lifecycle strip says what the dashboard can do, and the composer what sending does.
+  it('explains a finished unmanaged session and what resuming does', async () => {
+    const { flushPromises } = await import('@vue/test-utils')
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => String(url).endsWith('/control') ? { owned: false, resume: { available: true, endsRunningSession: false } } : {},
+    })))
+    const w = workspace({ ...baseAgent, status: 'finished', displayName: 'LocalScope Agent' } as Agent)
+    await flushPromises()
+    const strip = w.get('[data-testid="agent-modal-lifecycle"]')
+    expect(strip.attributes('data-kind')).toBe('ended-unmanaged')
+    expect(w.get('[data-testid="agent-modal-lifecycle-badge"]').text()).toBe('Not managed')
+    expect(w.get('[data-testid="agent-modal-observe-only"]').text()).toContain('has ended')
+    expect(w.get('[data-testid="agent-modal-resume-help"]').text()).toBe('Resume this Claude conversation as a new Dashboard-managed process.')
+    expect(strip.find('[data-testid="agent-modal-resume"]').exists()).toBe(true)
+    expect(w.find('[data-testid="agent-modal-stop"]').exists()).toBe(false)
+    const note = w.find('[data-testid="agent-resume-note"]')
+    if (note.exists()) {
+      expect(note.text()).toContain('This session has ended')
+      expect(note.text()).not.toContain('running one')
+    }
+    vi.unstubAllGlobals()
+  })
+
+  it('shows no lifecycle strip for an owned running agent, which has Stop and Delete', () => {
+    const w = workspace({ ...baseAgent, status: 'active', dashboardOwned: true } as Agent)
+    expect(w.find('[data-testid="agent-modal-lifecycle"]').exists()).toBe(false)
+    expect(w.find('[data-testid="agent-modal-stop"]').exists()).toBe(true)
+    expect(w.find('[data-testid="agent-modal-delete"]').exists()).toBe(true)
+  })
+
   it('says a pipeline agent is stopped through its task', () => {
     const w = workspace({ ...baseAgent, status: 'active', dashboardOwned: true, pipelineTaskId: 't-1' } as Agent)
     expect(w.find('[data-testid="agent-modal-stop"]').exists()).toBe(false)

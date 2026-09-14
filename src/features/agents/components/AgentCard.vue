@@ -8,7 +8,7 @@ import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
-import { agentIsDashboardOwned, agentIsRunning, editorLabel, lifecycleNote, openInEditor, useAgentLifecycle, useAgentProfileEditor } from '@/composables/useAgentLifecycle'
+import { agentIsDashboardOwned, agentIsRunning, editorLabel, lifecyclePresentation, openInEditor, useAgentLifecycle, useAgentProfileEditor } from '@/composables/useAgentLifecycle'
 import { useNow } from '@/composables/useNow'
 import { toast } from '@/composables/useToast'
 import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vue'
@@ -68,7 +68,8 @@ const isFinished = computed(() => props.agent.status === 'finished')
 // Stop and Delete only for an agent this dashboard launched (3N.2.1).
 const owned = computed(() => agentIsDashboardOwned(props.agent))
 const running = computed(() => owned.value && agentIsRunning(props.agent))
-const observeNote = computed(() => lifecycleNote(props.agent))
+const presentation = computed(() => lifecyclePresentation(props.agent))
+const observeNote = computed(() => presentation.value.note)
 const displayStatus = computed(() => agentDisplayStatus(props.agent))
 const statusBadgeTitle = computed(() => displayStatus.value === 'waiting'
   ? 'No new activity for a bit — the agent process is still alive, not waiting on you'
@@ -476,9 +477,13 @@ const ICON_BUTTON = 'inline-flex size-8 shrink-0 items-center justify-center rou
           v-if="observeNote"
           class="inline-flex h-8 cursor-default items-center gap-1.5 rounded-lg border border-line px-2.5 text-ui-sm text-fg-mute"
           data-testid="agent-card-observe-only"
+          :data-kind="presentation.kind"
           :title="observeNote"
         >
-          <svg viewBox="0 0 16 16" class="size-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z" /><circle cx="8" cy="8" r="1.8" /></svg>Observe only<span class="sr-only">. {{ observeNote }}</span>
+          <svg viewBox="0 0 16 16" class="size-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <g v-if="presentation.kind === 'ended-unmanaged'"><circle cx="8" cy="8" r="6" /><path d="M6.25 6.25h3.5v3.5h-3.5z" /></g>
+            <g v-else><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z" /><circle cx="8" cy="8" r="1.8" /></g>
+          </svg>{{ presentation.badge }}<span class="sr-only">. {{ observeNote }}</span>
         </span>
         <button
           v-if="running"

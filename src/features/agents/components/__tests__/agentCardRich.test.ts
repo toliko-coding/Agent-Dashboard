@@ -204,6 +204,26 @@ describe('rich agent card — actions', () => {
     expect(internal.find('[data-testid="agent-card-edit"]').exists()).toBe(false)
   })
 
+  // 3N.2.3: an ended session the dashboard does not manage is not "observed" — there is no process.
+  it('reads Not managed for a finished unmanaged session, and nothing extra for a finished owned one', async () => {
+    const ended = await render({ status: 'finished' })
+    const badge = ended.get('[data-testid="agent-card-observe-only"]')
+    expect(badge.attributes('data-kind')).toBe('ended-unmanaged')
+    expect(badge.text()).toContain('Not managed')
+    expect(badge.text()).not.toContain('Observe only')
+    expect(badge.attributes('title')).toContain('has ended')
+    expect(ended.find('[data-testid="agent-card-stop"]').exists()).toBe(false)
+    expect(ended.find('[data-testid="agent-card-delete"]').exists()).toBe(false)
+
+    const ownedEnded = await render({ status: 'finished', dashboardOwned: true })
+    expect(ownedEnded.find('[data-testid="agent-card-observe-only"]').exists()).toBe(false)
+    expect(ownedEnded.find('[data-testid="agent-card-delete"]').exists()).toBe(true)
+    expect(ownedEnded.find('[data-testid="agent-card-stop"]').exists()).toBe(false)
+
+    const running = await render({ status: 'active' })
+    expect(running.get('[data-testid="agent-card-observe-only"]').attributes('data-kind')).toBe('observed')
+  })
+
   it('points a pipeline agent at its task instead of offering Stop', async () => {
     const w = await render({ dashboardOwned: true, pipelineTaskId: 'task-1' })
     expect(w.find('[data-testid="agent-card-stop"]').exists()).toBe(false)

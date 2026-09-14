@@ -64,15 +64,44 @@ export function agentIsDashboardOwned(agent: Agent): boolean {
 export const EXTERNAL_SESSION_NOTE = 'External session — stop it from the terminal or application that started it.'
 export const PIPELINE_AGENT_NOTE = 'Managed by its pipeline task — stop or cancel the task instead.'
 
-/**
- * Why an agent offers no Stop or Delete: an external session or a pipeline
- * agent. Null for an owned agent, and for internal processes and remote
- * sessions, which say so elsewhere.
+export const ENDED_UNMANAGED_NOTE = 'This session has ended. It was not started under Agent Dashboard control, and its conversation is kept.'
+
+/*
+ * How an agent's lifecycle reads (3N.2.3), derived only from what the payload
+ * already says — dashboardOwned, the process state and the pipeline link:
+ *
+ *   owned            the dashboard launched it: Stop (while running) and Delete
+ *   observed         running, not launched by the dashboard: Observe only
+ *   ended-unmanaged  finished and not the dashboard's: there is no process to
+ *                    observe any more, only a conversation that can be resumed
+ *   pipeline         managed by its pipeline task
+ *   none             internal processes and remote sessions, described elsewhere
+ *
+ * Presentation only: ownership is still decided on the server, per request.
  */
+export type LifecycleKind = 'owned' | 'observed' | 'ended-unmanaged' | 'pipeline' | 'none'
+
+export interface LifecyclePresentation {
+  kind: LifecycleKind
+  badge: string | null
+  note: string | null
+}
+
+export function lifecyclePresentation(agent: Agent): LifecyclePresentation {
+  if (agent.internalProcess || agent.machine)
+    return { kind: 'none', badge: null, note: null }
+  if (agent.pipelineTaskId)
+    return { kind: 'pipeline', badge: 'Pipeline task', note: PIPELINE_AGENT_NOTE }
+  if (agentIsDashboardOwned(agent))
+    return { kind: 'owned', badge: null, note: null }
+  if (!agentIsRunning(agent))
+    return { kind: 'ended-unmanaged', badge: 'Not managed', note: ENDED_UNMANAGED_NOTE }
+  return { kind: 'observed', badge: 'Observe only', note: EXTERNAL_SESSION_NOTE }
+}
+
+/** Why an agent offers no Stop or Delete; null when it does or says so elsewhere. */
 export function lifecycleNote(agent: Agent): string | null {
-  if (agentIsDashboardOwned(agent) || agent.internalProcess || agent.machine)
-    return null
-  return agent.pipelineTaskId ? PIPELINE_AGENT_NOTE : EXTERNAL_SESSION_NOTE
+  return lifecyclePresentation(agent).note
 }
 
 /** Whether the agent's process is running, as far as the payload says. */
