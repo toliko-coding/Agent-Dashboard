@@ -167,13 +167,17 @@ describe('taskCard — agent chip', () => {
     expect(wrapper.emitted('select')).toBeFalsy()
   })
 
-  it('chip aria-label references the agent projectName', () => {
+  // 3L: the chip names the agent canonically, never by the folder it runs in.
+  it('names the agent with the canonical agent name, not its folder', async () => {
+    const { agentTitle } = await import('@/utils/agentLabels')
     const wrapper = mount(TaskCard, {
       props: { task: baseTask, workingAgent: baseAgent },
       global: { stubs },
     })
-    const chip = wrapper.find('button[data-testid="task-agent-chip"]')
-    expect(chip.attributes('aria-label')).toContain('my-app')
+    const chip = wrapper.get('button[data-testid="task-agent-chip"]')
+    expect(chip.attributes('aria-label')).toBe(`Open agent ${agentTitle(baseAgent)}`)
+    expect(chip.get('[data-testid="task-agent-name"]').text()).toBe(agentTitle(baseAgent))
+    expect(chip.text()).not.toContain('my-app')
   })
 })
 

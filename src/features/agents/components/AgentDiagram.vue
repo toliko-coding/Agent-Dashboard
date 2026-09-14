@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Agent } from '@/types'
 import { computed } from 'vue'
+import { agentTitle } from '@/utils/agentLabels'
 import { useAgentServices } from '../composables/useAgentServices'
 
 /*
@@ -75,6 +76,7 @@ const legend = computed(() => {
 })
 
 const WIDTH = 300
+// The working directory's name, for the node that stands for it — not the agent's name.
 const projectName = computed(() => props.agent.projectName)
 
 /** Evenly spaces the leaves across the width, whatever their count. */
@@ -93,7 +95,7 @@ const positions = computed(() => {
       :viewBox="`0 0 ${WIDTH} ${leaves.length ? 190 : 120}`"
       class="w-full h-auto"
       role="img"
-      :aria-label="`${projectName} agent, working in ${agent.cwd}${leaves.length ? `, connected to ${leaves.map(l => l.label).join(', ')}` : ''}`"
+      :aria-label="`${agentTitle(agent)}, working in ${projectName}${leaves.length ? `, connected to ${leaves.map(l => l.label).join(', ')}` : ''}`"
     >
       <!-- Agent -->
       <g>

@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import type { Agent, PipelineTask } from '../types'
+import type { Agent, PipelineStage, PipelineTask } from '../types'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { workspaceDisplay } from '../utils/agentGroup'
+import { agentTitle } from '../utils/agentLabels'
+import { STAGE_LABELS } from '../utils/stageLabels'
+import { agentDisplayStatus, statusLabel } from '../utils/statusColors'
 import AppModal from './ui/AppModal.vue'
 
 const emit = defineEmits<{
@@ -22,6 +26,30 @@ interface SearchResults {
 }
 
 const results = ref<SearchResults>({ tasks: [], agents: [] })
+
+/*
+ * How a result reads. An agent is named the way every surface names it
+ * (agentTitle), stated by its state word, and placed by repository and
+ * workspace — never by its folder or path. A task keeps its title and its
+ * stage, in words.
+ */
+function agentWhere(agent: Agent): string {
+  const ws = agent.workspace
+  if (!ws?.id)
+    return 'Workspace unknown'
+  const display = workspaceDisplay(ws)
+  if (ws.kind === 'plain')
+    return display.title
+  return `${ws.repository?.name || 'Repository'} · ${display.title}`
+}
+
+function agentState(agent: Agent): string {
+  return statusLabel(agentDisplayStatus({ status: agent.status, working: Boolean(agent.working) }))
+}
+
+function stageLabel(stage: PipelineStage): string {
+  return STAGE_LABELS[stage] ?? stage
+}
 const loading = ref(false)
 let debounceHandle: ReturnType<typeof setTimeout> | null = null
 let abortController: AbortController | null = null
@@ -79,7 +107,12 @@ function activate(result: typeof flatResults.value[number]) {
 function openDialog() {
   previouslyFocusedElement = document.activeElement
   open.value = true
-  void nextTick(() => inputRef.value?.focus())
+  /*
+   * AppModal moves focus to its panel on the tick after it opens, which used
+   * to land after this and leave the field unfocused — typing straight after
+   * ⌘K went nowhere. Focusing once the modal has settled keeps the field first.
+   */
+  void nextTick(() => setTimeout(() => inputRef.value?.focus(), 0))
 }
 
 // Lets the topbar's search affordance open the same dialog as ⌘K, so there is
@@ -147,7 +180,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 <template>
   <AppModal :open="open" :z-index="2000" size="auto" labelled-by="spotlight-search-label" @close="closeDialog">
     <div
-      class="bg-card rounded-xl border border-line shadow-2xl w-full max-w-lg overflow-hidden"
+      class="bg-card rounded-panel border border-line shadow-2xl w-full max-w-lg overflow-hidden"
     >
       <span id="spotlight-search-label" class="sr-only">Quick search</span>
       <!-- Live region for result count -->
@@ -155,7 +188,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         {{ flatResults.length }} results
       </div>
       <div class="flex items-center gap-2 px-4 py-3 border-b border-line focus-within:ring-[3px] focus-within:ring-accent">
-        <span class="text-fg-faint text-sm" aria-hidden="true">⌘K</span>
+        <span class="text-fg-faint text-ui-sm font-mono" aria-hidden="true">⌘K</span>
         <input
           ref="inputRef"
           v-model="query"
@@ -166,9 +199,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           aria-autocomplete="list"
           :aria-activedescendant="selectedIdx >= 0 && flatResults.length > 0 ? `spotlight-opt-${selectedIdx}` : undefined"
           placeholder="Search tasks and agents…"
-          class="flex-1 bg-transparent text-sm text-fg focus-visible:outline-none placeholder:text-fg-faint"
+          class="flex-1 bg-transparent text-ui text-fg focus-visible:outline-none placeholder:text-fg-faint"
         >
-        <span v-if="loading" class="text-xs text-fg-faint">Searching…</span>
+        <span v-if="loading" class="text-ui-sm text-fg-mute">Searching…</span>
       </div>
       <div
         id="spotlight-listbox"
@@ -177,14 +210,14 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         class="max-h-80 overflow-y-auto"
       >
         <template v-if="flatResults.length === 0 && query">
-          <p class="px-4 py-3 text-sm text-fg-faint">
-            No results for "{{ query }}"
+          <p class="px-4 py-3 text-ui text-fg-mute" data-testid="spotlight-empty">
+            No tasks or agents match "{{ query }}".
           </p>
         </template>
         <template v-else>
           <!-- Tasks section -->
           <template v-if="results.tasks.length > 0">
-            <div class="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-fg-faint">
+            <div class="px-3 pt-2 pb-1 text-label font-semibold uppercase tracking-wide text-fg-mute">
               Tasks
             </div>
             <div
@@ -194,23 +227,24 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               role="option"
               tabindex="-1"
               :aria-selected="selectedIdx === idx"
-              class="w-full text-left px-4 py-2 text-sm flex items-center gap-3 transition-colors cursor-pointer"
+              class="w-full text-left px-4 py-2 text-ui flex items-center gap-3 transition-colors cursor-pointer"
+              data-testid="spotlight-task"
               :class="selectedIdx === idx
                 ? 'bg-accent-soft text-accent'
                 : 'text-fg-soft hover:bg-raised'"
               @click="activate({ type: 'task', item: task })"
               @mouseenter="selectedIdx = idx"
             >
-              <span class="text-[10px] uppercase tracking-wide text-fg-faint w-10 flex-shrink-0">Task</span>
+              <span class="text-label uppercase tracking-wide text-fg-mute w-12 flex-shrink-0">Task</span>
               <span class="truncate">{{ task.title }}</span>
-              <span class="ml-auto text-[10px] text-fg-faint">{{ task.currentStage }}</span>
+              <span class="ml-auto shrink-0 text-ui-sm text-fg-mute" data-testid="spotlight-task-stage">{{ stageLabel(task.currentStage) }}</span>
             </div>
           </template>
 
           <!-- Agents section -->
           <template v-if="results.agents.length > 0">
             <div
-              class="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-fg-faint"
+              class="px-3 pt-2 pb-1 text-label font-semibold uppercase tracking-wide text-fg-mute"
               :class="{ 'border-t border-line mt-1': results.tasks.length > 0 }"
             >
               Agents
@@ -222,21 +256,25 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               role="option"
               tabindex="-1"
               :aria-selected="selectedIdx === (results.tasks.length + idx)"
-              class="w-full text-left px-4 py-2 text-sm flex items-center gap-3 transition-colors cursor-pointer"
+              class="w-full text-left px-4 py-2 text-ui flex items-center gap-3 transition-colors cursor-pointer"
+              data-testid="spotlight-agent"
               :class="selectedIdx === (results.tasks.length + idx)
                 ? 'bg-accent-soft text-accent'
                 : 'text-fg-soft hover:bg-raised'"
               @click="activate({ type: 'agent', item: agent })"
               @mouseenter="selectedIdx = results.tasks.length + idx"
             >
-              <span class="text-[10px] uppercase tracking-wide text-fg-faint w-10 flex-shrink-0">Agent</span>
-              <span class="truncate">{{ agent.projectName }}</span>
-              <span class="ml-auto text-[10px] text-fg-faint">{{ agent.status }}</span>
+              <span class="text-label uppercase tracking-wide text-fg-mute w-12 flex-shrink-0">Agent</span>
+              <span class="flex min-w-0 flex-col">
+                <span class="truncate" data-testid="spotlight-agent-name">{{ agentTitle(agent) }}</span>
+                <span class="truncate text-ui-sm text-fg-mute" data-testid="spotlight-agent-where">{{ agentWhere(agent) }}</span>
+              </span>
+              <span class="ml-auto shrink-0 text-ui-sm text-fg-mute" data-testid="spotlight-agent-state">{{ agentState(agent) }}</span>
             </div>
           </template>
         </template>
       </div>
-      <div class="px-4 py-2 border-t border-line flex gap-3 text-[10px] text-fg-faint">
+      <div class="px-4 py-2 border-t border-line flex gap-3 text-label text-fg-mute">
         <span>↑↓ navigate</span>
         <span>↵ open</span>
         <span>Esc close</span>

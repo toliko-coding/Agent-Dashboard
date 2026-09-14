@@ -10,6 +10,7 @@ import { shortId, useCopyId } from '@/composables/useCopyId'
 import { useAgentIdentity } from '@/features/agents'
 import { usePipelineConfig } from '@/features/pipeline/composables/usePipelineConfig'
 import { PluginSlot } from '@/features/plugins'
+import { agentTitle } from '@/utils/agentLabels'
 import { formatCost, formatDuration } from '@/utils/format'
 import { secondsUntil } from '@/utils/retryCountdown'
 import { STAGE_LABELS } from '@/utils/stageLabels'
@@ -117,13 +118,13 @@ const activeChildOutputExpanded = ref(false)
         <span class="font-mono text-[11px] text-info-text font-semibold overflow-hidden text-ellipsis whitespace-nowrap">{{ task.slug }}</span>
         <button
           type="button"
-          class="relative z-10 font-mono text-[10px] px-1 py-px rounded border bg-raised text-fg-mute border-line hover:text-fg-soft hover:border-fg-mute transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent flex-shrink-0"
+          class="relative z-10 font-mono text-label px-1 py-px rounded border bg-raised text-fg-mute border-line hover:text-fg-soft hover:border-fg-mute transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent flex-shrink-0"
           :aria-label="`Copy task id ${task.id}`"
           :title="task.id"
           @click.stop.prevent="copyId()"
         >{{ idCopied ? 'copied' : `#${shortId(task.id)}` }}</button>
       </span>
-      <span class="text-[10px] font-mono text-fg-mute">{{ shortDate(task.createdAt) }}</span>
+      <span class="text-label font-mono text-fg-mute">{{ shortDate(task.createdAt) }}</span>
     </div>
     <div class="text-[13px] font-semibold text-fg leading-tight line-clamp-2">
       {{ task.title }}
@@ -143,7 +144,7 @@ const activeChildOutputExpanded = ref(false)
     <!-- Project chip -->
     <div v-if="project" class="flex items-center gap-1">
       <span
-        class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-px rounded border border-transparent"
+        class="inline-flex items-center gap-1 text-label font-semibold px-1.5 py-px rounded border border-transparent"
         :style="project.color ? { backgroundColor: `${project.color}22`, color: project.color, borderColor: `${project.color}55` } : {}"
         :class="!project.color ? 'bg-raised text-fg-mute border-line' : ''"
         :title="`Project: ${project.name}`"
@@ -156,12 +157,13 @@ const activeChildOutputExpanded = ref(false)
       type="button"
       data-testid="task-agent-chip"
       class="relative z-10 self-start flex items-center gap-1.5 px-1.5 py-px rounded border border-line bg-raised hover:bg-card transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent text-left"
-      :aria-label="`Jump to agent: ${workingAgent.projectName}`"
+      :aria-label="`Open agent ${agentTitle(workingAgent)}`"
       @click.stop="emit('navigateAgent', workingAgent.sessionId)"
     >
       <span class="text-[11px] leading-none" aria-hidden="true">{{ agentIdentity.emoji }}</span>
       <AppBadge :variant="agentBadgeVariant" />
-      <span class="font-mono text-[10px] text-fg-soft truncate max-w-[120px]">{{ workingAgent.projectName }}</span>
+      <!-- The canonical agent name (utils/agentLabels), never the folder it runs in. -->
+      <span class="text-label text-fg-soft truncate max-w-[160px]" data-testid="task-agent-name">{{ agentTitle(workingAgent) }}</span>
     </button>
     <div
       v-if="(task.childCount ?? 0) > 0 && task.activeChild"
@@ -170,10 +172,10 @@ const activeChildOutputExpanded = ref(false)
       @click.stop
     >
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[10px] font-semibold text-fg-mute">
+        <span class="text-label font-semibold text-fg-mute">
           {{ task.activeChildCount ?? 0 }}/{{ task.childCount }} active subtask{{ (task.childCount ?? 0) !== 1 ? 's' : '' }}
         </span>
-        <span class="text-[10px] font-mono text-fg-mute whitespace-nowrap">
+        <span class="text-label font-mono text-fg-mute whitespace-nowrap">
           {{ formatDuration(task.activeChild.durationSeconds) }} · {{ Math.round(task.activeChild.tokensUsed / 1000) }}k tok · {{ formatCost(task.activeChild.costCents / 100) }}
         </span>
       </div>

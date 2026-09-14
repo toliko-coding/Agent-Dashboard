@@ -112,6 +112,15 @@ describe('agentDiagram', () => {
     expect(w.find('[data-testid="diagram-leaf-svc-s2"]').exists()).toBe(false)
   })
 
+  // 3L: named like every other surface, and no absolute path read aloud.
+  it('names the agent canonically and keeps the working directory path out of its label', async () => {
+    const { agentTitle } = await import('@/utils/agentLabels')
+    const w = await mountDiagram({})
+    const label = w.get('svg').attributes('aria-label')!
+    expect(label.startsWith(agentTitle(w.props('agent')))).toBe(true)
+    expect(label).not.toContain('/gh/')
+  })
+
   it('describes itself for assistive tech', async () => {
     const w = await mountDiagram({ liveInjectable: true })
     const label = w.get('svg').attributes('aria-label')
