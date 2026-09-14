@@ -13,9 +13,9 @@ async function load() {
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
 describe('settings sections', () => {
-  it('keeps all nineteen sections, each in a group that exists, with no empty group', () => {
-    expect(SETTINGS_SECTIONS).toHaveLength(19)
-    expect(new Set(SETTINGS_SECTIONS.map(s => s.id)).size).toBe(19)
+  it('keeps all twenty sections, each in a group that exists, with no empty group', () => {
+    expect(SETTINGS_SECTIONS).toHaveLength(20)
+    expect(new Set(SETTINGS_SECTIONS.map(s => s.id)).size).toBe(20)
     for (const section of SETTINGS_SECTIONS)
       expect(SETTINGS_GROUPS).toContain(section.group)
     for (const group of SETTINGS_GROUPS)

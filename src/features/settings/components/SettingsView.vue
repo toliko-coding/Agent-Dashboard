@@ -17,6 +17,7 @@ import { useUser } from '@/composables/useUser'
 import GrantSettings from '@/features/settings/components/GrantSettings.vue'
 import ObsidianSettings from '@/features/settings/components/ObsidianSettings.vue'
 import PipelineConfigSettings from '@/features/settings/components/PipelineConfigSettings.vue'
+import ProjectlessRootSettings from '@/features/settings/components/ProjectlessRootSettings.vue'
 import ProjectSettings from '@/features/settings/components/ProjectSettings.vue'
 import RemoteSettings from '@/features/settings/components/RemoteSettings.vue'
 import SpawnerSettings from '@/features/settings/components/SpawnerSettings.vue'
@@ -774,6 +775,11 @@ const { isImporting, importStatus, start: startImport } = useHistoryImport()
       <!-- Spawners -->
       <section v-else-if="activeSection === 'spawners'">
         <SpawnerSettings />
+      </section>
+
+      <!-- Agent folders -->
+      <section v-else-if="activeSection === 'agentFolders'">
+        <ProjectlessRootSettings />
       </section>
 
       <!-- Pipeline Configuration -->

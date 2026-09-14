@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { FolderCheck } from '../composables/useAgentFolders'
+import type { ProjectlessWorkspace } from '../composables/useAgentLifecycle'
 import type { Project } from '../types'
 import type { AgentPurpose } from '../utils/agentPurpose'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { allowWorkingFolder, checkFolder, listWorkingFolders } from '../composables/useAgentFolders'
+import { createProjectlessWorkspace, previewProjectlessWorkspace } from '../composables/useAgentLifecycle'
 import { fetchProjectFolders } from '../composables/useProjectFolders'
 import { useProjects } from '../composables/useProjects'
 import { useSpawnDialog } from '../composables/useSpawnDialog'
@@ -30,7 +32,9 @@ import AppSelect from './ui/AppSelect.vue'
  *
  *   Name, Icon      optional — who the agent is, shown instead of its session
  *                   title; presentation only, saved by session id (3N.1)
- *   Working folder  required — where Claude executes
+ *   Workspace       an existing folder, or a new projectless workspace the
+ *                   dashboard creates under Settings → Agent folders (3N.2)
+ *   Working folder  required for an existing folder — where Claude executes
  *   Project         optional — Dashboard organisation only (None is valid)
  *   Spawner, Prompt, System prompt, Permissions — unchanged
  *
@@ -73,6 +77,44 @@ const NAME_MAX = 60
 const displayName = ref('')
 const category = ref<AgentPurpose>(DEFAULT_AGENT_PURPOSE)
 const nameTooLong = computed(() => [...displayName.value.trim()].length > NAME_MAX)
+/*
+ * Where it runs (3N.2): an existing folder, or a new plain folder created under
+ * the projectless agents folder and named after the agent. A new workspace has
+ * no Project, repository or GitHub step; the server allows exactly that folder
+ * and Claude Code still asks whether to trust it.
+ */
+type WorkspaceMode = 'existing' | 'new'
+const workspaceMode = ref<WorkspaceMode>('existing')
+const newWorkspace = ref<ProjectlessWorkspace | null>(null)
+const newWorkspaceError = ref('')
+let previewTimer: ReturnType<typeof setTimeout> | null = null
+let previewAbort: AbortController | null = null
+watch([workspaceMode, displayName], ([mode, name]) => {
+  if (previewTimer)
+    clearTimeout(previewTimer)
+  previewAbort?.abort()
+  newWorkspace.value = null
+  newWorkspaceError.value = ''
+  if (mode !== 'new' || !name.trim())
+    return
+  previewTimer = setTimeout(async () => {
+    previewAbort = new AbortController()
+    try {
+      newWorkspace.value = await previewProjectlessWorkspace(name.trim(), previewAbort.signal)
+    }
+    catch (e) {
+      if (!(e instanceof DOMException && e.name === 'AbortError'))
+        newWorkspaceError.value = errorMessage(e, 'Could not name the workspace folder')
+    }
+  }, 300)
+})
+// A projectless workspace belongs to no Project.
+watch(workspaceMode, (mode) => {
+  if (mode === 'new')
+    projectChoice.value = ''
+})
+const newWorkspaceReady = computed(() => !!displayName.value.trim() && !!newWorkspace.value && !newWorkspace.value.exists)
+
 const purposeOptions = AGENT_PURPOSES.map(p => ({ value: p.value, label: p.value === DEFAULT_AGENT_PURPOSE ? `${p.label} (default)` : p.label }))
 type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'auto' | 'bypassPermissions' | 'dontAsk'
 const permissionMode = ref<PermissionMode>('default')
@@ -266,15 +308,17 @@ const canStart = computed(() =>
   !isSpawning.value
   && spawnedPid.value === null
   && prompt.value.trim() !== ''
-  && dlg.cwd.value.trim() !== ''
-  && check.value?.allowed === true
-  && !nameTooLong.value)
+  && !nameTooLong.value
+  && (workspaceMode.value === 'new'
+    ? newWorkspaceReady.value
+    : dlg.cwd.value.trim() !== '' && check.value?.allowed === true))
 
 function resetForm() {
   prompt.value = ''
   systemPrompt.value = ''
   displayName.value = ''
   category.value = DEFAULT_AGENT_PURPOSE
+  workspaceMode.value = 'existing'
   permissionMode.value = 'default'
   bypassConfirmed.value = false
   isSpawning.value = false
@@ -303,6 +347,18 @@ async function handleSpawn() {
   isSpawning.value = true
   errorMsg.value = ''
 
+  if (workspaceMode.value === 'new') {
+    try {
+      const ws = await createProjectlessWorkspace(displayName.value.trim())
+      dlg.cwd.value = ws.path
+    }
+    catch (err: unknown) {
+      errorMsg.value = errorMessage(err, 'Could not create the workspace folder')
+      isSpawning.value = false
+      return
+    }
+  }
+
   const cwd = dlg.cwd.value.trim()
   const body: Record<string, unknown> = {
     prompt: prompt.value.trim(),
@@ -320,7 +376,7 @@ async function handleSpawn() {
   if (dlg.spawnerId.value)
     body.spawnerId = dlg.spawnerId.value
   // Organisational only: omitted entirely for Project = None.
-  if (dlg.project.value?.id)
+  if (workspaceMode.value === 'existing' && dlg.project.value?.id)
     body.projectId = dlg.project.value.id
 
   try {
@@ -392,6 +448,9 @@ onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
   checkAbort?.abort()
+  previewAbort?.abort()
+  if (previewTimer)
+    clearTimeout(previewTimer)
   if (checkTimer)
     clearTimeout(checkTimer)
   if (autoCloseTimer)
@@ -461,8 +520,66 @@ onUnmounted(() => {
         </p>
       </section>
 
+      <!-- Where it runs: a folder you have, or a new plain workspace named after the agent (3N.2). -->
+      <fieldset class="m-0 flex min-w-0 flex-col gap-1.5 border-0 p-0" data-testid="spawn-workspace-mode">
+        <legend class="field-label mb-1.5">
+          Workspace
+        </legend>
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <label
+            class="flex cursor-pointer flex-col gap-0.5 rounded-lg border px-3 py-2 transition-colors duration-[var(--duration-fast)] ease-standard focus-within:ring-[3px] focus-within:ring-accent"
+            :class="workspaceMode === 'existing' ? 'border-accent bg-accent-soft' : 'border-line hover:border-line-strong'"
+          >
+            <span class="flex items-center gap-2">
+              <input v-model="workspaceMode" type="radio" name="spawn-workspace-mode" value="existing" class="accent-[var(--accent)]" data-testid="spawn-mode-existing">
+              <span class="text-ui font-medium text-fg">Existing folder</span>
+            </span>
+            <span class="text-ui-sm text-fg-mute">A repository, worktree or folder you already have</span>
+          </label>
+          <label
+            class="flex cursor-pointer flex-col gap-0.5 rounded-lg border px-3 py-2 transition-colors duration-[var(--duration-fast)] ease-standard focus-within:ring-[3px] focus-within:ring-accent"
+            :class="workspaceMode === 'new' ? 'border-accent bg-accent-soft' : 'border-line hover:border-line-strong'"
+          >
+            <span class="flex items-center gap-2">
+              <input v-model="workspaceMode" type="radio" name="spawn-workspace-mode" value="new" class="accent-[var(--accent)]" data-testid="spawn-mode-new">
+              <span class="text-ui font-medium text-fg">New projectless workspace</span>
+            </span>
+            <span class="text-ui-sm text-fg-mute">A new plain folder named after the agent — no Git or Project needed</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <section v-if="workspaceMode === 'new'" class="flex flex-col gap-1.5 rounded-lg border border-line bg-raised/40 px-3 py-2.5" aria-live="polite" data-testid="spawn-new-workspace">
+        <p v-if="!displayName.trim()" class="m-0 text-ui-sm text-fg-mute" data-testid="spawn-new-workspace-needs-name">
+          Give the agent a name above: its workspace folder is named after it.
+        </p>
+        <p v-else-if="newWorkspaceError" class="m-0 text-ui-sm text-danger-text" role="alert" data-testid="spawn-new-workspace-error">
+          {{ newWorkspaceError }}
+        </p>
+        <template v-else-if="newWorkspace">
+          <p class="m-0 text-ui-sm text-fg-soft">
+            Workspace folder <span class="font-mono text-fg" data-testid="spawn-new-workspace-folder">{{ newWorkspace.folder }}</span>
+          </p>
+          <p class="m-0 break-all font-mono text-label text-fg-faint" data-testid="spawn-new-workspace-path">
+            {{ newWorkspace.path }}
+          </p>
+          <p v-if="newWorkspace.exists" class="m-0 text-ui-sm text-danger-text" role="alert" data-testid="spawn-new-workspace-exists">
+            A folder with this name already exists. Choose another agent name — an existing folder is never reused.
+          </p>
+          <p v-else class="m-0 text-ui-sm text-fg-mute">
+            Created when you start the agent: a plain folder, with no Git repository, GitHub or Project. Claude Code will still ask whether to trust it.
+          </p>
+        </template>
+        <p v-else class="m-0 text-ui-sm text-fg-mute">
+          Naming the workspace folder…
+        </p>
+        <p class="m-0 text-label text-fg-faint">
+          Change where these folders go in Settings → Agent folders.
+        </p>
+      </section>
+
       <!-- Working folder: required, and the one input that decides where Claude runs. -->
-      <section class="flex flex-col gap-1.5" data-testid="spawn-folder-section">
+      <section v-if="workspaceMode === 'existing'" class="flex flex-col gap-1.5" data-testid="spawn-folder-section">
         <AppFieldLabel for="spawn-folder-input">
           Working folder
         </AppFieldLabel>
@@ -527,8 +644,8 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <!-- Project: optional organisation. None is a real choice, not a gap. -->
-      <section class="flex flex-col gap-1.5">
+      <!-- Project: optional organisation. None is a real choice, not a gap. A new projectless workspace has none. -->
+      <section v-if="workspaceMode === 'existing'" class="flex flex-col gap-1.5">
         <AppFieldLabel for="spawn-project">
           Project (optional)
         </AppFieldLabel>
@@ -545,7 +662,7 @@ onUnmounted(() => {
       </section>
 
       <QuickCreateProjectPanel
-        v-if="showQuickCreate"
+        v-if="showQuickCreate && workspaceMode === 'existing'"
         :spawners="spawners"
         @created="onProjectCreated"
         @cancel="onQuickCreateCancel"

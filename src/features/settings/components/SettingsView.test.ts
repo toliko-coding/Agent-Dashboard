@@ -21,6 +21,7 @@ const NAV_LABELS = [
   'Spawners',
   'Providers',
   'System Prompts',
+  'Agent folders',
   'Permissions',
   'Grants',
   'API Keys',

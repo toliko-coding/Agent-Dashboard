@@ -591,3 +591,98 @@ describe('spawnDialog — agent name and icon (3N.1)', () => {
     wrapper.unmount()
   })
 })
+
+describe('spawnDialog — new projectless workspace (3N.2)', () => {
+  let created: string[]
+  let existing: Set<string>
+  let createStatus: number
+  const ROOT = '/Users/me/Documents/AI-Agents'
+
+  beforeEach(() => {
+    created = []
+    existing = new Set()
+    createStatus = 201
+    const base = globalThis.fetch as unknown as (url: string, init?: RequestInit) => Promise<unknown>
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
+      const folderOf = () => (JSON.parse(String(init?.body ?? '{}')) as { name: string }).name.replace(/[^A-Z0-9]+/gi, '-')
+      if (url === '/api/agents/projectless/preview') {
+        const folder = folderOf()
+        return Promise.resolve({ ok: true, json: async () => ({ root: ROOT, folder, path: `${ROOT}/${folder}`, exists: existing.has(folder) }) })
+      }
+      if (url === '/api/agents/projectless/workspaces') {
+        const folder = folderOf()
+        if (createStatus !== 201)
+          return Promise.resolve({ ok: false, status: createStatus, json: async () => ({ error: 'a folder with that name already exists in the projectless agents folder; choose another name' }) })
+        created.push(folder)
+        return Promise.resolve({ ok: true, status: 201, json: async () => ({ root: ROOT, folder, path: `${ROOT}/${folder}`, exists: false }) })
+      }
+      return base(url, init)
+    }))
+  })
+
+  async function openNewWorkspace(name: string) {
+    const wrapper = mount(SpawnDialog, { props: { open: true }, attachTo: document.body })
+    await flushPromises()
+    ;(document.querySelector('[data-testid="spawn-mode-new"]') as HTMLInputElement).click()
+    await flushPromises()
+    if (name)
+      setInputValue(document.querySelector('[data-testid="spawn-name-wrap"]') as HTMLInputElement, name)
+    setInputValue(document.querySelector('[data-testid="spawn-prompt-wrap"]') as HTMLTextAreaElement, 'tidy my CV')
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 350))
+    await flushPromises()
+    return wrapper
+  }
+  const calls = () => (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls
+
+  it('hides the folder and Project fields, and needs a name to name the folder', async () => {
+    const wrapper = await openNewWorkspace('')
+    expect(document.querySelector('[data-testid="spawn-folder-section"]')).toBeNull()
+    expect(document.querySelector('#spawn-project')).toBeNull()
+    expect(document.querySelector('[data-testid="spawn-new-workspace-needs-name"]')).not.toBeNull()
+    expect((document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement).disabled).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('21–25: creates <root>/<folder> and starts the agent there — Project None, no Git, GitHub or repository step, trust left to the user', async () => {
+    const wrapper = await openNewWorkspace('Resume Editor')
+    expect(document.querySelector('[data-testid="spawn-new-workspace-folder"]')!.textContent).toBe('Resume-Editor')
+    expect(document.querySelector('[data-testid="spawn-new-workspace-path"]')!.textContent!.trim()).toBe(`${ROOT}/Resume-Editor`)
+    const start = document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement
+    expect(start.disabled).toBe(false)
+    start.click()
+    await flushPromises()
+
+    expect(created).toEqual(['Resume-Editor'])
+    const spawn = calls().find(c => c[0] === '/api/agents/spawn')!
+    const body = JSON.parse(spawn[1].body as string)
+    expect(body.cwd).toBe(`${ROOT}/Resume-Editor`)
+    expect(body.displayName).toBe('Resume Editor')
+    expect(body).not.toHaveProperty('projectId')
+    const urls = calls().map(c => String(c[0]))
+    expect(urls.some(u => u.includes('github') || u.includes('/api/repositories'))).toBe(false)
+    expect(calls().some(c => c[0] === '/api/projects' && c[1]?.method === 'POST')).toBe(false)
+    expect(urls.some(u => u.includes('/folder-trust'))).toBe(false)
+    // The workspace was created before the spawn, never after.
+    expect(urls.indexOf('/api/agents/projectless/workspaces')).toBeLessThan(urls.indexOf('/api/agents/spawn'))
+    wrapper.unmount()
+  })
+
+  it('20: never reuses an existing folder', async () => {
+    existing.add('Portfolio')
+    const wrapper = await openNewWorkspace('Portfolio')
+    expect(document.querySelector('[data-testid="spawn-new-workspace-exists"]')).not.toBeNull()
+    expect((document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement).disabled).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('shows why the folder could not be created, and does not start the agent', async () => {
+    createStatus = 409
+    const wrapper = await openNewWorkspace('Research')
+    ;(document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement).click()
+    await flushPromises()
+    expect(document.querySelector('[data-testid="spawn-error"]')!.textContent).toContain('already exists')
+    expect(calls().some(c => c[0] === '/api/agents/spawn')).toBe(false)
+    wrapper.unmount()
+  })
+})

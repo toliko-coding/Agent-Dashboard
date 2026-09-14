@@ -8,7 +8,7 @@
  */
 export type SettingsSection
   = | 'appearance' | 'notifications'
-    | 'spawners' | 'providers' | 'systemPrompts'
+    | 'spawners' | 'providers' | 'systemPrompts' | 'agentFolders'
     | 'permissionPresets' | 'grants' | 'apiKeys' | 'remotes'
     | 'pipelineConfig' | 'tracker'
     | 'projects'
@@ -36,6 +36,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   { id: 'spawners', icon: '⚙', label: 'Spawners', group: 'Agents' },
   { id: 'providers', icon: '🧩', label: 'Providers', group: 'Agents' },
   { id: 'systemPrompts', icon: '✦', label: 'System Prompts', group: 'Agents' },
+  // Where New Agent creates projectless workspaces (3N.2).
+  { id: 'agentFolders', icon: '▣', label: 'Agent folders', group: 'Agents' },
 
   { id: 'permissionPresets', icon: '⚿', label: 'Permissions', group: 'Access' },
   { id: 'grants', icon: '🛡', label: 'Grants', group: 'Access' },
