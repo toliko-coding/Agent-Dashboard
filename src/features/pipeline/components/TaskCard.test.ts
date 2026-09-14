@@ -1,13 +1,7 @@
 import type { Agent, PipelineTask } from '@/types'
 import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import TaskCard from '@/features/pipeline/components/TaskCard.vue'
-
-vi.mock('@/composables/useAgentIdentity', () => ({
-  useAgentIdentity: () => ({
-    getIdentity: () => ({ emoji: '🤖' }),
-  }),
-}))
 
 const baseTask: PipelineTask = {
   id: 'task-1',

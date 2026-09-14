@@ -2,12 +2,12 @@
 import type { Agent, PipelineStage, PipelineTask, Project, Spawner } from '@/types'
 import { useIntervalFn } from '@vueuse/core'
 import { computed, ref } from 'vue'
+import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppChip from '@/components/ui/AppChip.vue'
 import WorktreePill from '@/components/WorktreePill.vue'
 import { shortId, useCopyId } from '@/composables/useCopyId'
-import { useAgentIdentity } from '@/features/agents'
 import { usePipelineConfig } from '@/features/pipeline/composables/usePipelineConfig'
 import { PluginSlot } from '@/features/plugins'
 import { agentTitle } from '@/utils/agentLabels'
@@ -36,12 +36,6 @@ const emit = defineEmits<{
   moveUp: [task: PipelineTask]
   moveDown: [task: PipelineTask]
 }>()
-
-const { getIdentity } = useAgentIdentity()
-
-const agentIdentity = computed(() =>
-  props.workingAgent ? getIdentity(props.workingAgent.projectPath) : null,
-)
 
 // agentDisplayStatus, not agent.status: status is a 30s time bucket, so a
 // working agent arrives as 'active' and was shown as a resting green "Active".
@@ -153,14 +147,14 @@ const activeChildOutputExpanded = ref(false)
       </span>
     </div>
     <button
-      v-if="workingAgent && agentIdentity"
+      v-if="workingAgent"
       type="button"
       data-testid="task-agent-chip"
       class="relative z-10 self-start flex items-center gap-1.5 px-1.5 py-px rounded border border-line bg-raised hover:bg-card transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent text-left"
       :aria-label="`Open agent ${agentTitle(workingAgent)}`"
       @click.stop="emit('navigateAgent', workingAgent.sessionId)"
     >
-      <span class="text-[11px] leading-none" aria-hidden="true">{{ agentIdentity.emoji }}</span>
+      <AgentGlyph :agent="workingAgent" size="sm" />
       <AppBadge :variant="agentBadgeVariant" />
       <!-- The canonical agent name (utils/agentLabels), never the folder it runs in. -->
       <span class="text-label text-fg-soft truncate max-w-[160px]" data-testid="task-agent-name">{{ agentTitle(workingAgent) }}</span>

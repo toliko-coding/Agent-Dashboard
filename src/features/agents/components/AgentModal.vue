@@ -7,11 +7,11 @@ import MachineBadge from '@/components/MachineBadge.vue'
 import PromptInput from '@/components/PromptInput.vue'
 import TaskList from '@/components/TaskList.vue'
 import ToolTimeline from '@/components/ToolTimeline.vue'
+import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { toast } from '@/composables/useToast'
-import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
 import { useMetricsDisclosure } from '@/features/agents/composables/useMetricsDisclosure'
 import { PluginSlot } from '@/features/plugins'
 import { agentTitle } from '@/utils/agentLabels'
@@ -89,7 +89,6 @@ watch(() => props.agent?.sessionId, () => {
   openSubagent.value = null
 })
 
-const { getIdentity } = useAgentIdentity()
 const { resolveAgent } = usePermissionResolve()
 
 const totalTokens = computed(() => props.agent ? totalTokenCount(props.agent.tokenUsage) : 0)
@@ -153,7 +152,7 @@ watch(() => props.agent?.sessionId, (sessionId) => {
       <header class="bg-raised px-4 py-2.5 flex flex-col gap-2 flex-shrink-0 border-b border-line">
         <div class="flex items-center gap-2.5 min-w-0">
           <AppBadge :variant="agentDisplayStatus(agent)" />
-          <span aria-hidden="true">{{ getIdentity(agent.projectPath).emoji }}</span>
+          <AgentGlyph :agent="agent" size="sm" />
           <!-- The same name the cards, Needs you and Command use; the working folder is a diagnostic in the column below. -->
           <span :id="`agent-modal-title-${agent.pid}`" class="font-semibold text-sm text-fg truncate" data-testid="agent-modal-title">{{ agentTitle(agent) }}</span>
           <MachineBadge v-if="agent.machine" :machine="agent.machine" />

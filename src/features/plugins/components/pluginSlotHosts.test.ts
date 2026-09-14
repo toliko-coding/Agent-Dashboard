@@ -16,9 +16,6 @@ beforeEach(() => {
   }
   vi.stubGlobal('EventSource', FakeEventSource)
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: vi.fn(), removeItem: vi.fn() })
-  // useAgentIdentity persists via requestIdleCallback; a noop avoids a post-teardown
-  // setTimeout that would touch localStorage after globals are unstubbed.
-  vi.stubGlobal('requestIdleCallback', () => 0)
 })
 afterEach(() => vi.unstubAllGlobals())
 

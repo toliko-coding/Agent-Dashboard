@@ -7,13 +7,13 @@ import type { AnswerIntent } from '@/utils/answerKeys'
 import { computed, nextTick, ref, watch } from 'vue'
 import ConfirmCard from '@/components/ConfirmCard.vue'
 import QuestionCard from '@/components/QuestionCard.vue'
+import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import { useCapabilityDecisions } from '@/composables/useCapabilityDecisions'
 import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { openFolderTrust } from '@/composables/useSpawnWatch'
 import { toast } from '@/composables/useToast'
-import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
 import { agentTitle } from '@/utils/agentLabels'
 import { attentionFor } from '@/utils/attention'
 import { formatErrorState, formatRelativeActivity, secondsSince, shortModel } from '@/utils/format'
@@ -39,7 +39,6 @@ const emit = defineEmits<{
   deny: [taskId: string, ids: string[]]
 }>()
 
-const { getIdentity } = useAgentIdentity()
 const { nowMs } = useNow()
 const { resolveAgent } = usePermissionResolve()
 const { resolvingIds: resolvingCapabilityIds, resolve: resolveCapability } = useCapabilityDecisions()
@@ -978,7 +977,7 @@ watch(() => props.focusedSessionId, (id) => {
             ]"
           >
             <div class="flex items-center gap-2 min-w-0">
-              <span aria-hidden="true" class="text-[15px] shrink-0">{{ getIdentity(agent.projectPath).emoji }}</span>
+              <AgentGlyph :agent="agent" size="sm" />
               <span class="font-semibold text-[13px] text-fg truncate">{{ agentTitle(agent) }}</span>
               <span class="font-mono text-[11px] text-fg-faint shrink-0">{{ shortModel(agent.model ?? null) }}</span>
               <span

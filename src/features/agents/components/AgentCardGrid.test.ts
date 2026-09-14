@@ -4,12 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import AgentCardGrid from './AgentCardGrid.vue'
 
-vi.mock('@/features/agents/composables/useAgentIdentity', () => ({
-  useAgentIdentity: () => ({
-    getIdentity: () => ({ emoji: '🤖' }),
-  }),
-}))
-
 const stubs = {
   MachineBadge: true,
   ProviderBadge: true,

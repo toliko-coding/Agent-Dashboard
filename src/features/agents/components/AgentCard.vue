@@ -5,6 +5,7 @@ import { computed, defineAsyncComponent, ref } from 'vue'
 import MachineBadge from '@/components/MachineBadge.vue'
 import PromptInput from '@/components/PromptInput.vue'
 import ProviderBadge from '@/components/ProviderBadge.vue'
+import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import AppModal from '@/components/ui/AppModal.vue'
@@ -13,7 +14,6 @@ import { useNow } from '@/composables/useNow'
 import { toast } from '@/composables/useToast'
 import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vue'
 import MetricsPopover from '@/features/agents/components/MetricsPopover.vue'
-import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
 import { useMetricsDisclosure } from '@/features/agents/composables/useMetricsDisclosure'
 import { agentActivity, agentTitle } from '@/utils/agentLabels'
 import { formatCost, formatRelativeActivity, isAwaitingInput, secondsSince, shortModel } from '@/utils/format'
@@ -64,7 +64,6 @@ async function dismiss() {
   emit('dismiss', pid)
 }
 
-const { getIdentity } = useAgentIdentity()
 const { nowMs } = useNow()
 
 const title = computed(() => agentTitle(props.agent))
@@ -167,7 +166,7 @@ const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
             class="shrink-0 rounded-control bg-neutral-soft px-1 py-px text-label font-medium text-neutral-text whitespace-nowrap"
             title="The agent finished its turn — it will not do anything else until you send it something"
           >your turn</span>
-          <span class="shrink-0" aria-hidden="true">{{ getIdentity(agent.projectPath).emoji }}</span>
+          <AgentGlyph :agent="agent" size="sm" />
           <span class="min-w-0 truncate text-ui font-semibold text-fg" data-testid="agent-card-title" :title="title">{{ title }}</span>
         </button>
         <ProviderBadge :provider="agent.provider" />

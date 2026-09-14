@@ -5,10 +5,6 @@ import { nextTick } from 'vue'
 
 import AgentModal from './AgentModal.vue'
 
-vi.mock('@/features/agents/composables/useAgentIdentity', () => ({
-  useAgentIdentity: () => ({ getIdentity: () => ({ emoji: '🤖' }) }),
-}))
-
 const baseAgent: Agent = {
   pid: 1234,
   sessionId: 'sess-1',

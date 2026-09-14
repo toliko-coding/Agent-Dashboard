@@ -1,14 +1,8 @@
 import type { Agent } from '@/types'
 import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import AgentRow from './AgentRow.vue'
-
-vi.mock('@/features/agents/composables/useAgentIdentity', () => ({
-  useAgentIdentity: () => ({
-    getIdentity: () => ({ emoji: '🤖' }),
-  }),
-}))
 
 const baseAgent: Agent = {
   pid: 1234,

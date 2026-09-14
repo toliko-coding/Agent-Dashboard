@@ -5,12 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from '@/utils/testA11y'
 import AgentCard from './AgentCard.vue'
 
-vi.mock('@/features/agents/composables/useAgentIdentity', () => ({
-  useAgentIdentity: () => ({
-    getIdentity: () => ({ emoji: '🤖' }),
-  }),
-}))
-
 const baseAgent: Agent = {
   pid: 918273,
   sessionId: '3f2a1b9c-0000-4000-8000-000000000000',

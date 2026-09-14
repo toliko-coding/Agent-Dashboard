@@ -2,13 +2,13 @@
 import type { AttentionItem } from '@/features/attention'
 import type { Agent } from '@/types'
 import { computed, ref } from 'vue'
+import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
 import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { toast } from '@/composables/useToast'
-import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
 import { agentActivity, agentTitle } from '@/utils/agentLabels'
 import { attentionFor } from '@/utils/attention'
 import { formatBurnRate, formatCost, formatRelativeActivity, isAwaitingInput, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
@@ -34,7 +34,6 @@ const emit = defineEmits<{
   select: [agent: Agent]
 }>()
 
-const { getIdentity } = useAgentIdentity()
 const { nowMs } = useNow()
 const { resolving, resolveAgent } = usePermissionResolve()
 
@@ -99,7 +98,7 @@ async function handleResolve(outcome: 'granted' | 'denied') {
           :title="attention?.reason"
         >{{ attentionChip.word }}</span>
 
-        <span aria-hidden="true" class="text-ui shrink-0">{{ getIdentity(agent.projectPath).emoji }}</span>
+        <AgentGlyph :agent="agent" size="sm" />
         <span class="w-[168px] shrink-0 truncate text-ui font-semibold text-fg" data-testid="agent-row-name">{{ agentName }}</span>
 
         <!-- Where: repository and workspace, by identity. Never a folder path. -->
