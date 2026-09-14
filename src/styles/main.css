@@ -731,3 +731,9 @@ html, body {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+
+/* The agent workspace's context rail scrolls, so it takes keyboard focus (3N.2.3). */
+aside[tabindex="0"]:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: -3px;
+}

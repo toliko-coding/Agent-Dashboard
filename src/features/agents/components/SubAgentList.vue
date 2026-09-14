@@ -29,9 +29,9 @@ function toggleDisclosure() {
 
 <template>
   <div v-if="subagents.length > 0">
-    <h4 class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-2">
+    <h3 class="text-[10px] font-semibold uppercase tracking-wider text-fg-mute mb-2">
       Subagents ({{ activeSubagents.length }} active of {{ subagents.length }})
-    </h4>
+    </h3>
     <div class="max-h-[120px] overflow-y-auto overflow-x-hidden pr-1" data-testid="subagent-scroll">
       <SubAgentListItem
         v-for="sa in activeSubagents"

@@ -102,3 +102,12 @@ describe('renderMarkdown — keyboard access (3N.2.1)', () => {
     expect(html).toContain('tabindex="0"')
   })
 })
+
+describe('renderMarkdown — table headers (3N.2.3)', () => {
+  it('emits an empty header cell as an ordinary cell, and keeps named headers', () => {
+    const html = renderMarkdown('|   | Status |\n|---|:---:|\n| a | ok |')
+    expect(html).not.toMatch(/<th[^>]*>\s*<\/th>/)
+    expect(html).toMatch(/<th[^>]*>Status<\/th>/)
+    expect(html).toContain('<td')
+  })
+})

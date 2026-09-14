@@ -26,6 +26,11 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
     node.setAttribute('tabindex', '0')
 })
 
+// A table header cell with no text is announced as an empty header (axe
+// empty-table-header); markdown tables often leave the corner cell blank, so an
+// empty <th> is emitted as an ordinary cell instead.
+const EMPTY_TH = /<th(\s[^>]*)?>\s*<\/th>/g
+
 export function renderMarkdown(text: string): string {
-  return DOMPurify.sanitize(md.parse(text, { async: false }) as string)
+  return DOMPurify.sanitize(md.parse(text, { async: false }) as string).replace(EMPTY_TH, '<td$1></td>')
 }

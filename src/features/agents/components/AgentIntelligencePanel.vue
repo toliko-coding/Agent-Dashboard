@@ -46,6 +46,7 @@ const recentTools = computed(() => props.agent.lastTools.slice(-4).reverse())
 
 <template>
   <aside
+    tabindex="0"
     class="flex flex-col gap-4 overflow-y-auto p-4 border-l border-line bg-app/60 min-w-0"
     aria-label="Agent intelligence"
     data-testid="agent-intelligence"
