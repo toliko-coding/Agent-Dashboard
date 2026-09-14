@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/lx-wnk/agent-dashboard/sdk"
 	"github.com/lx-wnk/agent-dashboard/server/internal/auth"
 	"github.com/lx-wnk/agent-dashboard/server/internal/channelconfig"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent"
@@ -64,6 +65,9 @@ type SpawnStatus struct {
 	Prompt    string `json:"prompt"`
 	Cwd       string `json:"cwd"`
 	SpawnerID string `json:"spawnerId,omitempty"`
+	// AwaitingFolderTrust is Claude Code's workspace trust question, when it is
+	// open on this spawn's terminal right now. Filled on read, never stored.
+	AwaitingFolderTrust *sdk.DetectedFolderTrust `json:"awaitingFolderTrust,omitempty"`
 }
 
 // SpawnManager rate-limits and tracks user-initiated Claude agent spawns.
@@ -76,6 +80,10 @@ type SpawnManager struct {
 	spawnerRepo       repo.SpawnerRepo
 	spawnPolicy       services.SpawnPolicy
 	projectFolderRepo repo.ProjectFolderRepo // may be nil
+	// screenProbe reads whichever interactive screen is open on a spawned
+	// session's terminal (merger.RealScreenProbe in production); nil disables
+	// folder-trust detection.
+	screenProbe func(pid int) *sdk.PendingScreen
 
 	spawnLimiter  *slidingWindowLimiter
 	injectLimiter *slidingWindowLimiter
@@ -127,6 +135,19 @@ func NewSpawnManager(maxSpawns int, windowMs int, injectMax int, injectWindowMs 
 // before any spawns; safe to call with nil (disables --add-dir injection).
 func (m *SpawnManager) SetProjectFolderRepo(r repo.ProjectFolderRepo) {
 	m.projectFolderRepo = r
+}
+
+// SetScreenProbe installs the probe used to see Claude Code's folder trust
+// question on a spawned session's terminal. Safe to leave unset.
+func (m *SpawnManager) SetScreenProbe(fn func(pid int) *sdk.PendingScreen) {
+	m.screenProbe = fn
+}
+
+func (m *SpawnManager) probeScreen(pid int) *sdk.PendingScreen {
+	if m.screenProbe == nil {
+		return nil
+	}
+	return m.screenProbe(pid)
 }
 
 // IsSpawnAllowed reports whether a new spawn is allowed for the given user (sub).
@@ -327,10 +348,14 @@ func (m *SpawnManager) buildSpawnArgs(req *spawnRequest, spawnerRow *ent.Spawner
 		folders, lerr := m.projectFolderRepo.ListByProject(context.Background(), req.projectID)
 		if lerr != nil {
 			slog.Warn("spawn: ListByProject failed; skipping --add-dir injection", "projectId", req.projectID, "err", lerr)
-		} else {
+		} else if services.CwdWithinFolders(folders, req.cwd) {
 			for _, dir := range services.AdditionalDirsForProject(folders, req.cwd) {
 				canonicalArgs = append(canonicalArgs, "--add-dir", dir)
 			}
+		} else {
+			// The Project is only an association here: the agent works outside its
+			// folders, so they are not added to its reach.
+			slog.Info("spawn: cwd outside the named project's folders; no --add-dir injected", "projectId", req.projectID)
 		}
 	}
 
@@ -825,6 +850,8 @@ type SpawnHandler struct {
 	manager   *SpawnManager
 	auditRepo repo.AuditEventRepo // may be nil
 	dismisser AgentDismisser      // may be nil
+	// workingFolders enables the working-folder routes; nil leaves them answering 404.
+	workingFolders services.WorkingFolderSettings
 }
 
 // NewSpawnHandler creates a SpawnHandler backed by the given manager.
@@ -843,13 +870,18 @@ func (h *SpawnHandler) SetAgentDismisser(d AgentDismisser) {
 	h.dismisser = d
 }
 
+// requestSub is the authenticated user id, or "__global__" without auth.
+func requestSub(r *http.Request) string {
+	if payload, ok := auth.PayloadFromContext(r.Context()); ok && payload.Sub != "" {
+		return payload.Sub
+	}
+	return "__global__"
+}
+
 // Spawn handles POST /api/agents/spawn.
 func (h *SpawnHandler) Spawn(w http.ResponseWriter, r *http.Request) {
 	// Extract user identity for per-user rate limiting.
-	sub := "__global__"
-	if payload, ok := auth.PayloadFromContext(r.Context()); ok && payload.Sub != "" {
-		sub = payload.Sub
-	}
+	sub := requestSub(r)
 
 	if !h.manager.IsSpawnAllowed(sub) {
 		http.Error(w, fmt.Sprintf(`{"error":"Too many spawn requests. Max %d per %ds."}`,
@@ -894,6 +926,13 @@ func (h *SpawnHandler) Status(w http.ResponseWriter, r *http.Request) {
 	if status == nil {
 		http.Error(w, `{"error":"unknown spawn PID"}`, http.StatusNotFound)
 		return
+	}
+	// A session stopped at Claude's trust question has no session file yet, so
+	// it is not an agent anywhere else; this status is where the question shows.
+	if status.Status == "running" {
+		if screen := h.manager.probeScreen(pid); screen != nil && screen.FolderTrust != nil {
+			status.AwaitingFolderTrust = screen.FolderTrust
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(status)

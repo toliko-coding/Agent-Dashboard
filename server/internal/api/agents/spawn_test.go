@@ -731,6 +731,37 @@ func TestSpawn_AdditionalDirs_InjectedForMultiFolderProject(t *testing.T) {
 	}
 }
 
+// 3M: naming a Project is organisational. When the agent works outside that
+// Project's folders, they are not added to its reach.
+func TestSpawn_AdditionalDirs_NotInjectedWhenCwdOutsideProject(t *testing.T) {
+	base := t.TempDir()
+	base, _ = filepath.EvalSymlinks(base)
+	cwd := filepath.Join(base, "plain")
+	web := filepath.Join(base, "app", "web")
+	api := filepath.Join(base, "app", "api")
+	for _, d := range []string{cwd, web, api} {
+		require.NoError(t, os.MkdirAll(d, 0o755))
+	}
+	t.Setenv("HOME", base)
+	prevLook := lookTmuxPath
+	lookTmuxPath = func() string { return "" }
+	t.Cleanup(func() { lookTmuxPath = prevLook })
+	capturedPtr := captureExec(t)
+
+	m := NewSpawnManager(5, 60000, 30, 60000, nil, nil)
+	m.SetProjectFolderRepo(&fakeProjectFolderRepo{
+		byProject: map[string][]*ent.ProjectFolder{"proj-1": {newFolder(web), newFolder(api)}},
+	})
+
+	_, err := m.Spawn("u1", map[string]any{"prompt": "do thing", "cwd": cwd, "projectId": "proj-1", "enableChannel": false})
+	require.NoError(t, err)
+	captured := *capturedPtr
+	require.NotNil(t, captured)
+	for _, a := range captured.Args {
+		assert.NotEqual(t, "--add-dir", a, "no --add-dir expected when cwd is outside the project, got %v", captured.Args)
+	}
+}
+
 func TestSpawn_AdditionalDirs_NotInjectedWithoutProjectId(t *testing.T) {
 	base := t.TempDir()
 	cwd, _ := filepath.EvalSymlinks(base)

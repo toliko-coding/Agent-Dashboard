@@ -285,9 +285,104 @@ export function detectConfirmScreen(rows: string[]): DetectedConfirm | null {
  * Go side; the modal is the more specific match, so the confirm detector only
  * runs when the question detector found nothing.
  */
-export function detectScreen(rows: string[]): { question: DetectedQuestion | null, confirm: DetectedConfirm | null } {
+export function detectScreen(rows: string[]): { question: DetectedQuestion | null, confirm: DetectedConfirm | null, folderTrust: DetectedFolderTrust | null } {
   const question = detectQuestion(rows)
-  return { question, confirm: question ? null : detectConfirmScreen(rows) }
+  const confirm = question ? null : detectConfirmScreen(rows)
+  return { question, confirm, folderTrust: question || confirm ? null : detectFolderTrust(rows) }
+}
+
+/**
+ * Claude Code's workspace trust question, as `askq.DetectFolderTrust` detects
+ * it on the Go side (parity port — keep the two in step, with the shared
+ * `askq-folder-trust.txt` fixture byte-identical in both test trees).
+ *
+ * Claude asks it before a session file, a hook or a log exists, so for an agent
+ * the dashboard just started the rendered screen is the only evidence it is
+ * waiting. Detection reports; only an explicit user decision answers.
+ */
+export interface DetectedFolderTrust {
+  /** The folder Claude names, joined across wrapped rows. */
+  path: string
+  /** The highlighted option: Claude preselects "exit". */
+  selected: 'exit' | 'trust'
+}
+
+const FOLDER_TRUST_LABEL = 'accessing workspace:'
+const FOLDER_TRUST_QUESTION = 'quick safety check'
+const FOLDER_TRUST_EXIT = 'no, exit'
+const FOLDER_TRUST_YES = 'yes, i trust this folder'
+const FOLDER_TRUST_FOOTER = 'enter to confirm'
+const SELECTED_MARKER = '\u276F'
+const FOLDER_TRUST_NUMBER_RE = /^\d+\.\s+/
+const FOLDER_TRUST_BORDER_RE = /^[\s\u2502|]+|[\s\u2502|]+$/g
+
+function folderTrustText(row: string): string {
+  return row.replace(FOLDER_TRUST_BORDER_RE, '')
+}
+
+/**
+ * Requires the whole screen, a highlighted option, and the footer as the last
+ * non-blank row — an answered trust screen stays in scrollback above whatever
+ * Claude drew next, and must not read as still open.
+ */
+export function detectFolderTrust(rows: string[]): DetectedFolderTrust | null {
+  let last = -1
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (folderTrustText(rows[i]) !== '') {
+      last = i
+      break
+    }
+  }
+  if (last === -1 || !folderTrustText(rows[last]).toLowerCase().startsWith(FOLDER_TRUST_FOOTER))
+    return null
+
+  let start = -1
+  for (let i = last; i >= 0; i--) {
+    if (folderTrustText(rows[i]).toLowerCase() === FOLDER_TRUST_LABEL) {
+      start = i
+      break
+    }
+  }
+  if (start === -1)
+    return null
+
+  let i = start + 1
+  while (i < last && folderTrustText(rows[i]) === '')
+    i++
+  let path = ''
+  while (i < last && folderTrustText(rows[i]) !== '') {
+    path += folderTrustText(rows[i])
+    i++
+  }
+  if (!path.startsWith('/') && !path.startsWith('~'))
+    return null
+
+  let sawQuestion = false
+  let sawExit = false
+  let sawTrust = false
+  let selected: DetectedFolderTrust['selected'] | null = null
+  for (; i < last; i++) {
+    const text = folderTrustText(rows[i])
+    if (text.toLowerCase().startsWith(FOLDER_TRUST_QUESTION)) {
+      sawQuestion = true
+      continue
+    }
+    const marked = text.startsWith(SELECTED_MARKER)
+    const label = (marked ? text.slice(SELECTED_MARKER.length) : text).trim().toLowerCase().replace(FOLDER_TRUST_NUMBER_RE, '')
+    if (label === FOLDER_TRUST_EXIT) {
+      sawExit = true
+      if (marked)
+        selected = 'exit'
+    }
+    else if (label === FOLDER_TRUST_YES) {
+      sawTrust = true
+      if (marked)
+        selected = 'trust'
+    }
+  }
+  if (!sawQuestion || !sawExit || !sawTrust || selected === null)
+    return null
+  return { path, selected }
 }
 
 /**

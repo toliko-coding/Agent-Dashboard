@@ -989,6 +989,7 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 		OnboardingHandler:      onboardingHandler,
 		ProvidersHandler:       providersHandler,
 		SettingsHandler:        settingsHandler,
+		Settings:               settingsSvc,
 		SearchHandler:          searchHandler,
 		HistoryHandler:         historyHandler,
 		MemoryHandler:          memoryHandler,

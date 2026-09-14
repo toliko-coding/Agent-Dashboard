@@ -496,3 +496,66 @@ func TestDetectConfirmScreen_RejectsNonAdjacentPair(t *testing.T) {
 		t.Fatalf("matched a non-adjacent pair: %+v", c)
 	}
 }
+
+func TestDetectFolderTrust(t *testing.T) {
+	const wantPath = "/home/dev/work/clients/northwind-analytics/experiments/2026-plain-folder-without-git/for-the-agent-dashboard-trust-check-with-a-long-name"
+
+	t.Run("reads the folder across a wrapped row and the preselected exit", func(t *testing.T) {
+		got := DetectFolderTrust(loadFixture(t, "askq-folder-trust.txt"))
+		if got == nil {
+			t.Fatal("expected the trust screen to be detected")
+		}
+		if got.Path != wantPath {
+			t.Errorf("path = %q, want %q", got.Path, wantPath)
+		}
+		if got.Selected != "exit" {
+			t.Errorf("selected = %q, want exit", got.Selected)
+		}
+	})
+
+	t.Run("follows the highlight to trust", func(t *testing.T) {
+		rows := loadFixture(t, "askq-folder-trust.txt")
+		for i, r := range rows {
+			switch strings.TrimSpace(r) {
+			case "\u276f No, exit":
+				rows[i] = "   No, exit"
+			case "Yes, I trust this folder":
+				rows[i] = " \u276f Yes, I trust this folder"
+			}
+		}
+		got := DetectFolderTrust(rows)
+		if got == nil || got.Selected != "trust" {
+			t.Fatalf("expected selected trust, got %+v", got)
+		}
+	})
+
+	t.Run("is part of DetectScreen, and not a question or confirm screen", func(t *testing.T) {
+		s := DetectScreen(loadFixture(t, "askq-folder-trust.txt"))
+		if s == nil || s.FolderTrust == nil || s.Question != nil || s.Confirm != nil {
+			t.Fatalf("expected only FolderTrust, got %+v", s)
+		}
+	})
+
+	t.Run("an answered trust screen left in scrollback is not open", func(t *testing.T) {
+		rows := append(loadFixture(t, "askq-folder-trust.txt"), " \u2733 Welcome to Claude Code", " > ")
+		if got := DetectFolderTrust(rows); got != nil {
+			t.Fatalf("scrollback matched as open: %+v", got)
+		}
+	})
+
+	t.Run("does not match without the options or the question", func(t *testing.T) {
+		rows := loadFixture(t, "askq-folder-trust.txt")
+		var noQuestion []string
+		for _, r := range rows {
+			if !strings.Contains(r, "Quick safety check") {
+				noQuestion = append(noQuestion, r)
+			}
+		}
+		if DetectFolderTrust(noQuestion) != nil {
+			t.Error("matched without the question")
+		}
+		if DetectFolderTrust(loadFixture(t, "askq-single.txt")) != nil || DetectFolderTrust(loadFixture(t, "askq-nonmodal.txt")) != nil {
+			t.Error("matched another screen")
+		}
+	})
+}

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { detectConfirmScreen, detectQuestion, screenSignature } from '../askQuestionScreen'
+import { detectConfirmScreen, detectFolderTrust, detectQuestion, detectScreen, screenSignature } from '../askQuestionScreen'
 import confirmScreen from './fixtures/askq-confirm.txt?raw'
+import folderTrust from './fixtures/askq-folder-trust.txt?raw'
 import multi from './fixtures/askq-multi.txt?raw'
 import nonModal from './fixtures/askq-nonmodal.txt?raw'
 import single from './fixtures/askq-single.txt?raw'
@@ -322,5 +323,42 @@ describe('confirm screen tolerance', () => {
       'some unrelated line',
       '2. Cancel',
     ])).toBeNull()
+  })
+})
+
+describe('detectFolderTrust (parity with askq.DetectFolderTrust)', () => {
+  const WANT = '/home/dev/work/clients/northwind-analytics/experiments/2026-plain-folder-without-git/for-the-agent-dashboard-trust-check-with-a-long-name'
+  const rows = () => folderTrust.split('\n')
+
+  it('reads the folder across a wrapped row and the preselected exit', () => {
+    expect(detectFolderTrust(rows())).toEqual({ path: WANT, selected: 'exit' })
+  })
+
+  it('follows the highlight to trust', () => {
+    const r = rows().map((row) => {
+      if (row.trim() === '\u276F No, exit')
+        return '   No, exit'
+      if (row.trim() === 'Yes, I trust this folder')
+        return ' \u276F Yes, I trust this folder'
+      return row
+    })
+    expect(detectFolderTrust(r)?.selected).toBe('trust')
+  })
+
+  it('is part of detectScreen and not a question or confirm screen', () => {
+    const screen = detectScreen(rows())
+    expect(screen.question).toBeNull()
+    expect(screen.confirm).toBeNull()
+    expect(screen.folderTrust?.path).toBe(WANT)
+  })
+
+  it('an answered trust screen left in scrollback is not open', () => {
+    expect(detectFolderTrust([...rows(), ' \u2733 Welcome to Claude Code', ' > '])).toBeNull()
+  })
+
+  it('does not match other screens or a screen missing its question', () => {
+    expect(detectFolderTrust(rows().filter(r => !r.includes('Quick safety check')))).toBeNull()
+    expect(detectFolderTrust(single.split('\n'))).toBeNull()
+    expect(detectFolderTrust(nonModal.split('\n'))).toBeNull()
   })
 })

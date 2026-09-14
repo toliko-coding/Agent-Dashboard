@@ -64,6 +64,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/plugin"
 	"github.com/lx-wnk/agent-dashboard/server/internal/serverask"
 	"github.com/lx-wnk/agent-dashboard/server/internal/services"
+	"github.com/lx-wnk/agent-dashboard/server/internal/settings"
 	"github.com/lx-wnk/agent-dashboard/server/internal/sse"
 )
 
@@ -200,6 +201,8 @@ type RouterDeps struct {
 	AdapterHandler         *adapters.Handler
 	ProvidersHandler       *providersapi.Handler
 	SettingsHandler        *settingsapi.Handler
+	// Settings backs the working-folder allow-list; nil disables those routes.
+	Settings               *settings.Service
 	OnboardingHandler      *onboarding.Handler
 	MCPHandler             http.Handler
 	ChannelReply           *agents.ChannelReplyHandler
@@ -542,11 +545,20 @@ func NewRouter(deps RouterDeps) http.Handler {
 		// Spawn management — rate-limited user-initiated agent spawning and channel message forwarding.
 		// Inside the protected group so only authenticated users can spawn agents.
 		//
-		// Build the cwd allow-list from registered project folder paths (F-SEC-001).
-		// Sensitive home dirs (~/.ssh, ~/.aws, etc.) are always blocked regardless.
-		var spawnPolicy services.SpawnPolicy
+		// Build the cwd allow-list (F-SEC-001) from the two lists a user curates:
+		// Project folder paths and explicitly allowed working folders (3M), so a
+		// Project is never the price of starting an agent. Sensitive home dirs
+		// (~/.ssh, ~/.aws, etc.) are always blocked regardless.
+		var roots []services.RootsProvider
 		if deps.ProjectRepo != nil && deps.ProjectFolderRepo != nil {
-			spawnPolicy = services.NewSpawnPolicy(services.ProjectFolderRootsProvider(deps.ProjectRepo, deps.ProjectFolderRepo))
+			roots = append(roots, services.ProjectFolderRootsProvider(deps.ProjectRepo, deps.ProjectFolderRepo))
+		}
+		if deps.Settings != nil {
+			roots = append(roots, services.WorkingFolderRootsProvider(deps.Settings))
+		}
+		var spawnPolicy services.SpawnPolicy
+		if len(roots) > 0 {
+			spawnPolicy = services.NewSpawnPolicy(services.CombineRootsProviders(roots...))
 		} else {
 			spawnPolicy = services.NewSpawnPolicy(nil)
 		}
@@ -556,6 +568,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 			deps.SpawnerRepo, spawnPolicy,
 		)
 		spawnMgr.SetProjectFolderRepo(deps.ProjectFolderRepo)
+		// Lets a spawn's status report Claude's folder trust question, which is
+		// asked before the session exists anywhere else.
+		spawnMgr.SetScreenProbe(merger.RealScreenProbe)
 		go spawnMgr.StartPruner(serverCtx)
 		spawnHandler := agents.NewSpawnHandler(spawnMgr)
 		if deps.AuditEventRepo != nil {
@@ -566,6 +581,14 @@ func NewRouter(deps RouterDeps) http.Handler {
 		}
 		r.Post("/api/agents/spawn", spawnHandler.Spawn)
 		r.Get("/api/agents/spawn/{pid}/status", spawnHandler.Status)
+		r.Post("/api/agents/spawn/preflight", spawnHandler.Preflight)
+		r.Post("/api/agents/spawn/{pid}/folder-trust", spawnHandler.FolderTrust)
+		if deps.Settings != nil {
+			spawnHandler.SetWorkingFolderSettings(deps.Settings)
+		}
+		r.Get("/api/agents/working-folders", spawnHandler.ListWorkingFolders)
+		r.Post("/api/agents/working-folders", spawnHandler.AddWorkingFolder)
+		r.Delete("/api/agents/working-folders", spawnHandler.RemoveWorkingFolder)
 		r.Post("/api/agents/{pid}/message", spawnHandler.Message)
 		r.Delete("/api/agents/{pid}/channel", spawnHandler.DismissChannel)
 		uploadImageHandler := agents.NewUploadImageHandler()

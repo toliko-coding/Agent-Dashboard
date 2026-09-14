@@ -3,7 +3,9 @@
 package settings
 
 import (
+	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strconv"
 )
 
@@ -77,6 +79,28 @@ func (d Definition) Validate(raw string) error {
 	return nil
 }
 
+// SpawnWorkingFoldersKey holds the folders a user explicitly allowed agents to
+// be started in, apart from any Dashboard Project: a JSON array of clean
+// absolute paths. JSON rather than a stringSlice, whose comma-joined storage
+// would split a path that contains a comma. Read by services.WorkingFolders.
+const SpawnWorkingFoldersKey = "spawn.workingFolders"
+
+// absolutePathList accepts a JSON array of clean absolute paths.
+func absolutePathList(key string) func(string) error {
+	return func(raw string) error {
+		var paths []string
+		if err := json.Unmarshal([]byte(raw), &paths); err != nil {
+			return fmt.Errorf("%s: must be a JSON array of absolute paths", key)
+		}
+		for _, p := range paths {
+			if !filepath.IsAbs(p) || filepath.Clean(p) != p {
+				return fmt.Errorf("%s: %q is not a clean absolute path", key, p)
+			}
+		}
+		return nil
+	}
+}
+
 func positiveInt(key string) func(string) error {
 	return func(raw string) error {
 		n, err := strconv.Atoi(raw)
@@ -120,6 +144,8 @@ var definitions = func() map[string]Definition {
 		{Key: "hooks.eventsPerSession", Type: TypeInt, Default: "50", Apply: ApplyRestart, Category: "hooks", validate: positiveInt("hooks.eventsPerSession")},
 		{Key: "spawn.rateLimit", Type: TypeInt, Default: "5", Apply: ApplyRestart, Category: "spawn"},
 		{Key: "spawn.allowedCommands", Type: TypeStringSlice, Default: "", Apply: ApplyRestart, Category: "spawn"},
+		// Folders a user explicitly allowed agents to start in, apart from any Project.
+		{Key: SpawnWorkingFoldersKey, Type: TypeString, Default: "[]", Apply: ApplyLive, Category: "spawn", validate: absolutePathList(SpawnWorkingFoldersKey)},
 		{Key: "spawn.rateWindowMs", Type: TypeInt, Default: "60000", Apply: ApplyRestart, Category: "spawn", validate: positiveInt("spawn.rateWindowMs")},
 		{Key: "inject.rateLimit", Type: TypeInt, Default: "30", Apply: ApplyRestart, Category: "inject"},
 		{Key: "inject.rateWindowMs", Type: TypeInt, Default: "60000", Apply: ApplyRestart, Category: "inject", validate: positiveInt("inject.rateWindowMs")},

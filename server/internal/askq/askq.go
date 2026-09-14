@@ -361,5 +361,109 @@ func DetectScreen(rows []string) *sdk.PendingScreen {
 	if c := DetectConfirmScreen(rows); c != nil {
 		return &sdk.PendingScreen{Confirm: c}
 	}
+	if t := DetectFolderTrust(rows); t != nil {
+		return &sdk.PendingScreen{FolderTrust: t}
+	}
 	return nil
+}
+
+// DetectedFolderTrust is aliased like the modal types above.
+type DetectedFolderTrust = sdk.DetectedFolderTrust
+
+const (
+	folderTrustLabel    = "accessing workspace:"
+	folderTrustQuestion = "quick safety check"
+	folderTrustExit     = "no, exit"
+	folderTrustYes      = "yes, i trust this folder"
+	folderTrustFooter   = "enter to confirm"
+	selectedMarker      = "❯" // ❯
+)
+
+var folderTrustNumberRe = regexp.MustCompile(`^\d+\.\s+`)
+
+// folderTrustText trims padding and any box-drawing border from a rendered row.
+func folderTrustText(row string) string {
+	return strings.TrimSpace(strings.Trim(strings.TrimSpace(row), "\u2502|"))
+}
+
+// DetectFolderTrust detects Claude Code's workspace trust question — "Accessing
+// workspace: <folder>", "Quick safety check: Is this a project you created or
+// one you trust?", and the two options "No, exit" / "Yes, I trust this folder".
+//
+// Claude asks it before any session file, hook or log exists, so for a session
+// the dashboard just started this screen is the only evidence it is waiting.
+// Detection is a report, never an answer.
+//
+// It requires every part of the screen, the highlighted option, and the footer
+// as the last non-blank row: the scrollback keeps an answered trust screen above
+// whatever Claude drew next, and that one must not read as still open. A folder
+// path that wraps is joined across rows (trailing padding is dropped, so a space
+// exactly at a wrap is lost; the answer endpoint compares canonical paths and
+// refuses on any mismatch).
+func DetectFolderTrust(rows []string) *DetectedFolderTrust {
+	last := -1
+	for i := len(rows) - 1; i >= 0; i-- {
+		if folderTrustText(rows[i]) != "" {
+			last = i
+			break
+		}
+	}
+	if last == -1 || !strings.HasPrefix(strings.ToLower(folderTrustText(rows[last])), folderTrustFooter) {
+		return nil
+	}
+
+	start := -1
+	for i := last; i >= 0; i-- {
+		if strings.ToLower(folderTrustText(rows[i])) == folderTrustLabel {
+			start = i
+			break
+		}
+	}
+	if start == -1 {
+		return nil
+	}
+
+	i := start + 1
+	for i < last && folderTrustText(rows[i]) == "" {
+		i++
+	}
+	var path strings.Builder
+	for i < last && folderTrustText(rows[i]) != "" {
+		path.WriteString(folderTrustText(rows[i]))
+		i++
+	}
+	folder := path.String()
+	if !strings.HasPrefix(folder, "/") && !strings.HasPrefix(folder, "~") {
+		return nil
+	}
+
+	sawQuestion, sawExit, sawTrust := false, false, false
+	selected := ""
+	for ; i < last; i++ {
+		text := folderTrustText(rows[i])
+		lower := strings.ToLower(text)
+		if strings.HasPrefix(lower, folderTrustQuestion) {
+			sawQuestion = true
+			continue
+		}
+		marked := strings.HasPrefix(text, selectedMarker)
+		label := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(text, selectedMarker)))
+		label = folderTrustNumberRe.ReplaceAllString(label, "")
+		switch label {
+		case folderTrustExit:
+			sawExit = true
+			if marked {
+				selected = "exit"
+			}
+		case folderTrustYes:
+			sawTrust = true
+			if marked {
+				selected = "trust"
+			}
+		}
+	}
+	if !sawQuestion || !sawExit || !sawTrust || selected == "" {
+		return nil
+	}
+	return &DetectedFolderTrust{Path: folder, Selected: selected}
 }

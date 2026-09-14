@@ -1,6 +1,7 @@
 CONNECT /*
 CONNECT /api/plugins/{id}/proxy/*
 DELETE /*
+DELETE /api/agents/working-folders
 DELETE /api/agents/{pid}/channel
 DELETE /api/grants/{id}
 DELETE /api/me
@@ -21,6 +22,7 @@ GET /*
 GET /api/agents
 GET /api/agents/spawn/{pid}/status
 GET /api/agents/stream
+GET /api/agents/working-folders
 GET /api/agents/{pid}/terminal
 GET /api/agents/{sessionId}/output
 GET /api/analytics/cost-forecast
@@ -111,6 +113,9 @@ PATCH /api/spawners/{id}
 PATCH /api/tasks/{id}
 POST /*
 POST /api/agents/spawn
+POST /api/agents/spawn/preflight
+POST /api/agents/spawn/{pid}/folder-trust
+POST /api/agents/working-folders
 POST /api/agents/{pid}/answer-question
 POST /api/agents/{pid}/message
 POST /api/agents/{pid}/upload-image

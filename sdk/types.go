@@ -334,6 +334,19 @@ type DetectedConfirm struct {
 	Options  []DetectedOption `json:"options"`
 }
 
+// DetectedFolderTrust is Claude Code's workspace trust question ("Quick safety
+// check: Is this a project you created or one you trust?"), detected on the
+// terminal of a session the dashboard started. Claude asks it before a session
+// log, a hook or a session file exists, so the rendered screen is the only
+// signal there is. Detection only reports it; nothing answers it but an
+// explicit user decision.
+type DetectedFolderTrust struct {
+	// Path is the folder Claude names, joined across wrapped rows.
+	Path string `json:"path"`
+	// Selected is the highlighted option: "exit" (Claude's default) or "trust".
+	Selected string `json:"selected"`
+}
+
 // PendingScreen is whichever interactive AskUserQuestion screen is currently
 // open on a session's terminal. At most one field is non-nil; both are nil when
 // no such screen is open. Probing for both in one round-trip keeps the scan hot
@@ -341,6 +354,8 @@ type DetectedConfirm struct {
 type PendingScreen struct {
 	Question *DetectedQuestion `json:"question,omitempty"`
 	Confirm  *DetectedConfirm  `json:"confirm,omitempty"`
+	// FolderTrust is Claude's workspace trust question, before any session exists.
+	FolderTrust *DetectedFolderTrust `json:"folderTrust,omitempty"`
 }
 
 // How an agent's spawner attribution was established: recorded from the pipeline

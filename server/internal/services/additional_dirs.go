@@ -31,3 +31,29 @@ func AdditionalDirsForProject(folders []*ent.ProjectFolder, cwd string) []string
 	}
 	return dirs
 }
+
+// CwdWithinFolders reports whether cwd is one of folders or inside one of them.
+//
+// A Project is an organisational association. Its other folders reach an agent
+// (as --add-dir) only when the agent works in one of that Project's own
+// folders — never merely because a spawn request named the Project, which would
+// let the association widen an agent's file access.
+func CwdWithinFolders(folders []*ent.ProjectFolder, cwd string) bool {
+	cwdAbs, err := canonicalize(cwd)
+	if err != nil {
+		return false
+	}
+	for _, f := range folders {
+		if f == nil || f.Path == "" {
+			continue
+		}
+		root, err := canonicalize(f.Path)
+		if err != nil {
+			continue
+		}
+		if isUnder(cwdAbs, root) {
+			return true
+		}
+	}
+	return false
+}

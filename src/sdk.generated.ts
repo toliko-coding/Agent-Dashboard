@@ -358,6 +358,24 @@ export interface DetectedConfirm {
   options: DetectedOption[]
 }
 /**
+ * DetectedFolderTrust is Claude Code's workspace trust question ("Quick safety
+ * check: Is this a project you created or one you trust?"), detected on the
+ * terminal of a session the dashboard started. Claude asks it before a session
+ * log, a hook or a session file exists, so the rendered screen is the only
+ * signal there is. Detection only reports it; nothing answers it but an
+ * explicit user decision.
+ */
+export interface DetectedFolderTrust {
+  /**
+   * Path is the folder Claude names, joined across wrapped rows.
+   */
+  path: string
+  /**
+   * Selected is the highlighted option: "exit" (Claude's default) or "trust".
+   */
+  selected: string
+}
+/**
  * PendingScreen is whichever interactive AskUserQuestion screen is currently
  * open on a session's terminal. At most one field is non-nil; both are nil when
  * no such screen is open. Probing for both in one round-trip keeps the scan hot
@@ -366,6 +384,10 @@ export interface DetectedConfirm {
 export interface PendingScreen {
   question?: DetectedQuestion
   confirm?: DetectedConfirm
+  /**
+   * FolderTrust is Claude's workspace trust question, before any session exists.
+   */
+  folderTrust?: DetectedFolderTrust
 }
 export const SpawnerSourceTask = 'task'
 export const SpawnerSourceEnv = 'env'
