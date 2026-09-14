@@ -340,6 +340,7 @@ Preparing the first public release.
 
 
 ### Fixed
+- **Clicking ⓘ no longer closes the metrics popover that hovering just opened.** Hover and focus preview it; a click or Enter pins it open and a second press closes it; Escape closes it (without also closing the agent details panel around it); moving focus away dismisses it. The card and the details panel share this behaviour, and the button reports its state with `aria-expanded`.
 - **Agent group headers no longer call session cost "today".** The figure is the sum of those sessions' cost estimates; today's spend is the status bar's, from the persisted ledger.
 - **The System view no longer claims LocalScope metrics are uncollected.** It said listening ports, processes and emulators were "Not collected yet" although LocalScope collects all three. It now shows listening services, developer processes, devices and network connections from the existing LocalScope snapshot — no new polling — with 0 shown as a measurement, unknown values as "Not collected", an unavailable collector stated as unknown rather than zero, and stale or degraded readings marked. Network throughput, which genuinely is not collected, is still named.
 - **Search promised more than it searched.** The topbar trigger said "Search agents, projects, or commands"; the palette searches tasks and agents, and the trigger now says exactly that.

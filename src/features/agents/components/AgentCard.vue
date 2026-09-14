@@ -14,6 +14,7 @@ import { toast } from '@/composables/useToast'
 import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vue'
 import MetricsPopover from '@/features/agents/components/MetricsPopover.vue'
 import { useAgentIdentity } from '@/features/agents/composables/useAgentIdentity'
+import { useMetricsDisclosure } from '@/features/agents/composables/useMetricsDisclosure'
 import { agentTitle, workActivity } from '@/utils/agentLabels'
 import { formatCost, formatRelativeActivity, isAwaitingInput, secondsSince, shortModel } from '@/utils/format'
 import { agentDisplayStatus } from '@/utils/statusColors'
@@ -101,7 +102,8 @@ const attentionChip = computed(() => {
     : { word: 'Needs you', tone: 'text-warning-text border-warning-line' }
 })
 
-const showMetrics = ref(false)
+const metrics = useMetricsDisclosure()
+const metricsOpen = metrics.open
 const arming = ref(false)
 // Arming is per session and lives on the bridge, not in the client: the hook
 // asks the server on every gated tool call, and the server has to know before
@@ -216,19 +218,22 @@ const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
           </span>
           <span
             class="relative z-10"
-            @mouseenter="showMetrics = true"
-            @mouseleave="showMetrics = false"
-            @focusin="showMetrics = true"
-            @focusout="showMetrics = false"
+            data-testid="agent-card-metrics"
+            @mouseenter="metrics.onPointerEnter"
+            @mouseleave="metrics.onPointerLeave"
+            @focusin="metrics.onFocusIn"
+            @focusout="metrics.onFocusOut"
+            @keydown.escape="metrics.onEscape"
           >
             <button
               type="button"
               class="inline-flex min-h-6 min-w-6 items-center justify-center rounded text-ui-sm leading-none text-fg-mute hover:text-fg-soft focus-visible:outline-2 focus-visible:outline-ring"
               aria-label="Show more metrics"
+              :aria-expanded="metricsOpen"
               data-testid="agent-card-info"
-              @click.stop="showMetrics = !showMetrics"
+              @click.stop="metrics.toggle"
             >ⓘ</button>
-            <MetricsPopover v-if="showMetrics" :agent="agent" @click.stop />
+            <MetricsPopover v-if="metricsOpen" :agent="agent" @click.stop />
           </span>
           <button
             v-if="agent.liveInjectable"

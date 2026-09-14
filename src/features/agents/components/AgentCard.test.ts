@@ -283,3 +283,47 @@ describe('agentCard — accessibility', () => {
     w.unmount()
   })
 })
+
+describe('agentCard — metrics popover (3I)', () => {
+  const wrap = (w: ReturnType<typeof render>) => w.get('[data-testid="agent-card-metrics"]')
+  const isOpen = (w: ReturnType<typeof render>) => w.find('[data-testid="metrics-popover"]').exists()
+
+  // G: the click a pointer user makes while hovering must not close what hover opened.
+  it('keeps the popover open when it is clicked while hovered, and closes it on a second click', async () => {
+    const w = render()
+    await wrap(w).trigger('mouseenter')
+    expect(isOpen(w)).toBe(true)
+    await w.get('[data-testid="agent-card-info"]').trigger('click')
+    expect(isOpen(w)).toBe(true)
+    await wrap(w).trigger('mouseleave')
+    expect(isOpen(w)).toBe(true)
+    await w.get('[data-testid="agent-card-info"]').trigger('click')
+    expect(isOpen(w)).toBe(false)
+  })
+
+  it('closes a hover preview when the pointer leaves, and opening it never opens the agent', async () => {
+    const w = render()
+    await wrap(w).trigger('mouseenter')
+    await wrap(w).trigger('mouseleave')
+    expect(isOpen(w)).toBe(false)
+    await w.get('[data-testid="agent-card-info"]').trigger('click')
+    expect(w.emitted('select')).toBeFalsy()
+  })
+
+  // H: keyboard.
+  it('opens on focus, reports its state, closes on Escape and when focus leaves', async () => {
+    const w = render()
+    const info = w.get('[data-testid="agent-card-info"]')
+    await wrap(w).trigger('focusin')
+    expect(isOpen(w)).toBe(true)
+    expect(info.attributes('aria-expanded')).toBe('true')
+    await wrap(w).trigger('keydown', { key: 'Escape' })
+    expect(isOpen(w)).toBe(false)
+    expect(info.attributes('aria-expanded')).toBe('false')
+
+    await wrap(w).trigger('focusin')
+    await info.trigger('click')
+    await wrap(w).trigger('focusout', { relatedTarget: null })
+    expect(isOpen(w)).toBe(false)
+  })
+})
