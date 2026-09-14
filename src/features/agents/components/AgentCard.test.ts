@@ -103,7 +103,8 @@ describe('agentCard — compact worker (3G)', () => {
 
   it('shows role, last activity and cost as facts', () => {
     const w = render({ spawnerName: 'Reviewer' })
-    expect(w.get('[data-testid="agent-card-facts"]').text()).toMatch(/Reviewer · (Just now|\d+s ago)/)
+    expect(w.get('[data-testid="agent-card-facts"]').text()).toBe('Reviewer')
+    expect(w.get('[data-testid="agent-card-since"]').text()).toMatch(/^(Just now|\d+s ago)$/)
     expect(w.get('[data-testid="agent-card-cost"]').text()).toBe('$1.25')
   })
 
@@ -163,21 +164,25 @@ describe('agentCard finished state', () => {
     vi.unstubAllGlobals()
   })
 
-  it('shows no dismiss button for a live agent', () => {
-    expect(render({ status: 'active' }).find('[data-testid="agent-card-dismiss"]').exists()).toBe(false)
+  it('offers Stop only while the agent is running', () => {
+    expect(render({ status: 'active' }).find('[data-testid="agent-card-stop"]').exists()).toBe(true)
+    expect(render({ status: 'finished' }).find('[data-testid="agent-card-stop"]').exists()).toBe(false)
   })
 
-  it('shows a dismiss button for a finished agent', () => {
+  it('offers Delete for a finished agent, which reads Finished', () => {
     const w = render({ status: 'finished' })
-    expect(w.find('[data-testid="agent-card-dismiss"]').exists()).toBe(true)
+    expect(w.find('[data-testid="agent-card-delete"]').exists()).toBe(true)
     expect(w.get('[data-testid="agent-card-activity"]').text()).toBe('Finished')
   })
 
-  it('calls the DELETE endpoint and emits dismiss on click', async () => {
+  it('asks for confirmation instead of deleting straight away', async () => {
+    const { useAgentLifecycle } = await import('@/composables/useAgentLifecycle')
     const w = render({ pid: 4242, status: 'finished' })
-    await w.get('[data-testid="agent-card-dismiss"]').trigger('click')
-    expect(fetch).toHaveBeenCalledWith('/api/agents/4242/channel', expect.objectContaining({ method: 'DELETE' }))
-    expect(w.emitted('dismiss')?.[0]).toEqual([4242])
+    await w.get('[data-testid="agent-card-delete"]').trigger('click')
+    expect(useAgentLifecycle().pending.value).toMatchObject({ action: 'delete', agent: { pid: 4242 } })
+    expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining('/api/agents/4242'), expect.anything())
+    expect(w.emitted('select')).toBeFalsy()
+    useAgentLifecycle().cancel()
   })
 })
 

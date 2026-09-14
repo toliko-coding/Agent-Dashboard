@@ -18,7 +18,7 @@ const props = defineProps<{
   stale?: boolean
 }>()
 
-defineEmits<{ select: [agent: Agent], dismiss: [pid: number] }>()
+defineEmits<{ select: [agent: Agent] }>()
 
 const attentionBySession = computed(() => {
   const map = new Map<string, AttentionItem>()
@@ -137,7 +137,7 @@ watch(() => props.groups, (groups) => {
         >
           <div v-for="child in group.children" :key="child.key" class="flex flex-col gap-1.5">
             <WorkspaceGroupRow :workspace="child.workspace!" :agents="child.agents" />
-            <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,19rem),1fr))]" data-testid="group-card-grid">
+            <div class="grid gap-4 grid-cols-1 @min-[46rem]:grid-cols-2 @min-[66rem]:grid-cols-3" data-testid="group-card-grid">
               <AgentCard
                 v-for="agent in child.agents"
                 :key="agent.pid"
@@ -145,7 +145,6 @@ watch(() => props.groups, (groups) => {
                 :attention="attentionBySession.get(agent.sessionId) ?? null"
                 :stale="stale"
                 @select="$emit('select', agent)"
-                @dismiss="$emit('dismiss', $event)"
               />
             </div>
           </div>
@@ -153,7 +152,7 @@ watch(() => props.groups, (groups) => {
         <div
           v-else
           v-show="!isCollapsed(group.key)"
-          class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,19rem),1fr))] mt-2"
+          class="grid gap-4 grid-cols-1 @min-[46rem]:grid-cols-2 @min-[66rem]:grid-cols-3 mt-2"
           data-testid="group-card-grid"
         >
           <AgentCard
@@ -163,14 +162,13 @@ watch(() => props.groups, (groups) => {
             :attention="attentionBySession.get(agent.sessionId) ?? null"
             :stale="stale"
             @select="$emit('select', agent)"
-            @dismiss="$emit('dismiss', $event)"
           />
         </div>
       </div>
     </div>
   </template>
   <template v-else>
-    <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,19rem),1fr))]">
+    <div class="grid gap-4 grid-cols-1 @min-[46rem]:grid-cols-2 @min-[66rem]:grid-cols-3">
       <AgentCard
         v-for="agent in agents"
         :key="agent.pid"
@@ -178,7 +176,6 @@ watch(() => props.groups, (groups) => {
         :attention="attentionBySession.get(agent.sessionId) ?? null"
         :stale="stale"
         @select="$emit('select', agent)"
-        @dismiss="$emit('dismiss', $event)"
       />
       <p v-if="agents.length === 0" class="col-span-full text-center py-12 text-fg-mute text-sm">
         No running Claude agents found.

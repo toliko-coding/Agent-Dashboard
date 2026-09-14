@@ -48,26 +48,6 @@ function makeLocalStorageMock() {
   }
 }
 
-describe('agentCardGrid dismiss forwarding', () => {
-  beforeEach(() => {
-    vi.restoreAllMocks()
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, status: 204 })))
-  })
-
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
-  it('re-emits dismiss with the pid when a finished card is dismissed', async () => {
-    const w = mount(AgentCardGrid, {
-      props: { agents: [finishedAgent(4242)] },
-      global: { stubs },
-    })
-    await w.find('[data-testid="agent-card-dismiss"]').trigger('click')
-    expect(w.emitted('dismiss')?.[0]).toEqual([4242])
-  })
-})
-
 describe('agentCardGrid collapsible groups', () => {
   let localStorageMock: ReturnType<typeof makeLocalStorageMock>
 
@@ -212,10 +192,13 @@ describe('agentCardGrid collapsible groups', () => {
 })
 
 describe('agentCardGrid — responsive tiles (3N)', () => {
-  it('fills as many compact columns as fit instead of fixed breakpoints', () => {
+  // 3N.2: one column when narrow, two at medium widths, never more than three.
+  it('lays cards out one, two or three to a row by the width it is given', () => {
     const w = mount(AgentCardGrid, { props: { agents: [] } })
-    const grid = w.get('.grid')
-    expect(grid.classes().join(' ')).toContain('grid-cols-[repeat(auto-fill,minmax(min(100%,19rem),1fr))]')
-    expect(grid.classes().join(' ')).not.toMatch(/\b(md|xl):grid-cols-/)
+    const classes = w.get('.grid').classes().join(' ')
+    expect(classes).toContain('grid-cols-1')
+    expect(classes).toContain('@min-[46rem]:grid-cols-2')
+    expect(classes).toContain('@min-[66rem]:grid-cols-3')
+    expect(classes).not.toMatch(/grid-cols-(?:[4-9]|\[repeat)/)
   })
 })

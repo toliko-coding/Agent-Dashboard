@@ -19,7 +19,7 @@ import { AGENT_PURPOSE_PATHS, agentPurpose, agentPurposeLabel } from '@/utils/ag
 const props = withDefaults(defineProps<{
   agent?: Pick<Agent, 'category'> | null
   purpose?: AgentPurpose
-  size?: 'sm' | 'md'
+  size?: 'sm' | 'md' | 'lg'
 }>(), { agent: null, purpose: undefined, size: 'md' })
 
 const value = computed<AgentPurpose>(() => props.purpose ?? agentPurpose(props.agent ?? {}))
@@ -33,12 +33,12 @@ const label = computed(() => `${agentPurposeLabel(value.value)} agent`)
     :title="label"
     data-testid="agent-glyph"
     :data-category="value"
-    class="inline-flex shrink-0 items-center justify-center rounded-control border border-line bg-raised text-fg-soft"
-    :class="size === 'sm' ? 'size-5' : 'size-7'"
+    class="inline-flex shrink-0 items-center justify-center border text-fg-soft"
+    :class="size === 'lg' ? 'cc-glyph-lg size-11 rounded-xl' : size === 'sm' ? 'size-5 rounded-control border-line bg-raised' : 'size-7 rounded-control border-line bg-raised'"
   >
     <svg
       viewBox="0 0 24 24"
-      :class="size === 'sm' ? 'size-3.5' : 'size-[18px]'"
+      :class="size === 'lg' ? 'size-6' : size === 'sm' ? 'size-3.5' : 'size-[18px]'"
       fill="none"
       stroke="currentColor"
       stroke-width="1.75"

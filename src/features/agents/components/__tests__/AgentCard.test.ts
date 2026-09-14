@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import AgentCard from '../AgentCard.vue'
 
 // Avoid the real composable's setTimeout localStorage write firing after teardown.
@@ -61,10 +61,9 @@ describe('agentCard interaction', () => {
     expect(w.emitted('select')).toBeTruthy()
   })
 
-  it('does not emit select when the prompt input is clicked', async () => {
+  it('keeps the prompt composer in the details workspace, not on the card', () => {
     const w = mount(AgentCard, { props: { agent: makeAgent() }, global: { stubs } })
-    await w.get('[data-testid="prompt-input"]').trigger('click')
-    expect(w.emitted('select')).toBeFalsy()
+    expect(w.find('[data-testid="prompt-input"]').exists()).toBe(false)
   })
 
   it('emits select when the card body is clicked', async () => {
@@ -73,12 +72,12 @@ describe('agentCard interaction', () => {
     expect(w.emitted('select')).toBeTruthy()
   })
 
-  it('does not emit select when the dismiss button is clicked', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({})))
+  it('does not emit select when Delete is clicked', async () => {
     const w = mount(AgentCard, { props: { agent: makeAgent({ status: 'finished' }) }, global: { stubs } })
-    await w.get('[data-testid="agent-card-dismiss"]').trigger('click')
+    await w.get('[data-testid="agent-card-delete"]').trigger('click')
     expect(w.emitted('select')).toBeFalsy()
-    vi.unstubAllGlobals()
+    const { useAgentLifecycle } = await import('@/composables/useAgentLifecycle')
+    useAgentLifecycle().cancel()
   })
 
   it('does not emit select when the info button is clicked, and reveals the metrics popover', async () => {

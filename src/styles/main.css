@@ -489,6 +489,16 @@ html, body {
   100% { transform: translateX(300%); }
 }
 
+/*
+ * Working, along an edge: a faint highlight travels slowly. Slower and dimmer
+ * than the tool sweep, so "busy" and "a tool call is open" stay distinct. Ends
+ * past the far end, so a reduced-motion freeze leaves the edge at rest.
+ */
+@keyframes state-energy {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(420%); }
+}
+
 /* Completion: one brief settle, then nothing. Success is an event, not a state. */
 @keyframes state-settle {
   0% { opacity: 0.4; transform: scale(0.86); }
@@ -508,6 +518,7 @@ html, body {
   --motion-flow: 900ms;
   --motion-settle: 420ms;
   --motion-sweep: 1600ms;
+  --motion-energy: 5200ms;
 }
 
 /*
@@ -523,6 +534,39 @@ html, body {
 .motion-waiting { animation: state-attention var(--motion-attention) var(--ease-standard) infinite; }
 .motion-flow { animation: state-flow var(--motion-flow) linear infinite; }
 .motion-sweep { animation: state-sweep var(--motion-sweep) var(--ease-standard) infinite; }
+.motion-energy { animation: state-energy var(--motion-energy) linear infinite; }
+
+/*
+ * Command-center surfaces (3N.2). Structure, not state: a card lifts off the
+ * ground with a faint top-lit gradient and an inner highlight; the frame takes
+ * a state colour only when the state is working, attention or failure. No glow
+ * on idle cards, and nothing here animates.
+ */
+.cc-card {
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--accent) 7%, transparent) 0%, transparent 34%),
+    var(--card);
+  box-shadow: inset 0 1px 0 color-mix(in oklch, var(--fg) 6%, transparent);
+  transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+}
+.cc-card:hover {
+  box-shadow: inset 0 1px 0 color-mix(in oklch, var(--fg) 9%, transparent), 0 10px 30px -18px color-mix(in oklch, var(--accent) 45%, transparent);
+}
+.cc-frame-working {
+  border-color: color-mix(in oklch, var(--state-working) 45%, var(--line));
+  box-shadow: inset 0 1px 0 color-mix(in oklch, var(--state-working) 22%, transparent), 0 12px 32px -20px color-mix(in oklch, var(--state-working) 55%, transparent);
+}
+.cc-frame-attention { border-color: color-mix(in oklch, var(--state-waiting) 55%, var(--line)); }
+.cc-frame-failed { border-color: color-mix(in oklch, var(--state-error) 55%, var(--line)); }
+.cc-energy { background: linear-gradient(90deg, transparent, var(--state-working), transparent); }
+.cc-glyph-lg {
+  border-color: color-mix(in oklch, var(--accent) 35%, var(--line));
+  background:
+    radial-gradient(120% 120% at 30% 0%, color-mix(in oklch, var(--accent) 26%, transparent), transparent 60%),
+    color-mix(in oklch, var(--raised) 85%, var(--live) 15%);
+  color: var(--fg);
+  box-shadow: inset 0 1px 0 color-mix(in oklch, var(--fg) 12%, transparent);
+}
 .motion-success { animation: state-settle var(--motion-settle) var(--ease-standard) 1; }
 /*
  * Something newly needs the user: the attention ring, once, as the item
