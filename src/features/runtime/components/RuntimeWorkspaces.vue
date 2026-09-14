@@ -11,7 +11,7 @@ import { RuntimeTopologyTree } from '@/features/cockpit'
  * because opening this section is the explicit request for it; that mount is
  * what starts the service and process lists.
  */
-const { agents } = useAgents({ autoStart: false })
+const { agents, live } = useAgents({ autoStart: false })
 </script>
 
 <template>
@@ -22,6 +22,6 @@ const { agents } = useAgents({ autoStart: false })
       </h2>
       <span class="text-ui-sm text-fg-mute">What runs in each repository and workspace, grouped by identity</span>
     </header>
-    <RuntimeTopologyTree :agents="agents" />
+    <RuntimeTopologyTree :agents="agents" :live="live" />
   </section>
 </template>

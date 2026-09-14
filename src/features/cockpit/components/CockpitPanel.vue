@@ -15,7 +15,7 @@ const testid = (state: PanelState) => `cockpit-${props.id}-${state}`
 
 <template>
   <section
-    class="bg-card border border-line rounded-panel p-4 flex flex-col gap-3 min-w-0"
+    class="cc-card border border-line rounded-xl p-4 flex flex-col gap-3 min-w-0"
     :data-testid="`cockpit-panel-${id}`"
     :aria-busy="state === 'loading'"
   >

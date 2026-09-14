@@ -293,8 +293,25 @@ describe('runtimeTopologyTree — visualization (3N)', () => {
     expect(node.get('[data-testid="topology-services"] svg').attributes('aria-hidden')).toBe('true')
   })
 
-  it('is structure: nothing in the tree moves', () => {
+  it('is still while agent updates are not live, even with working agents', () => {
     const agents = scenario().map(a => ({ ...a, working: true }) as Agent)
     expect(mountTree(agents).html()).not.toMatch(/motion-|animate-/)
+  })
+
+  // 3N.2: flow only where real work is happening, and only on current evidence.
+  it('flows only along a workspace with a working agent while updates are live and LocalScope is current', () => {
+    const [main, ls, unresolved] = scenario()
+    const w = mount(RuntimeTopologyTree, { props: { agents: [{ ...main, working: true } as Agent, ls, unresolved], live: true } })
+    expect(workspaceNode(w, 'ws_main').get('ul').attributes('data-flowing')).toBe('true')
+    expect(workspaceNode(w, 'ws_main').get('ul').classes()).toContain('motion-rail')
+    expect(workspaceNode(w, 'ws_ls').get('ul').classes()).not.toContain('motion-rail')
+    expect(workspaceNode(w, 'ws_wt').get('ul').classes()).not.toContain('motion-rail')
+  })
+
+  it('stops flowing when LocalScope\'s reading is stale', () => {
+    const [main] = scenario()
+    servicesState = list([svc(MAIN, 5173)], { source: 'stale', ageMs: 180_000 })
+    const w = mount(RuntimeTopologyTree, { props: { agents: [{ ...main, working: true } as Agent], live: true } })
+    expect(w.html()).not.toMatch(/motion-/)
   })
 })

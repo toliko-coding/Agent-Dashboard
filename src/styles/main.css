@@ -280,11 +280,12 @@
 .dark {
   --card-hover-shadow: 0 2px 12px rgba(0,0,0,0.3);
   /* Calm dark: deeper background so content lifts via subtle surfaces, not hard borders */
-  --app: #0b0e14;
-  --card: #12151c;
-  --raised: #1c212b;
-  --line: #232a37;
-  --line-strong: #2a313e;
+  /* 3N.2: a deeper navy ground with slightly cooler, stepped surfaces. */
+  --app: #070b14;
+  --card: #0d1220;
+  --raised: #161d2e;
+  --line: #1e283b;
+  --line-strong: #2b3652;
   /* Text hierarchy — WCAG AA audit (2026-06-29), worst-case surface --raised:
      fg 44:1, soft 38:1, mute 30:1 (AAA), faint 5.9:1 (AA). All pass. */
   --fg: var(--color-slate-100);
@@ -559,6 +560,61 @@ html, body {
 .cc-frame-attention { border-color: color-mix(in oklch, var(--state-waiting) 55%, var(--line)); }
 .cc-frame-failed { border-color: color-mix(in oklch, var(--state-error) 55%, var(--line)); }
 .cc-energy { background: linear-gradient(90deg, transparent, var(--state-working), transparent); }
+
+/* The ground: two faint light pools and, in the dark theme, a quiet grid. Static. */
+.cc-app {
+  background-color: var(--app);
+  background-image:
+    radial-gradient(1100px 520px at 78% -10%, color-mix(in oklch, var(--accent) 8%, transparent), transparent 62%),
+    radial-gradient(900px 520px at -6% 106%, color-mix(in oklch, var(--live) 6%, transparent), transparent 60%);
+}
+.dark .cc-app {
+  background-image:
+    radial-gradient(1100px 520px at 78% -10%, color-mix(in oklch, var(--accent) 11%, transparent), transparent 62%),
+    radial-gradient(900px 520px at -6% 106%, color-mix(in oklch, var(--live) 8%, transparent), transparent 60%),
+    linear-gradient(color-mix(in oklch, var(--fg) 2.2%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--fg) 2.2%, transparent) 1px, transparent 1px);
+  background-size: auto, auto, 48px 48px, 48px 48px;
+}
+.cc-hero {
+  background:
+    radial-gradient(80% 160% at 88% 0%, color-mix(in oklch, var(--accent) 18%, transparent), transparent 60%),
+    radial-gradient(60% 140% at 100% 100%, color-mix(in oklch, var(--live) 12%, transparent), transparent 62%),
+    var(--card);
+  box-shadow: inset 0 1px 0 color-mix(in oklch, var(--fg) 7%, transparent);
+}
+.cc-accent-text {
+  background: linear-gradient(90deg, var(--accent), var(--live-dot));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.cc-instrument {
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--accent) 6%, transparent), transparent 70%),
+    var(--card);
+  box-shadow: inset 0 1px 0 color-mix(in oklch, var(--fg) 6%, transparent);
+}
+.cc-instrument-live { border-color: color-mix(in oklch, var(--state-working) 40%, var(--line)); }
+.cc-instrument-attention { border-color: color-mix(in oklch, var(--state-waiting) 50%, var(--line)); }
+
+/*
+ * Live flow along a topology rail: a short light travels down the left border
+ * while the relationship carries real, current work. Ends past the bottom, so a
+ * reduced-motion freeze leaves the rail plain.
+ */
+@keyframes rail-flow {
+  from { background-position: 0 -45%; }
+  to { background-position: 0 145%; }
+}
+.cc-rail-flow {
+  background-image: linear-gradient(180deg, transparent, var(--state-live), transparent);
+  background-repeat: no-repeat;
+  background-size: 1px 45%;
+  background-origin: border-box;
+  background-clip: border-box;
+}
+.motion-rail { animation: rail-flow 2600ms linear infinite; }
 .cc-glyph-lg {
   border-color: color-mix(in oklch, var(--accent) 35%, var(--line));
   background:

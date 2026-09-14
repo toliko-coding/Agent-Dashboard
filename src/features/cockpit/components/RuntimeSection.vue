@@ -21,6 +21,8 @@ const props = defineProps<{
   agents: Agent[]
   /** Live sessions, for the agent count. */
   liveAgentCount: number
+  /** Agent updates are arriving; the topology draws flow only then. */
+  live?: boolean
 }>()
 
 const { snapshot, loaded } = useLocalMachine()
@@ -52,7 +54,7 @@ const shownRows = computed(() => unavailable.value || !loaded.value ? rows.value
   <section
     aria-labelledby="runtime-heading"
     data-testid="command-runtime"
-    class="rounded-panel border border-line bg-card px-4 py-3 flex flex-col gap-3 min-w-0"
+    class="cc-card rounded-xl border border-line px-4 py-3 flex flex-col gap-3 min-w-0"
   >
     <header class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <h2 id="runtime-heading" class="m-0 text-body font-semibold text-fg">
@@ -90,6 +92,6 @@ const shownRows = computed(() => unavailable.value || !loaded.value ? rows.value
       LocalScope is not connected, so machine counts are unknown — not zero.
     </p>
 
-    <RuntimeTopology :agents="agents" />
+    <RuntimeTopology :agents="agents" :live="live" />
   </section>
 </template>

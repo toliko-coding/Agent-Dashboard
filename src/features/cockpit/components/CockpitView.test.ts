@@ -21,7 +21,7 @@ vi.mock('@/composables/useViewState', () => ({
   useViewState: () => ({ activeView }),
 }))
 // Panels with their own fetches and their own tests; here only their place matters.
-for (const panel of ['ActivityFeedPanel', 'ClaudeUsagePanel', 'GitHubPanel', 'MachineResourcesPanel', 'MemoryPanel', 'PipelinePanel', 'ProjectsSummaryPanel', 'RoutinesPanel', 'RuntimeSection', 'CommandStatusStrip'])
+for (const panel of ['ActivityFeedPanel', 'ClaudeUsagePanel', 'CommandHero', 'GitHubPanel', 'MachineResourcesPanel', 'MemoryPanel', 'PipelinePanel', 'ProjectsSummaryPanel', 'RoutinesPanel', 'RuntimeSection', 'CommandStatusStrip'])
   vi.doMock(`./${panel}.vue`, () => ({ default: { name: panel, template: `<section data-testid="stub-${panel}" />` } }))
 
 function item(subject: AttentionItem['subject'], id: string): AttentionItem {
@@ -57,7 +57,7 @@ describe('command page — layout', () => {
 
   it('answers in order: status, what needs me, what is working, the runtime, then the rest', async () => {
     const w = await render()
-    expect(order(w)).toEqual(['stub-CommandStatusStrip', 'needs-you', 'command-main', 'command-secondary', 'command-integrations'])
+    expect(order(w)).toEqual(['stub-CommandHero', 'stub-CommandStatusStrip', 'needs-you', 'command-main', 'command-secondary', 'command-integrations'])
     const children = (id: string) => [...w.get(`[data-testid="${id}"]`).element.children].map(c => c.getAttribute('data-testid'))
     expect(children('command-main')).toEqual(['command-primary', 'command-rail'])
     expect(children('command-primary')).toEqual(['active-work', 'stub-RuntimeSection'])

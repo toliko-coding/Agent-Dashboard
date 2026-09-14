@@ -11,6 +11,7 @@ import { activeWorkAgents, agentFootprint, liveAgents, workActivity } from '../c
 import ActiveWork from './ActiveWork.vue'
 import ActivityFeedPanel from './ActivityFeedPanel.vue'
 import ClaudeUsagePanel from './ClaudeUsagePanel.vue'
+import CommandHero from './CommandHero.vue'
 import CommandStatusStrip from './CommandStatusStrip.vue'
 import GitHubPanel from './GitHubPanel.vue'
 import MachineResourcesPanel from './MachineResourcesPanel.vue'
@@ -99,6 +100,8 @@ function openAgent(agent: Agent): void {
 
 <template>
   <div class="flex flex-col gap-4 min-w-0" data-testid="cockpit">
+    <CommandHero :live="live" />
+
     <CommandStatusStrip
       :attention="attention"
       :working="observed ? working.length : null"
@@ -120,7 +123,7 @@ function openAgent(agent: Agent): void {
           @select="openAgent"
         />
 
-        <RuntimeSection :agents="agents" :live-agent-count="sessions.length" />
+        <RuntimeSection :agents="agents" :live-agent-count="sessions.length" :live="live" />
       </div>
 
       <aside class="flex flex-col gap-4 min-w-0" aria-label="Usage, this machine and recent activity" data-testid="command-rail">

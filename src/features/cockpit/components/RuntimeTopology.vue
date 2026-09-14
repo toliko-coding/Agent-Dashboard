@@ -19,7 +19,7 @@ import RuntimeTopologyTree from './RuntimeTopologyTree.vue'
  * consumer. Those lists were deliberately kept off always-mounted surfaces, and
  * a collapsed section must not quietly bring them back.
  */
-defineProps<{ agents: Agent[] }>()
+defineProps<{ agents: Agent[], live?: boolean }>()
 
 const STORAGE_KEY = 'system-map-topology-expanded'
 
@@ -71,6 +71,6 @@ watch(expanded, (value) => {
       </h3>
       <span class="text-ui-sm text-fg-faint">Repository → workspace → agents, processes and services</span>
     </div>
-    <RuntimeTopologyTree v-if="expanded" id="runtime-topology-tree" :agents="agents" />
+    <RuntimeTopologyTree v-if="expanded" id="runtime-topology-tree" :agents="agents" :live="live" />
   </section>
 </template>

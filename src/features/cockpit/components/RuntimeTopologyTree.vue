@@ -17,11 +17,20 @@ import TopologyWorkspaceNode from './TopologyWorkspaceNode.vue'
  * without seeing the indentation. Connector lines draw the branches; they are
  * pseudo-elements, decoration only.
  *
+ * Flow (3N.2): a workspace's rail carries a travelling light only while one of
+ * its agents is working, agent updates are live and LocalScope's lists are
+ * current. A stale or unavailable reading, or a dropped agent stream, stops it:
+ * motion here claims "this is happening now", so it needs evidence that is.
+ *
  * The summary line counts what the tree holds. Processes and services are
  * counted only when LocalScope reported those lists — an unreported list is
  * already stated as unknown above the tree, never summed as zero.
  */
-const props = defineProps<{ agents: Agent[] }>()
+const props = defineProps<{
+  agents: Agent[]
+  /** Agent updates are arriving. Without them nothing flows. */
+  live?: boolean
+}>()
 
 const services = useMachineServices()
 const processes = useMachineProcesses()
@@ -65,6 +74,13 @@ const summary = computed(() => {
     parts.push(plural(serviceItems.value.length, 'service', 'services'))
   return parts.join(' · ')
 })
+
+const fresh = computed(() => [services.data.value, processes.data.value]
+  .every(reading => reading.source !== 'stale' && reading.source !== 'unavailable'))
+
+function flowing(node: { agents: Agent[] }): boolean {
+  return !!props.live && fresh.value && node.agents.some(a => a.working && a.status !== 'finished')
+}
 
 // One branch tick per workspace, drawn from the repository's rail.
 const BRANCH = 'relative before:absolute before:-left-3 before:top-4 before:h-px before:w-3 before:bg-line-strong'
@@ -114,12 +130,13 @@ function plural(n: number, one: string, many: string): string {
             data-testid="topology-workspace-count"
           >{{ repo.workspaces.length }} workspaces</span>
         </p>
-        <ul class="ml-1 mt-2 flex flex-col gap-2 border-l border-line-strong pl-3 min-w-0" :aria-label="`Workspaces in repository ${repo.label}`">
+        <ul class="ml-1 mt-2 flex flex-col gap-2 border-l border-line-strong pl-3 min-w-0" :class="repo.workspaces.some(flowing) ? 'cc-rail-flow motion-rail' : ''" :aria-label="`Workspaces in repository ${repo.label}`">
           <li v-for="node in repo.workspaces" :key="node.key" :class="BRANCH">
             <TopologyWorkspaceNode
               :node="node"
               :services-known="serviceItems !== null"
               :processes-known="processItems !== null"
+              :flowing="flowing(node)"
             />
           </li>
         </ul>
@@ -140,6 +157,7 @@ function plural(n: number, one: string, many: string): string {
               :node="node"
               :services-known="serviceItems !== null"
               :processes-known="processItems !== null"
+              :flowing="flowing(node)"
             />
           </li>
         </ul>

@@ -27,12 +27,15 @@ import { agentDisplayStatus, statusLabel } from '@/utils/statusColors'
  *
  * No path is shown. The workspace is identified by its branch and kind; a
  * worktree also shows its directory name, the one safe distinguishing fact
- * when two of them are detached. No motion: the topology is structure.
+ * when two of them are detached. The only motion is the rail's flow, and only
+ * when `flowing` says the evidence is live.
  */
 const props = defineProps<{
   node: TopologyWorkspace
   servicesKnown: boolean
   processesKnown: boolean
+  /** A working agent here, live updates and a current LocalScope reading (see RuntimeTopologyTree). */
+  flowing?: boolean
 }>()
 
 const display = computed(() => workspaceDisplay(props.node.workspace))
@@ -93,7 +96,12 @@ const BRANCH = 'relative before:absolute before:-left-3 before:top-[0.7rem] befo
       <span v-if="showName" class="font-mono text-fg-faint break-all">{{ node.workspace.name }}</span>
     </p>
 
-    <ul class="ml-1.5 flex flex-col gap-1 border-l border-line-strong pl-3 text-ui-sm min-w-0" :aria-label="listLabel">
+    <ul
+      class="ml-1.5 flex flex-col gap-1 border-l border-line-strong pl-3 text-ui-sm min-w-0"
+      :class="flowing ? 'cc-rail-flow motion-rail' : ''"
+      :data-flowing="flowing ? 'true' : undefined"
+      :aria-label="listLabel"
+    >
       <li
         v-for="a in node.agents"
         :key="`${a.sessionId}-${a.pid}`"

@@ -69,7 +69,7 @@ function workspaceTitle(group: AgentGrouping): { title: string, kind: string, di
     aria-labelledby="active-work-heading"
     data-testid="active-work"
     :data-status="status"
-    class="rounded-panel border border-line bg-card min-w-0"
+    class="cc-card rounded-xl border border-line min-w-0"
   >
     <header class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 pt-3 pb-2">
       <h2 id="active-work-heading" class="m-0 text-title font-semibold text-fg">

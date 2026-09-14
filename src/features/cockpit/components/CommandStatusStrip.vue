@@ -5,17 +5,15 @@ import { computed } from 'vue'
 import { DataFreshnessIndicator, useLocalMachine } from '@/features/localscope'
 
 /*
- * One instrument across the top of Command: the few readings worth taking
- * before anything else, each from data the dashboard already has. Not a row of
- * tiles — one panel of labelled readings, with the counts large enough to read
- * across a room and everything else set small.
+ * Command's instruments (3N.2): a row of readings, each a small lit panel with
+ * its mark, its number and what the number is — from data the dashboard already
+ * has. Null is never drawn as zero: an unknown reading shows "…" or says why.
  *
- * Motion: the working reading's dot breathes while agents are working and
- * updates are live. Nothing else here moves; a count is not an activity.
+ * Motion: only the working reading's dot breathes, and only while agents work
+ * and updates are live. A count is not an activity.
  *
- * Connection state appears only when it is news. While agent updates arrive the
- * topbar and sidebar already say so; when they stop, this panel says the numbers
- * beside it are the last ones known.
+ * Connection state appears only when it is news; the hero and topbar already
+ * say when updates are live.
  */
 const props = defineProps<{
   attention: AttentionQueue
@@ -52,30 +50,29 @@ const localRuntime = computed(() => {
 })
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
+const TILE = 'cc-instrument flex min-w-0 flex-col gap-1.5 rounded-xl border border-line px-4 py-3'
+const DT = 'flex items-center gap-2 text-label uppercase tracking-wider text-fg-faint'
+const MARK = 'inline-flex size-6 shrink-0 items-center justify-center rounded-lg border border-line bg-raised/60 text-fg-soft'
 </script>
 
 <template>
-  <section
-    aria-label="Command status"
-    data-testid="command-status"
-    class="rounded-panel border border-line bg-card px-4 py-3 min-w-0"
-  >
-    <dl class="m-0 flex flex-wrap items-end gap-x-8 gap-y-3 min-w-0">
-      <div class="flex flex-col gap-1" data-testid="status-needs-you" :data-count="needsYou.count ?? undefined">
-        <dt class="text-label uppercase tracking-wider text-fg-faint">
-          Needs you
+  <section aria-label="Command status" data-testid="command-status" class="min-w-0">
+    <dl class="m-0 grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-[repeat(5,minmax(0,1fr))_auto]">
+      <div :class="TILE" data-testid="status-running" :data-count="running ?? undefined">
+        <dt :class="DT">
+          <span :class="MARK" aria-hidden="true"><svg viewBox="0 0 16 16" class="size-3.5" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5.5h8v7H4zM8 3v2.5M6.5 8.5h.01M9.5 8.5h.01" stroke-linecap="round" /></svg></span>
+          Agents
         </dt>
-        <dd
-          class="m-0 font-mono text-title-lg font-semibold leading-none tabular-nums"
-          :class="(needsYou.count ?? 0) > 0 ? 'text-warning-text' : 'text-fg'"
-          :aria-label="needsYou.label"
-        >
-          {{ needsYou.text }}
+        <dd class="m-0 flex items-baseline gap-1.5 leading-none">
+          <span class="font-mono text-title-lg font-semibold tabular-nums text-fg">{{ running === null || running === undefined ? '…' : running }}</span>{{ ' ' }}
+          <span v-if="running !== null && running !== undefined" class="text-ui-sm text-fg-mute">{{ running === 1 ? 'session' : 'sessions' }}</span>
         </dd>
       </div>
 
-      <div class="flex flex-col gap-1" data-testid="status-working" :data-count="working ?? undefined">
-        <dt class="text-label uppercase tracking-wider text-fg-faint">
+      <div :class="[TILE, (working ?? 0) > 0 ? 'cc-instrument-live' : '']" data-testid="status-working" :data-count="working ?? undefined">
+        <dt :class="DT">
+          <span :class="MARK" aria-hidden="true"><svg viewBox="0 0 16 16" class="size-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2.5 8h2.5l1.5-4 3 8 1.5-4h2.5" /></svg></span>
           Working
         </dt>
         <dd class="m-0 flex items-center gap-2 font-mono text-title-lg font-semibold leading-none tabular-nums text-fg">
@@ -93,18 +90,23 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
         </dd>
       </div>
 
-      <div v-if="running !== undefined" class="flex flex-col gap-1" data-testid="status-running" :data-count="running ?? undefined">
-        <dt class="text-label uppercase tracking-wider text-fg-faint">
-          Running
+      <div :class="[TILE, (needsYou.count ?? 0) > 0 ? 'cc-instrument-attention' : '']" data-testid="status-needs-you" :data-count="needsYou.count ?? undefined">
+        <dt :class="DT">
+          <span :class="MARK" aria-hidden="true"><svg viewBox="0 0 16 16" class="size-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 2.5l6 11H2z M8 6.5v3.2M8 11.6h.01" /></svg></span>
+          Needs you
         </dt>
-        <dd class="m-0 flex items-baseline gap-1.5 leading-none">
-          <span class="font-mono text-title-lg font-semibold tabular-nums text-fg">{{ running === null ? '…' : running }}</span>{{ ' ' }}
-          <span v-if="running !== null" class="text-ui-sm text-fg-mute">{{ running === 1 ? 'session' : 'sessions' }}</span>
+        <dd
+          class="m-0 font-mono text-title-lg font-semibold leading-none tabular-nums"
+          :class="(needsYou.count ?? 0) > 0 ? 'text-warning-text' : 'text-fg'"
+          :aria-label="needsYou.label"
+        >
+          {{ needsYou.text }}
         </dd>
       </div>
 
-      <div v-if="footprint" class="flex min-w-0 flex-col gap-1" data-testid="status-footprint">
-        <dt class="text-label uppercase tracking-wider text-fg-faint">
+      <div v-if="footprint" :class="TILE" data-testid="status-footprint">
+        <dt :class="DT">
+          <span :class="MARK" aria-hidden="true"><svg viewBox="0 0 16 16" class="size-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M5 3v7M5 10a2 2 0 1 0 0 3.5M11 6a2 2 0 1 0 0-3.5A2 2 0 0 0 11 6zM11 6c0 3-6 2-6 4" /></svg></span>
           Agents in
         </dt>
         <dd class="m-0 text-ui text-fg-soft tabular-nums">
@@ -112,17 +114,18 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
         </dd>
       </div>
 
-      <div class="flex min-w-0 flex-col gap-1" data-testid="status-local-runtime" :data-state="localRuntime.state">
-        <dt class="text-label uppercase tracking-wider text-fg-faint">
+      <div :class="TILE" data-testid="status-local-runtime" :data-state="localRuntime.state">
+        <dt :class="DT">
+          <span :class="MARK" aria-hidden="true"><svg viewBox="0 0 16 16" class="size-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3 3.5h10v4H3zM3 9.5h10v3.5H3zM5.5 5.5h.01M5.5 11.2h.01" /></svg></span>
           Local runtime
         </dt>
-        <dd class="m-0 flex flex-wrap items-baseline gap-x-2 text-ui text-fg-soft tabular-nums min-w-0">
+        <dd class="m-0 flex min-w-0 flex-wrap items-baseline gap-x-2 text-ui text-fg-soft tabular-nums">
           <span>{{ localRuntime.text }}</span>
           <DataFreshnessIndicator v-if="localRuntime.state !== 'loading'" :reading="machine" testid="status-local-runtime-freshness" />
         </dd>
       </div>
 
-      <div v-if="!live" class="flex flex-col gap-1 sm:ml-auto" data-testid="status-connection">
+      <div v-if="!live" class="flex flex-col justify-center gap-1 col-span-full xl:col-span-1" data-testid="status-connection">
         <dt class="sr-only">
           Agent updates
         </dt>
