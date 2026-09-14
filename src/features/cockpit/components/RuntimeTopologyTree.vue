@@ -74,7 +74,7 @@ function plural(n: number, one: string, many: string): string {
       <li
         v-for="repo in topology.repositories"
         :key="repo.key"
-        class="rounded-lg border border-line p-2 min-w-0"
+        class="rounded-panel border border-line bg-card p-3 min-w-0"
         data-testid="topology-repository"
         :data-repository-id="repo.id"
       >
@@ -88,7 +88,7 @@ function plural(n: number, one: string, many: string): string {
             data-testid="topology-workspace-count"
           >{{ repo.workspaces.length }} workspaces</span>
         </p>
-        <ul class="flex flex-col gap-2 mt-1.5 min-w-0" :aria-label="`Workspaces in repository ${repo.label}`">
+        <ul class="flex flex-col gap-2 mt-2 min-w-0" :aria-label="`Workspaces in repository ${repo.label}`">
           <li v-for="node in repo.workspaces" :key="node.key">
             <TopologyWorkspaceNode
               :node="node"
@@ -101,14 +101,14 @@ function plural(n: number, one: string, many: string): string {
 
       <li
         v-if="topology.local.length > 0"
-        class="rounded-lg border border-line p-2 min-w-0"
+        class="rounded-panel border border-line bg-card p-3 min-w-0"
         data-testid="topology-local"
       >
         <p class="flex flex-wrap items-baseline gap-2 min-w-0">
           <span class="text-label uppercase tracking-wider text-fg-faint">Local workspaces</span>
           <span class="text-ui-sm text-fg-faint">not in a Git repository</span>
         </p>
-        <ul class="flex flex-col gap-2 mt-1.5 min-w-0" aria-label="Local workspaces, not in a Git repository">
+        <ul class="flex flex-col gap-2 mt-2 min-w-0" aria-label="Local workspaces, not in a Git repository">
           <li v-for="node in topology.local" :key="node.key">
             <TopologyWorkspaceNode
               :node="node"
@@ -125,7 +125,7 @@ function plural(n: number, one: string, many: string): string {
       -->
       <li
         v-if="hasUnresolved"
-        class="rounded-lg border border-dashed border-line p-2 min-w-0"
+        class="rounded-panel border border-dashed border-line-strong p-3 min-w-0"
         data-testid="topology-unresolved"
       >
         <p class="text-label uppercase tracking-wider text-fg-faint">
@@ -138,7 +138,7 @@ function plural(n: number, one: string, many: string): string {
             class="flex items-baseline gap-2 min-w-0"
             data-testid="topology-unresolved-agent"
           >
-            <span class="text-label uppercase tracking-wider text-fg-faint w-16 shrink-0">Agent</span>
+            <span class="text-label uppercase tracking-wider text-fg-faint w-20 shrink-0">Agent</span>
             <span class="text-fg truncate">{{ agentTitle(a) }} · {{ statusLabel(agentDisplayStatus(a)) }}</span>
           </li>
           <li v-if="unresolved.processes" class="text-fg-mute" data-testid="topology-unresolved-processes">
