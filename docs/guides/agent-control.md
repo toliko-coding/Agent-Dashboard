@@ -72,7 +72,9 @@ In New Agent, **Workspace → New projectless workspace** creates a plain folder
 - **Permissions.** Exactly the new folder is added to the allowed working folders, never the projectless agents folder itself. Sensitive locations (`~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.config`, `~/.claude`) and your home folder itself are refused. Claude Code's own folder trust question is still asked and answered only by you, in the dialog or in Needs you.
 - **Changing the location.** Changing the projectless agents folder moves nothing that already exists.
 
-API: `GET`/`PUT /api/agents/projectless`, `POST /api/agents/projectless/preview`, and `POST /api/agents/spawn` with `"projectless": true`.
+- **Specialist templates.** A new projectless workspace can start from a server template (`"template": "resume-editor"` with the spawn). The server writes the scaffold only into the folder it just created — never over existing files — and removes it again if the agent fails to start. The Resume Editor template adds `master-cv/`, `job-descriptions/`, `tailored/`, `exports/`, `notes/`, a README and a `CLAUDE.md` with the agent's working rules, which Claude Code loads from the folder on every start and resume.
+
+API: `GET`/`PUT /api/agents/projectless`, `POST /api/agents/projectless/preview`, and `POST /api/agents/spawn` with `"projectless": true` (and optionally `"template"`).
 
 ### Stopping and deleting an agent
 

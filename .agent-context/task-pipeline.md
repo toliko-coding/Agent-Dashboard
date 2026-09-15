@@ -162,7 +162,7 @@ The following `pipeline/` symbols may be imported at runtime from `api/*` and `m
 | `ProgressOpts` | `types.go` | `api/tasks/handler.go`, `mcp/tools/control.go` |
 | `ResolvedProjectDir` | `session_reader.go` | `api/tasks/analyze_routes.go` |
 | `FindNewestSessionID` | `session_reader.go` | `api/tasks/cost_stage_routes.go` |
-| `ReadLastStageJsonOutput` | `session_reader.go` | `api/tasks/cost_stage_routes.go` |
+| `ReadLastStageJsonOutput` | `session_reader.go` | `api/tasks/cost_stage_routes.go`, `api/router.go` (roadmap proposal import from a dashboard-owned agent's final JSON block) |
 | `SessionFileExists` | `session_reader.go` | `api/tasks/handler.go` |
 | `ValidateStageOutput` | `completion_detector.go` | `api/agents/channel_stage_output.go` |
 

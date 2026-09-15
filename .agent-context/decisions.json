@@ -136,5 +136,23 @@
     "context": "Phase 4A asked for runs, stages, roles, handoffs, attention, failure, bounded retries/review loops and recovery. The task pipeline already persists and enforces all of them.",
     "decision": "ADR-0014: Run = task, execution = stage_run, role = stage, handoff = structured stage output, attention = awaiting_user/permission requests via Needs you, bounds = max_iterations/maxAutoRetries/maxParallelOrchestrators/plan cap, recovery = DecideRecovery + sweeps. Clients use src/utils/runState.ts (queued/preparing/running/waiting_user/succeeded/failed/cancelled, timeline) derived from persisted fields only; failure categories only where persisted state proves them.",
     "consequences": "No duplicate run tables. Gaps: per-stage output schemas for backlog/plan_review/implementation, a persisted failure_category, a Project Manager role above tasks."
+  },
+  {
+    "id": "AD-2026-09-15-project-intelligence-roadmap",
+    "title": "Project roadmaps are normalized rows with server-assigned provenance and an explicit current phase",
+    "status": "accepted",
+    "date": "2026-09-15",
+    "context": "Phase 4B asked for a Project Intelligence roadmap that never fabricates progress and distinguishes user-defined, dashboard-verified and AI-suggested information.",
+    "decision": "roadmap_phase and roadmap_item rows (cascade from project), roadmap_proposal holding an immutable validated JSON payload. internal/roadmap scopes every operation by project, keeps at most one is_current phase per project (explicit, never first-incomplete), assigns provenance server-side (user on edit, suggested on proposal accept, verified only for items linked to a same-project pipeline task whose status is read from the task), and reports progress only as completed/non-skipped items. AI proposals are pending until accepted (append or replace) or rejected, imported only from a dashboard-owned agent running in the project's folders, and the analysis agent is spawned with a server-written prompt through the normal spawn policy.",
+    "consequences": "No percentages without items; no silent AI overwrites; cross-project access is 404. Dependencies are a JSON id list validated to the same project rather than a separate table."
+  },
+  {
+    "id": "AD-2026-09-15-specialist-templates",
+    "title": "Specialist agents are projectless workspaces scaffolded from server templates with rules in CLAUDE.md",
+    "status": "accepted",
+    "date": "2026-09-15",
+    "context": "Phase 4C: a durable Resume Editor agent with a stable role across restarts and Resume under Dashboard, without a Project or Git.",
+    "decision": "services.ProjectlessTemplate (first: resume-editor) is applied only to the folder a projectless spawn just created (O_EXCL, never over existing files) and rolled back on a failed spawn. The specialist's rules live in the workspace CLAUDE.md, which Claude Code loads on every start and resume, instead of a spawn-time system prompt that resume would drop.",
+    "consequences": "The role is visible and editable by the user in their folder. New specialists are new template entries, not new agent types."
   }
 ]
