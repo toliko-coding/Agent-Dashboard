@@ -304,3 +304,35 @@ func titles(rm roadmap.Roadmap) []string {
 	}
 	return out
 }
+
+// Phase 4.1: Add imports only the phases the roadmap does not have; a changed or
+// unchanged phase is never duplicated, and a proposal with nothing new is refused.
+func TestAcceptAppendAddsOnlyNewPhases(t *testing.T) {
+	ctx := t.Context()
+	c := openDB(t)
+	s := roadmap.New(c)
+	p := newProject(t, c, "p")
+	mine, _ := s.AddPhase(ctx, p, roadmap.PhaseInput{Title: "Project Intelligence", Status: roadmap.StatusActive})
+
+	payload, err := roadmap.ValidateProposal(proposal(
+		map[string]any{"title": "  project   INTELLIGENCE ", "status": "completed"},
+		map[string]any{"title": "Orchestration", "status": "active", "current": true},
+	))
+	require.NoError(t, err)
+	created, err := s.CreateProposal(ctx, p, payload, "sess-1")
+	require.NoError(t, err)
+	require.NoError(t, s.AcceptProposal(ctx, p, created.ID, roadmap.AcceptAppend))
+
+	rm, _ := s.Get(ctx, p)
+	require.Equal(t, []string{"Project Intelligence", "Orchestration"}, titles(rm))
+	require.Equal(t, mine, rm.Phases[0].ID)
+	require.Equal(t, roadmap.StatusActive, rm.Phases[0].Status, "a proposed change to an existing phase is not applied by Add")
+	require.Equal(t, roadmap.ProvenanceUser, rm.Phases[0].Provenance)
+	require.Equal(t, roadmap.ProvenanceSuggested, rm.Phases[1].Provenance)
+
+	nothingNew, _ := s.CreateProposal(ctx, p, payload, "sess-1")
+	require.True(t, isInvalid(s.AcceptProposal(ctx, p, nothingNew.ID, roadmap.AcceptAppend)), "nothing new to add")
+	rm, _ = s.Get(ctx, p)
+	require.Len(t, rm.Phases, 2)
+	require.Equal(t, 1, rm.PendingProposals, "a refused Add leaves the proposal pending")
+}

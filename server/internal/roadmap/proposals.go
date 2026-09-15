@@ -273,13 +273,29 @@ func (s *Service) AcceptProposal(ctx context.Context, projectID, proposalID, mod
 			if err != nil {
 				return err
 			}
-			if len(existing)+len(payload.Phases) > MaxPhases {
-				return invalid("accepting would exceed %d phases; replace instead", MaxPhases)
-			}
+			// Append adds only the phases the roadmap does not already have (by
+			// normalized title). A proposed change to an existing phase is shown
+			// in review but never applied by Add — that takes Replace or an edit.
+			known := make(map[string]bool, len(existing))
 			for _, e := range existing {
 				pos = max(pos, e.Position+1)
 				hasCurrent = hasCurrent || e.IsCurrent
+				known[NormalizeTitle(e.Title)] = true
 			}
+			additions := payload.Phases[:0:0]
+			for _, ph := range payload.Phases {
+				if !known[NormalizeTitle(ph.Title)] {
+					additions = append(additions, ph)
+					known[NormalizeTitle(ph.Title)] = true
+				}
+			}
+			if len(additions) == 0 {
+				return invalid("the proposal has no new phases to add; replace instead, or reject it")
+			}
+			if len(existing)+len(additions) > MaxPhases {
+				return invalid("accepting would exceed %d phases; replace instead", MaxPhases)
+			}
+			payload.Phases = additions
 		}
 		for i, ph := range payload.Phases {
 			phaseID := uuid.NewString()
@@ -304,4 +320,12 @@ func (s *Service) AcceptProposal(ctx context.Context, projectID, proposalID, mod
 		}
 		return tx.RoadmapProposal.UpdateOneID(proposalID).SetStatus(ProposalAccepted).SetDecidedAt(s.now()).Exec(ctx)
 	})
+}
+
+// NormalizeTitle is how a proposed phase is matched to an existing one:
+// case-insensitive, with surrounding and repeated whitespace ignored. The
+// review screen (src/features/projects/roadmap/roadmapModel.ts proposalDiff)
+// matches the same way.
+func NormalizeTitle(title string) string {
+	return strings.ToLower(strings.Join(strings.Fields(title), " "))
 }
