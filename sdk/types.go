@@ -237,6 +237,10 @@ type BtwMessage struct {
 // Ahead and Behind are pointers so JSON null is preserved when the base
 // branch cannot be resolved on `origin` (e.g. local-only base).
 type WorktreeStatusDTO struct {
+	// Exists is false when the task records a worktree path whose folder is
+	// gone (removed outside the dashboard). The other fields are then unknown,
+	// not clean; removing the worktree clears the stale path.
+	Exists    bool   `json:"exists"`
 	Branch    string `json:"branch"`
 	Ahead     *int   `json:"ahead"`
 	Behind    *int   `json:"behind"`

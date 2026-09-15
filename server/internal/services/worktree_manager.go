@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strconv"
 	"strings"
@@ -61,6 +62,16 @@ func (m *WorktreeManager) WorktreeStatus(ctx context.Context, taskID string) (*s
 	}
 	cwd := *task.WorktreePath
 
+	// A folder removed outside the dashboard has no status to read: say so
+	// instead of reporting it as a clean worktree with no files.
+	if _, statErr := os.Stat(cwd); errors.Is(statErr, fs.ErrNotExist) {
+		dto := &sdk.WorktreeStatusDTO{Exists: false}
+		if task.SourceBranch != nil {
+			dto.Branch = *task.SourceBranch
+		}
+		return dto, nil
+	}
+
 	branch := m.currentBranch(ctx, cwd)
 	if branch == "" && task.SourceBranch != nil {
 		branch = *task.SourceBranch
@@ -76,6 +87,7 @@ func (m *WorktreeManager) WorktreeStatus(ctx context.Context, taskID string) (*s
 	dirty, fileCount := m.dirtyState(ctx, cwd)
 
 	dto := &sdk.WorktreeStatusDTO{
+		Exists:    true,
 		Branch:    branch,
 		Dirty:     dirty,
 		FileCount: fileCount,

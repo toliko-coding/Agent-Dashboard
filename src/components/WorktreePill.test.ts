@@ -41,7 +41,7 @@ describe('worktreePill', () => {
   })
 
   it('renders clean branch (no dirty dot, no counts when both null)', async () => {
-    setStatus({ branch: 'feat/foo', dirty: false, fileCount: 0, ahead: undefined, behind: undefined })
+    setStatus({ exists: true, branch: 'feat/foo', dirty: false, fileCount: 0, ahead: undefined, behind: undefined })
     const wrapper = mount(WorktreePill, { props: { taskId: 't1' } })
     await flushPromises()
     expect(wrapper.find('[data-testid="worktree-pill"]').exists()).toBe(true)
@@ -51,14 +51,14 @@ describe('worktreePill', () => {
   })
 
   it('renders dirty dot when dirty=true', async () => {
-    setStatus({ branch: 'feat/foo', dirty: true, fileCount: 3, ahead: 0, behind: 0 })
+    setStatus({ exists: true, branch: 'feat/foo', dirty: true, fileCount: 3, ahead: 0, behind: 0 })
     const wrapper = mount(WorktreePill, { props: { taskId: 't1' } })
     await flushPromises()
     expect(wrapper.find('[data-testid="worktree-pill-dirty"]').exists()).toBe(true)
   })
 
   it('renders ahead-only counts', async () => {
-    setStatus({ branch: 'feat/foo', dirty: false, fileCount: 0, ahead: 2, behind: undefined })
+    setStatus({ exists: true, branch: 'feat/foo', dirty: false, fileCount: 0, ahead: 2, behind: undefined })
     const wrapper = mount(WorktreePill, { props: { taskId: 't1' } })
     await flushPromises()
     const counts = wrapper.find('[data-testid="worktree-pill-counts"]')
@@ -68,7 +68,7 @@ describe('worktreePill', () => {
   })
 
   it('renders behind-only counts', async () => {
-    setStatus({ branch: 'feat/foo', dirty: false, fileCount: 0, ahead: undefined, behind: 5 })
+    setStatus({ exists: true, branch: 'feat/foo', dirty: false, fileCount: 0, ahead: undefined, behind: 5 })
     const wrapper = mount(WorktreePill, { props: { taskId: 't1' } })
     await flushPromises()
     const counts = wrapper.find('[data-testid="worktree-pill-counts"]')
@@ -78,14 +78,14 @@ describe('worktreePill', () => {
   })
 
   it('renders no counts when ahead+behind both null (no base branch)', async () => {
-    setStatus({ branch: 'feat/foo', dirty: false, fileCount: 0, ahead: undefined, behind: undefined })
+    setStatus({ exists: true, branch: 'feat/foo', dirty: false, fileCount: 0, ahead: undefined, behind: undefined })
     const wrapper = mount(WorktreePill, { props: { taskId: 't1' } })
     await flushPromises()
     expect(wrapper.find('[data-testid="worktree-pill-counts"]').exists()).toBe(false)
   })
 
   it('truncates long branch names with an ellipsis', async () => {
-    setStatus({ branch: 'feat/this-is-a-really-long-branch-name-that-exceeds', dirty: false, fileCount: 0, ahead: 0, behind: 0 })
+    setStatus({ exists: true, branch: 'feat/this-is-a-really-long-branch-name-that-exceeds', dirty: false, fileCount: 0, ahead: 0, behind: 0 })
     const wrapper = mount(WorktreePill, { props: { taskId: 't1' } })
     await flushPromises()
     const branch = wrapper.find('[data-testid="worktree-pill-branch"]').text()
@@ -94,11 +94,21 @@ describe('worktreePill', () => {
   })
 
   it('clicking the pill button emits open', async () => {
-    setStatus({ branch: 'feat/foo', dirty: false, fileCount: 0, ahead: 0, behind: 0 })
+    setStatus({ exists: true, branch: 'feat/foo', dirty: false, fileCount: 0, ahead: 0, behind: 0 })
     const wrapper = mount(WorktreePill, { props: { taskId: 't1' } })
     await flushPromises()
     await wrapper.find('[data-testid="worktree-pill"]').trigger('click')
     expect(wrapper.emitted('open')).toBeTruthy()
     expect(wrapper.emitted('open')!.length).toBe(1)
+  })
+})
+
+describe('worktreePill — folder removed outside the dashboard', () => {
+  it('marks the worktree as missing', async () => {
+    setStatus({ exists: false, branch: 'feat/foo', dirty: false, fileCount: 0 })
+    const wrapper = mount(WorktreePill, { props: { taskId: 't1' } })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="worktree-pill-missing"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="worktree-pill"]').attributes('title')).toContain('missing')
   })
 })

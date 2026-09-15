@@ -237,6 +237,12 @@ export interface BtwMessage {
  * branch cannot be resolved on `origin` (e.g. local-only base).
  */
 export interface WorktreeStatusDTO {
+  /**
+   * Exists is false when the task records a worktree path whose folder is
+   * gone (removed outside the dashboard). The other fields are then unknown,
+   * not clean; removing the worktree clears the stale path.
+   */
+  exists: boolean
   branch: string
   ahead?: number
   behind?: number

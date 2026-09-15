@@ -18,7 +18,7 @@ function withSetup<T>(composable: () => T) {
 }
 
 function makeStatus(overrides: Partial<WorktreeStatusDTO> = {}): WorktreeStatusDTO {
-  return { branch: 'feat/x', ahead: 0, behind: 0, dirty: false, fileCount: 0, ...overrides }
+  return { exists: true, branch: 'feat/x', ahead: 0, behind: 0, dirty: false, fileCount: 0, ...overrides }
 }
 
 beforeEach(() => {

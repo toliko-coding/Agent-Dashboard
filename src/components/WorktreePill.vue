@@ -44,17 +44,18 @@ const showAheadBehind = computed(() => {
     v-if="status"
     type="button"
     class="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-px rounded border bg-raised text-fg-mute border-line cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-500"
-    :title="`Worktree on branch ${status.branch}${
+    :title="status.exists === false ? `Worktree folder missing (branch ${status.branch})` : `Worktree on branch ${status.branch}${
       status.ahead != null || status.behind != null
         ? ` — ahead ${status.ahead ?? 0}, behind ${status.behind ?? 0}`
         : ''
     }${status.dirty ? ` — ${status.fileCount} dirty file${status.fileCount === 1 ? '' : 's'}` : ''}`"
-    :aria-label="`Worktree on branch ${status.branch}, open details`"
+    :aria-label="status.exists === false ? `Worktree folder missing, branch ${status.branch}, open details` : `Worktree on branch ${status.branch}, open details`"
     data-testid="worktree-pill"
     @click="emit('open')"
   >
     <span aria-hidden="true">⎇</span>
     <span data-testid="worktree-pill-branch">{{ truncatedBranch }}</span>
+    <span v-if="status.exists === false" class="text-warning-text" data-testid="worktree-pill-missing">missing</span>
     <span
       v-if="showAheadBehind"
       class="flex items-center gap-0.5"

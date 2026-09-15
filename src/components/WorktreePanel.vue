@@ -111,7 +111,11 @@ async function handleCreate(): Promise<void> {
         No worktree status available.
       </p>
 
-      <dl v-if="status" class="grid grid-cols-[auto_1fr] gap-y-1.5 gap-x-4 text-[13px]">
+      <p v-if="status && status.exists === false" class="m-0 text-[11px] text-warning-text" data-testid="worktree-missing">
+        The worktree folder no longer exists at <span class="font-mono break-all">{{ worktreePath }}</span>, so its files cannot be shown. Remove clears it from this task.
+      </p>
+
+      <dl v-if="status && status.exists !== false" class="grid grid-cols-[auto_1fr] gap-y-1.5 gap-x-4 text-[13px]">
         <div class="contents">
           <dt class="text-fg-mute text-[11px] uppercase tracking-[0.5px]">
             Branch
@@ -186,7 +190,7 @@ async function handleCreate(): Promise<void> {
 
         <!-- Open in editor -->
         <a
-          v-if="editorHrefComputed"
+          v-if="editorHrefComputed && status?.exists !== false"
           :href="editorHrefComputed"
           target="_blank"
           rel="noopener noreferrer"
@@ -196,6 +200,7 @@ async function handleCreate(): Promise<void> {
           Open
         </a>
         <AppSelect
+          v-if="status?.exists !== false"
           v-model="editorScheme"
           :options="editorSchemeOptions"
           class="text-[11px]"

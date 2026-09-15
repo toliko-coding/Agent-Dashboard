@@ -416,3 +416,46 @@ func TestHasUnpushedWork_DirtyWorktree(t *testing.T) {
 		t.Fatal("expected true: worktree has uncommitted changes")
 	}
 }
+
+// Phase 4.1.1: a worktree folder removed outside the dashboard is reported as
+// missing — never as a clean worktree with no files — and Remove still clears it.
+func TestWorktreeStatus_FolderRemovedOutsideDashboard(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not found")
+	}
+	repoDir := t.TempDir()
+	initGitRepo(t, repoDir)
+	mgr, taskRepo := newWTManager(t)
+	id := createTestTask(t, taskRepo, "vanished-wt", repoDir)
+
+	path, err := mgr.CreateWorktree(t.Context(), id)
+	if err != nil {
+		t.Fatalf("CreateWorktree: %v", err)
+	}
+	st, err := mgr.WorktreeStatus(t.Context(), id)
+	if err != nil || st == nil || !st.Exists {
+		t.Fatalf("a live worktree must report exists=true, got %+v err=%v", st, err)
+	}
+
+	if err := os.RemoveAll(path); err != nil {
+		t.Fatal(err)
+	}
+	st, err = mgr.WorktreeStatus(t.Context(), id)
+	if err != nil || st == nil {
+		t.Fatalf("status for a vanished folder: %+v err=%v", st, err)
+	}
+	if st.Exists || st.Dirty || st.FileCount != 0 || st.Ahead != nil || st.Behind != nil {
+		t.Fatalf("a vanished folder must report exists=false and nothing else, got %+v", st)
+	}
+
+	if err := mgr.RemoveWorktree(t.Context(), id, false); err != nil {
+		t.Fatalf("RemoveWorktree on a vanished folder: %v", err)
+	}
+	task, err := taskRepo.GetByID(t.Context(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.WorktreePath != nil && *task.WorktreePath != "" {
+		t.Fatalf("Remove must clear the stale path, got %q", *task.WorktreePath)
+	}
+}

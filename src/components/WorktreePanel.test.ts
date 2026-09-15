@@ -62,7 +62,7 @@ afterEach(() => {
 describe('worktreePanel', () => {
   describe('copy-path', () => {
     it('clicking Copy path copies the path via the clipboard composable', async () => {
-      setStatus({ branch: 'feat/foo', dirty: false, fileCount: 2, ahead: 0, behind: 0 })
+      setStatus({ exists: true, branch: 'feat/foo', dirty: false, fileCount: 2, ahead: 0, behind: 0 })
       const wrapper = mount(WorktreePanel, {
         props: { taskId: 't1', worktreePath: '/home/user/worktrees/task1', active: true },
       })
@@ -74,7 +74,7 @@ describe('worktreePanel', () => {
 
   describe('remove-clean', () => {
     it('clicking Remove on a clean worktree calls remove(false) and emits change', async () => {
-      setStatus({ branch: 'feat/foo', dirty: false, fileCount: 2, ahead: 0, behind: 0 })
+      setStatus({ exists: true, branch: 'feat/foo', dirty: false, fileCount: 2, ahead: 0, behind: 0 })
       const wrapper = mount(WorktreePanel, {
         props: { taskId: 't1', worktreePath: '/home/user/worktrees/task1', active: true },
       })
@@ -88,7 +88,7 @@ describe('worktreePanel', () => {
 
   describe('remove-dirty-confirm', () => {
     it('clicking Remove on a dirty worktree shows inline confirm without calling remove', async () => {
-      setStatus({ branch: 'feat/foo', dirty: true, fileCount: 3, ahead: 0, behind: 0 })
+      setStatus({ exists: true, branch: 'feat/foo', dirty: true, fileCount: 3, ahead: 0, behind: 0 })
       const wrapper = mount(WorktreePanel, {
         props: { taskId: 't1', worktreePath: '/home/user/worktrees/task1', active: true },
       })
@@ -100,7 +100,7 @@ describe('worktreePanel', () => {
     })
 
     it('confirming the dirty prompt calls remove(true) and emits change', async () => {
-      setStatus({ branch: 'feat/foo', dirty: true, fileCount: 3, ahead: 0, behind: 0 })
+      setStatus({ exists: true, branch: 'feat/foo', dirty: true, fileCount: 3, ahead: 0, behind: 0 })
       const wrapper = mount(WorktreePanel, {
         props: { taskId: 't1', worktreePath: '/home/user/worktrees/task1', active: true },
       })
@@ -131,5 +131,20 @@ describe('worktreePanel', () => {
       expect(createMock).toHaveBeenCalled()
       expect(wrapper.emitted('change')).toBeTruthy()
     })
+  })
+})
+
+describe('worktreePanel — folder removed outside the dashboard', () => {
+  it('says the folder is gone instead of showing a clean worktree, and keeps Remove', async () => {
+    setStatus({ exists: false, branch: 'feat/foo', dirty: false, fileCount: 0 })
+    const wrapper = mount(WorktreePanel, {
+      props: { taskId: 't1', worktreePath: '/home/user/worktrees/gone', active: true },
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="worktree-missing"]').text()).toContain('no longer exists')
+    expect(wrapper.find('[data-testid="worktree-panel-files"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="worktree-open-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="worktree-editor-scheme"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="worktree-remove-btn"]').exists()).toBe(true)
   })
 })
