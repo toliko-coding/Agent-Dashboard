@@ -12,6 +12,7 @@ import { toast } from '@/composables/useToast'
 import { AgentChatStream } from '@/features/agents'
 import RefineStatusPanel from '@/features/pipeline/components/RefineStatusPanel.vue'
 import StageOutputView from '@/features/pipeline/components/StageOutputView.vue'
+import RunTimeline from '@/features/pipeline/components/task/RunTimeline.vue'
 import TaskPendingRequests from '@/features/pipeline/components/task/TaskPendingRequests.vue'
 import { useInjectedTask, useInjectedTaskDetails } from '@/features/pipeline/composables/taskModalContext'
 import { completedPhasesFromTurns, fetchRefineTurns, lastAssistantContent } from '@/features/pipeline/composables/useRefinementChat'
@@ -146,6 +147,7 @@ watch(
 
 <template>
   <section v-if="task" class="flex-1 overflow-y-auto p-5 flex flex-col gap-4 min-h-0">
+    <RunTimeline v-if="task" :task="task" :stage-runs="stageRuns" class="mb-4" />
     <!-- Lingering-pending gate: orchestrator refuses to respawn while pendings linger. -->
     <div
       v-if="task.blockedByPendingPermissions"
