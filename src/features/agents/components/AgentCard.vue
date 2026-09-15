@@ -12,6 +12,7 @@ import { useNow } from '@/composables/useNow'
 import { toast } from '@/composables/useToast'
 import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vue'
 import MetricsPopover from '@/features/agents/components/MetricsPopover.vue'
+import { useMainAgent } from '@/features/agents/composables/useMainAgent'
 import { useMetricsDisclosure } from '@/features/agents/composables/useMetricsDisclosure'
 import { agentKind } from '@/utils/agentCategory'
 import { agentActivity, agentTechnical, agentTitle, agentTopic, workActivity } from '@/utils/agentLabels'
@@ -63,6 +64,9 @@ const emit = defineEmits<{ select: [agent: Agent] }>()
 const { nowMs } = useNow()
 const { requestStop, requestDelete } = useAgentLifecycle()
 const { requestEdit } = useAgentProfileEditor()
+// The agent that maintains Agent Dashboard itself; a designation, never inferred
+// from the folder it works in, and it grants nothing.
+const { isMain } = useMainAgent()
 
 const isFinished = computed(() => props.agent.status === 'finished')
 // Stop and Delete only for an agent this dashboard launched (3N.2.1).
@@ -263,6 +267,12 @@ const ICON_BUTTON = 'inline-flex size-8 shrink-0 items-center justify-center rou
         <span class="w-full min-w-0 truncate text-body font-semibold leading-tight text-fg" data-testid="agent-card-title" :title="title">{{ title }}</span>
         <span class="flex max-w-full min-w-0 items-center gap-2 text-ui-sm">
           <AppBadge :variant="displayStatus" :title="statusBadgeTitle" :still="stale" />
+          <span
+            v-if="isMain(agent)"
+            class="shrink-0 rounded-control border border-accent/50 px-1.5 py-px text-label font-semibold uppercase tracking-wide text-accent"
+            data-testid="agent-card-main"
+            title="Main agent — maintains Agent Dashboard itself. A designation only: it grants no permissions."
+          >Main</span>
           <span class="truncate text-fg-faint" data-testid="agent-card-since">{{ since }}</span>
         </span>
       </button>

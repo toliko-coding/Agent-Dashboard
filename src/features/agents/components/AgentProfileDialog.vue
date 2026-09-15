@@ -8,6 +8,7 @@ import AppInput from '@/components/ui/AppInput.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import { updateAgentProfile, useAgentProfileEditor } from '@/composables/useAgentLifecycle'
 import { useAgents } from '@/features/agents/composables/useAgents'
+import { isMainAgent, setMainAgent, useMainAgent } from '@/features/agents/composables/useMainAgent'
 import { agentTitle } from '@/utils/agentLabels'
 import { agentPurpose, DEFAULT_AGENT_PURPOSE } from '@/utils/agentPurpose'
 
@@ -25,6 +26,14 @@ const { applyAgentProfile } = useAgents({ autoStart: false })
 
 const name = ref('')
 const category = ref<AgentPurpose>(DEFAULT_AGENT_PURPOSE)
+/*
+ * Main agent: which agent maintains Agent Dashboard itself. A designation, not
+ * a permission - it changes how the agent is shown and nothing else. Offered
+ * only for an agent the dashboard started, because it is stored as a session id
+ * and must never decorate a session the dashboard does not own.
+ */
+const { mainSessionId } = useMainAgent()
+const isMain = ref(false)
 const busy = ref(false)
 const error = ref('')
 
@@ -34,6 +43,7 @@ watch(editing, (agent) => {
   if (agent) {
     name.value = agent.displayName ?? ''
     category.value = agentPurpose(agent)
+    isMain.value = isMainAgent(agent, mainSessionId.value)
   }
 }, { immediate: true })
 
@@ -58,6 +68,10 @@ async function save() {
       category: category.value === DEFAULT_AGENT_PURPOSE ? '' : category.value,
     })
     applyAgentProfile(agent.sessionId, saved)
+    // Designation is a separate setting, written only when it changed: saving a
+    // name must not silently re-point the main agent.
+    if (isMain.value !== isMainAgent(agent, mainSessionId.value))
+      await setMainAgent(isMain.value ? agent.sessionId : '')
     busy.value = false
     cancelEdit()
   }
@@ -104,6 +118,19 @@ async function save() {
           Icon
         </AppFieldLabel>
         <AgentPurposeField id="agent-profile-icon" v-model="category" testid="agent-profile-icon" />
+      </div>
+
+      <div v-if="editing.dashboardOwned" class="flex flex-col gap-1.5">
+        <AppFieldLabel for="agent-profile-main">
+          Role
+        </AppFieldLabel>
+        <label class="flex items-start gap-2 text-ui-sm text-fg-soft" for="agent-profile-main">
+          <input id="agent-profile-main" v-model="isMain" type="checkbox" class="mt-0.5 cursor-pointer" data-testid="agent-profile-main">
+          <span class="flex flex-col gap-0.5">
+            <span>Main agent — maintains Agent Dashboard itself.</span>
+            <span class="text-fg-mute">A label only: it grants no permission, no authority over other agents, and no exemption from ownership. Choosing it replaces any current main agent.</span>
+          </span>
+        </label>
       </div>
 
       <p v-if="error" class="m-0 rounded-control bg-danger-soft px-3 py-2 text-ui-sm text-danger-text" role="alert" data-testid="agent-profile-error">
