@@ -33,9 +33,35 @@ func ValidateStageOutput(stage string, output map[string]any) ValidationResult {
 		return validateSelfReview(output)
 	case "finalization":
 		return validateFinalization(output)
+	case "implementation":
+		return validateImplementation(output)
 	default:
 		return ValidationResult{OK: true}
 	}
+}
+
+// validateImplementation checks the Developer handoff (Phase 4.1). Lists may be
+// empty — a task that changes no files reports changedFiles: [] — but every
+// field must be present with the right type, so prose alone is never success.
+func validateImplementation(o map[string]any) ValidationResult {
+	if _, ok := o["summary"].(string); !ok {
+		return missing("summary (string)")
+	}
+	for _, field := range []string{"completedWork", "changedFiles", "validation", "risks", "blockers"} {
+		list, ok := o[field].([]any)
+		if !ok {
+			return missing(field + " (array of strings)")
+		}
+		for _, v := range list {
+			if _, ok := v.(string); !ok {
+				return ValidationResult{OK: false, Error: fmt.Sprintf("%s must contain only strings", field)}
+			}
+		}
+	}
+	if _, ok := o["nextAction"].(string); !ok {
+		return missing("nextAction (string)")
+	}
+	return ValidationResult{OK: true}
 }
 
 func missing(field string) ValidationResult {
@@ -78,6 +104,8 @@ type CompletionResult struct {
 	Retryable   bool
 	Infra       bool
 	RateLimited bool
+	// Category is the failure category of a failed result (Failure* constants).
+	Category string
 }
 
 type CompletionDeps struct {
@@ -130,7 +158,7 @@ func DetectCompletion(sr *ent.StageRun, cwd string, deps CompletionDeps) (Comple
 				defer func() { _ = os.Remove(syntheticFile) }() // clean up synthetic session after reading
 				read, err := ReadLastStageJsonOutputFromFile(syntheticFile)
 				if err != nil {
-					return CompletionResult{Kind: "failed", Error: fmt.Sprintf("synthetic session read error: %s", err), Infra: true}, nil
+					return CompletionResult{Kind: "failed", Error: fmt.Sprintf("synthetic session read error: %s", err), Infra: true, Category: FailureAgentFailed}, nil
 				}
 				// A recovered, parseable output supersedes an earlier transient API error;
 				// only requeue as rate-limited when no output was produced.
@@ -147,6 +175,7 @@ func DetectCompletion(sr *ent.StageRun, cwd string, deps CompletionDeps) (Comple
 						Kind:        "failed",
 						Infra:       true,
 						RateLimited: true,
+						Category:    FailureAgentFailed,
 						Error:       fmt.Sprintf("agent hit API rate/usage limit (status %d)", read.APIError.Status),
 						Output:      out,
 					}, nil
@@ -162,13 +191,14 @@ func DetectCompletion(sr *ent.StageRun, cwd string, deps CompletionDeps) (Comple
 							Error:     "adapter did not produce a stage output block: it called neither set_stage_output nor emitted a ```json fence",
 							Output:    map[string]any{"agentMessage": trimmed},
 							Retryable: true,
+							Category:  FailureInvalidResult,
 						}, nil
 					}
-					return CompletionResult{Kind: "failed", Error: "no parseable json output in synthetic session", Infra: true}, nil
+					return CompletionResult{Kind: "failed", Error: "no parseable json output in synthetic session", Infra: true, Category: FailureInvalidResult}, nil
 				}
 				v := validateFn(sr.Stage, read.Output)
 				if !v.OK {
-					return CompletionResult{Kind: "failed", Error: v.Error, Output: read.Output, Retryable: true}, nil
+					return CompletionResult{Kind: "failed", Error: v.Error, Output: read.Output, Retryable: true, Category: FailureInvalidResult}, nil
 				}
 				return CompletionResult{Kind: "completed", Output: read.Output}, nil
 			}
@@ -181,11 +211,11 @@ func DetectCompletion(sr *ent.StageRun, cwd string, deps CompletionDeps) (Comple
 	}
 	if sessionID == "" {
 		if sr.StartedAt == nil {
-			return CompletionResult{Kind: "failed", Error: "stage_run never started — cannot locate session", Infra: true}, nil
+			return CompletionResult{Kind: "failed", Error: "stage_run never started — cannot locate session", Infra: true, Category: FailureSpawnFailed}, nil
 		}
 		found, err := findSessionFn(cwd, sr.StartedAt.Format("2006-01-02T15:04:05Z"))
 		if err != nil {
-			return CompletionResult{Kind: "failed", Error: fmt.Sprintf("session lookup error: %s", err), Infra: true}, nil
+			return CompletionResult{Kind: "failed", Error: fmt.Sprintf("session lookup error: %s", err), Infra: true, Category: FailureAgentFailed}, nil
 		}
 		sessionID = found
 		if sessionID != "" && deps.PersistSID != nil {
@@ -196,15 +226,16 @@ func DetectCompletion(sr *ent.StageRun, cwd string, deps CompletionDeps) (Comple
 	if sessionID == "" {
 		projectDir, _ := ResolvedProjectDir(cwd)
 		return CompletionResult{
-			Kind:  "failed",
-			Error: fmt.Sprintf("no session JSONL found in %s after %v (cwd=%s)", projectDir, sr.StartedAt, cwd),
-			Infra: true,
+			Kind:     "failed",
+			Error:    fmt.Sprintf("no session JSONL found in %s after %v (cwd=%s)", projectDir, sr.StartedAt, cwd),
+			Infra:    true,
+			Category: FailureAgentDisappeared,
 		}, nil
 	}
 
 	read, err := readOutputFn(cwd, sessionID)
 	if err != nil {
-		return CompletionResult{Kind: "failed", Error: fmt.Sprintf("session read error: %s", err), Infra: true}, nil
+		return CompletionResult{Kind: "failed", Error: fmt.Sprintf("session read error: %s", err), Infra: true, Category: FailureAgentFailed}, nil
 	}
 	// A recovered, parseable output supersedes an earlier transient API error;
 	// only requeue as rate-limited when no output was produced.
@@ -221,6 +252,7 @@ func DetectCompletion(sr *ent.StageRun, cwd string, deps CompletionDeps) (Comple
 			Kind:        "failed",
 			Infra:       true,
 			RateLimited: true,
+			Category:    FailureAgentFailed,
 			Error:       fmt.Sprintf("agent hit API rate/usage limit (status %d)", read.APIError.Status),
 			Output:      out,
 		}, nil
@@ -242,14 +274,15 @@ func DetectCompletion(sr *ent.StageRun, cwd string, deps CompletionDeps) (Comple
 				Error:     "agent did not produce a stage output block: it called neither set_stage_output nor emitted a ```json fence",
 				Output:    map[string]any{"agentMessage": trimmed},
 				Retryable: true,
+				Category:  FailureInvalidResult,
 			}, nil
 		}
-		return CompletionResult{Kind: "failed", Error: "no parseable json output in session tail", Infra: true}, nil
+		return CompletionResult{Kind: "failed", Error: "no parseable json output in session tail", Infra: true, Category: FailureInvalidResult}, nil
 	}
 
 	v := validateFn(sr.Stage, read.Output)
 	if !v.OK {
-		return CompletionResult{Kind: "failed", Error: v.Error, Output: read.Output, Retryable: true}, nil
+		return CompletionResult{Kind: "failed", Error: v.Error, Output: read.Output, Retryable: true, Category: FailureInvalidResult}, nil
 	}
 	return CompletionResult{Kind: "completed", Output: read.Output}, nil
 }

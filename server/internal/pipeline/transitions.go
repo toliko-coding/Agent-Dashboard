@@ -138,13 +138,15 @@ func (o *PipelineOrchestrator) applyTransitionWrites(
 			output = map[string]any{}
 		}
 		output["error"] = tr.Reason
-		if _, err := srRepo.Update(ctx, sr.ID, repo.UpdateStageRunInput{
-			Status: strPtr("failed"), EndedAt: &now, Output: output,
-		}); err != nil {
+		failIn := repo.UpdateStageRunInput{Status: strPtr("failed"), EndedAt: &now, Output: output}
+		if tr.Category != "" {
+			failIn.FailureCategory = strPtr(tr.Category)
+		}
+		if _, err := srRepo.Update(ctx, sr.ID, failIn); err != nil {
 			return nil, nil, nil, fmt.Errorf("applyTransition.fail.updateRun: %w", err)
 		}
 		_ = auditRepo.RecordTaskAudit(ctx, task.ID, nil, "stage_failed", "task:"+task.ID,
-			map[string]any{"stage": sr.Stage, "iteration": sr.Iteration, "error": tr.Reason})
+			map[string]any{"stage": sr.Stage, "iteration": sr.Iteration, "error": tr.Reason, "category": tr.Category})
 		updatedRunID = sr.ID
 		if o.opts.OnStageFailed != nil {
 			info := StageFailedInfo{StageRunID: sr.ID, Stage: sr.Stage, Iteration: sr.Iteration, Error: tr.Reason}
@@ -153,11 +155,15 @@ func (o *PipelineOrchestrator) applyTransitionWrites(
 		postCommit = append(postCommit, func() { o.stageRuns.releaseStageRun(ctx, sr.ID) })
 
 	case WaitUserTransition:
-		if _, err := srRepo.Update(ctx, sr.ID, repo.UpdateStageRunInput{
+		waitIn := repo.UpdateStageRunInput{
 			Status:   strPtr("awaiting_user"),
 			Output:   tr.Output,
 			PIDClear: tr.AgentDone, // clear dead PID so the awaiting_user reaper does not immediately re-fail
-		}); err != nil {
+		}
+		if tr.Category != "" {
+			waitIn.FailureCategory = strPtr(tr.Category)
+		}
+		if _, err := srRepo.Update(ctx, sr.ID, waitIn); err != nil {
 			return nil, nil, nil, fmt.Errorf("applyTransition.waitUser.updateRun: %w", err)
 		}
 		_ = auditRepo.RecordTaskAudit(ctx, task.ID, nil, "awaiting_user", "task:"+task.ID,
@@ -176,9 +182,11 @@ func (o *PipelineOrchestrator) applyTransitionWrites(
 				failOutput = map[string]any{}
 			}
 			failOutput["error"] = fmt.Sprintf("iteration limit reached (%d)", maxIter)
-			if _, err := srRepo.Update(ctx, sr.ID, repo.UpdateStageRunInput{
-				Status: strPtr("failed"), EndedAt: &now, Output: failOutput,
-			}); err != nil {
+			limitIn := repo.UpdateStageRunInput{Status: strPtr("failed"), EndedAt: &now, Output: failOutput}
+			if tr.Category != "" {
+				limitIn.FailureCategory = strPtr(tr.Category)
+			}
+			if _, err := srRepo.Update(ctx, sr.ID, limitIn); err != nil {
 				return nil, nil, nil, fmt.Errorf("applyTransition.iterate.limitFail: %w", err)
 			}
 			_ = auditRepo.RecordTaskAudit(ctx, task.ID, nil, "iteration_limit_reached", "task:"+task.ID,
@@ -190,9 +198,13 @@ func (o *PipelineOrchestrator) applyTransitionWrites(
 			}
 			postCommit = append(postCommit, func() { o.stageRuns.releaseStageRun(ctx, sr.ID) })
 		} else {
-			if _, err := srRepo.Update(ctx, sr.ID, repo.UpdateStageRunInput{
-				Status: strPtr("done"), EndedAt: &now, Output: tr.Output,
-			}); err != nil {
+			// An invalid result retried once keeps its category, so the run list
+			// never reads a rejected output as a plain success.
+			iterIn := repo.UpdateStageRunInput{Status: strPtr("done"), EndedAt: &now, Output: tr.Output}
+			if tr.Category != "" {
+				iterIn.FailureCategory = strPtr(tr.Category)
+			}
+			if _, err := srRepo.Update(ctx, sr.ID, iterIn); err != nil {
 				return nil, nil, nil, fmt.Errorf("applyTransition.iterate.updateRun: %w", err)
 			}
 			postCommit = append(postCommit, func() { o.stageRuns.releaseStageRun(ctx, sr.ID) })

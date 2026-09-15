@@ -140,6 +140,11 @@ func PendingUserPrompt(v string) predicate.StageRun {
 	return predicate.StageRun(sql.FieldEQ(FieldPendingUserPrompt, v))
 }
 
+// FailureCategory applies equality check predicate on the "failure_category" field. It's identical to FailureCategoryEQ.
+func FailureCategory(v string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldEQ(FieldFailureCategory, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.StageRun {
 	return predicate.StageRun(sql.FieldEQ(FieldCreatedAt, v))
@@ -983,6 +988,81 @@ func PendingUserPromptEqualFold(v string) predicate.StageRun {
 // PendingUserPromptContainsFold applies the ContainsFold predicate on the "pending_user_prompt" field.
 func PendingUserPromptContainsFold(v string) predicate.StageRun {
 	return predicate.StageRun(sql.FieldContainsFold(FieldPendingUserPrompt, v))
+}
+
+// FailureCategoryEQ applies the EQ predicate on the "failure_category" field.
+func FailureCategoryEQ(v string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldEQ(FieldFailureCategory, v))
+}
+
+// FailureCategoryNEQ applies the NEQ predicate on the "failure_category" field.
+func FailureCategoryNEQ(v string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldNEQ(FieldFailureCategory, v))
+}
+
+// FailureCategoryIn applies the In predicate on the "failure_category" field.
+func FailureCategoryIn(vs ...string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldIn(FieldFailureCategory, vs...))
+}
+
+// FailureCategoryNotIn applies the NotIn predicate on the "failure_category" field.
+func FailureCategoryNotIn(vs ...string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldNotIn(FieldFailureCategory, vs...))
+}
+
+// FailureCategoryGT applies the GT predicate on the "failure_category" field.
+func FailureCategoryGT(v string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldGT(FieldFailureCategory, v))
+}
+
+// FailureCategoryGTE applies the GTE predicate on the "failure_category" field.
+func FailureCategoryGTE(v string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldGTE(FieldFailureCategory, v))
+}
+
+// FailureCategoryLT applies the LT predicate on the "failure_category" field.
+func FailureCategoryLT(v string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldLT(FieldFailureCategory, v))
+}
+
+// FailureCategoryLTE applies the LTE predicate on the "failure_category" field.
+func FailureCategoryLTE(v string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldLTE(FieldFailureCategory, v))
+}
+
+// FailureCategoryContains applies the Contains predicate on the "failure_category" field.
+func FailureCategoryContains(v string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldContains(FieldFailureCategory, v))
+}
+
+// FailureCategoryHasPrefix applies the HasPrefix predicate on the "failure_category" field.
+func FailureCategoryHasPrefix(v string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldHasPrefix(FieldFailureCategory, v))
+}
+
+// FailureCategoryHasSuffix applies the HasSuffix predicate on the "failure_category" field.
+func FailureCategoryHasSuffix(v string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldHasSuffix(FieldFailureCategory, v))
+}
+
+// FailureCategoryIsNil applies the IsNil predicate on the "failure_category" field.
+func FailureCategoryIsNil() predicate.StageRun {
+	return predicate.StageRun(sql.FieldIsNull(FieldFailureCategory))
+}
+
+// FailureCategoryNotNil applies the NotNil predicate on the "failure_category" field.
+func FailureCategoryNotNil() predicate.StageRun {
+	return predicate.StageRun(sql.FieldNotNull(FieldFailureCategory))
+}
+
+// FailureCategoryEqualFold applies the EqualFold predicate on the "failure_category" field.
+func FailureCategoryEqualFold(v string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldEqualFold(FieldFailureCategory, v))
+}
+
+// FailureCategoryContainsFold applies the ContainsFold predicate on the "failure_category" field.
+func FailureCategoryContainsFold(v string) predicate.StageRun {
+	return predicate.StageRun(sql.FieldContainsFold(FieldFailureCategory, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

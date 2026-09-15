@@ -336,7 +336,8 @@ func (o *PipelineOrchestrator) drainHTTPResults(ctx context.Context) {
 					continue
 				}
 				if _, err := o.applyTransition(ctx, task, run, FailTransition{
-					Reason: fmt.Sprintf("HTTP adapter error: %s", res.err),
+					Reason:   fmt.Sprintf("HTTP adapter error: %s", res.err),
+					Category: FailureAgentFailed,
 				}); err != nil {
 					slog.Error("drainHTTPResults.applyFail", "err", err)
 				}
@@ -591,7 +592,8 @@ func (o *PipelineOrchestrator) enforceBudgetsAndTimeout(ctx context.Context, tas
 			fresh, _ := o.stageRuns.GetByID(ctx, run.ID)
 			if fresh != nil && fresh.Status == "running" {
 				if _, err := o.applyTransition(ctx, task, fresh, FailTransition{
-					Reason: fmt.Sprintf("stage timeout: ran %.0fs (limit %ds)", elapsed, timeoutSec),
+					Reason:   fmt.Sprintf("stage timeout: ran %.0fs (limit %ds)", elapsed, timeoutSec),
+					Category: FailureTimeout,
 				}); err != nil {
 					slog.Error("finalizeCompletedAsyncRuns.timeout", "err", err)
 				}
@@ -633,7 +635,7 @@ func (o *PipelineOrchestrator) handleFailedResult(ctx context.Context, task *ent
 				output[k] = v
 			}
 			output["rate_limit_retries_exhausted"] = maxRL
-			if _, err := o.applyTransition(ctx, task, fresh, FailTransition{Reason: result.Error, Output: output}); err != nil {
+			if _, err := o.applyTransition(ctx, task, fresh, FailTransition{Reason: result.Error, Output: output, Category: resultCategory(result)}); err != nil {
 				slog.Error("finalizeCompletedAsyncRuns.applyTransition.rateLimitHardFail", "err", err)
 			}
 		}
@@ -665,7 +667,7 @@ func (o *PipelineOrchestrator) handleFailedResult(ctx context.Context, task *ent
 				output[k] = v
 			}
 			output["auto_retries_exhausted"] = maxRetries
-			if _, err := o.applyTransition(ctx, task, fresh, FailTransition{Reason: result.Error, Output: output}); err != nil {
+			if _, err := o.applyTransition(ctx, task, fresh, FailTransition{Reason: result.Error, Output: output, Category: resultCategory(result)}); err != nil {
 				slog.Error("finalizeCompletedAsyncRuns.applyTransition.hardFail", "err", err)
 			}
 		}
@@ -678,7 +680,7 @@ func (o *PipelineOrchestrator) handleFailedResult(ctx context.Context, task *ent
 			if _, err := o.applyTransition(ctx, task, fresh, IterateTransition{Output: map[string]any{
 				"validation_error": result.Error,
 				"rejected_output":  result.Output,
-			}}); err != nil {
+			}, Category: FailureInvalidResult}); err != nil {
 				slog.Error("finalizeCompletedAsyncRuns.applyTransition.iterate", "err", err)
 			}
 		} else {
@@ -686,6 +688,7 @@ func (o *PipelineOrchestrator) handleFailedResult(ctx context.Context, task *ent
 				Reason:    fmt.Sprintf("schema validation failed twice at stage %s: %s", fresh.Stage, result.Error),
 				Output:    map[string]any{"validation_error": result.Error, "rejected_output": result.Output},
 				AgentDone: true,
+				Category:  FailureInvalidResult,
 			}); err != nil {
 				slog.Error("finalizeCompletedAsyncRuns.applyTransition.waitUser", "err", err)
 			}
@@ -693,7 +696,7 @@ func (o *PipelineOrchestrator) handleFailedResult(ctx context.Context, task *ent
 		return
 	}
 
-	if _, err := o.applyTransition(ctx, task, fresh, FailTransition{Reason: result.Error, Output: result.Output}); err != nil {
+	if _, err := o.applyTransition(ctx, task, fresh, FailTransition{Reason: result.Error, Output: result.Output, Category: resultCategory(result)}); err != nil {
 		slog.Error("finalizeCompletedAsyncRuns.applyTransition.hardFail", "err", err)
 	}
 }
@@ -733,7 +736,7 @@ func (o *PipelineOrchestrator) finalizeCompletedAsyncRuns(ctx context.Context, a
 			if run.Pid != nil && proc.IsPidAlive(*run.Pid) {
 				_ = syscallKill(*run.Pid)
 			}
-			if _, err := o.applyTransition(ctx, task, run, FailTransition{Reason: "task cancelled externally"}); err != nil {
+			if _, err := o.applyTransition(ctx, task, run, FailTransition{Reason: "task cancelled externally", Category: FailureCancelled}); err != nil {
 				slog.Error("finalizeCompletedAsyncRuns.externalCancel", "err", err)
 			}
 			continue
@@ -788,7 +791,7 @@ func (o *PipelineOrchestrator) recoverRunningStageRuns(ctx context.Context) {
 		if decision.Kind == "resume" {
 			_, _ = o.stageRuns.MarkPending(ctx, run.ID)
 		} else {
-			_, _ = o.stageRuns.MarkFailed(ctx, run.ID, map[string]any{"error": "orchestrator crashed before completion; no session to resume"})
+			_, _ = o.stageRuns.MarkFailed(ctx, run.ID, map[string]any{"error": "orchestrator crashed before completion; no session to resume"}, FailureAgentDisappeared)
 		}
 	}
 }
@@ -1070,7 +1073,7 @@ func (o *PipelineOrchestrator) RequeueForUser(ctx context.Context, taskID, userP
 	// in place to pending — leaving two pending runs on the same task+stage, the
 	// older of which never spawns and is never reaped (StartedAt stays nil).
 	if latest.Status == "requeued" {
-		if _, err := o.stageRuns.Update(ctx, latest.ID, repo.UpdateStageRunInput{Status: strPtr("failed")}); err != nil {
+		if _, err := o.stageRuns.Update(ctx, latest.ID, repo.UpdateStageRunInput{Status: strPtr("failed"), FailureCategory: strPtr(FailureCancelled)}); err != nil {
 			return nil, err
 		}
 	}
@@ -1096,7 +1099,8 @@ func (o *PipelineOrchestrator) reapAwaitingUserAgent(ctx context.Context, taskID
 		_ = syscallKill(*run.Pid)
 	}
 	if _, err := o.applyTransition(ctx, task, run, FailTransition{
-		Reason: "user resolved permissions — restarting stage with grants applied",
+		Reason:   "user resolved permissions — restarting stage with grants applied",
+		Category: FailurePermissionRequired,
 	}); err != nil {
 		slog.Error("reapAwaitingUserAgent.applyTransition", "taskID", taskID, "err", err)
 	}
@@ -1128,7 +1132,7 @@ func (o *PipelineOrchestrator) KillRunningStage(ctx context.Context, taskID stri
 	if err := syscallKill(*run.Pid); err != nil {
 		return fmt.Errorf("KillRunningStage: kill pid %d: %w", *run.Pid, err)
 	}
-	_, err = o.applyTransition(ctx, task, run, FailTransition{Reason: "killed for checkpoint revert"})
+	_, err = o.applyTransition(ctx, task, run, FailTransition{Reason: "killed for checkpoint revert", Category: FailureCancelled})
 	return err
 }
 

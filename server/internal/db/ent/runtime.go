@@ -769,7 +769,7 @@ func init() {
 	// stagerun.DefaultRetryCount holds the default value on creation for the retry_count field.
 	stagerun.DefaultRetryCount = stagerunDescRetryCount.Default.(int)
 	// stagerunDescCreatedAt is the schema descriptor for created_at field.
-	stagerunDescCreatedAt := stagerunFields[17].Descriptor()
+	stagerunDescCreatedAt := stagerunFields[18].Descriptor()
 	// stagerun.DefaultCreatedAt holds the default value on creation for the created_at field.
 	stagerun.DefaultCreatedAt = stagerunDescCreatedAt.Default.(func() time.Time)
 	systempromptFields := schema.SystemPrompt{}.Fields()

@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/rawrepo"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/repo"
 	"github.com/lx-wnk/agent-dashboard/server/internal/pipeline"
+	"github.com/lx-wnk/agent-dashboard/server/internal/services"
 	"github.com/lx-wnk/agent-dashboard/server/internal/sse"
 	"github.com/lx-wnk/agent-dashboard/server/internal/taskcontrol"
 	"github.com/lx-wnk/agent-dashboard/server/internal/validation"
@@ -69,6 +71,7 @@ type Handler struct {
 	worktreeMgr       WorktreeStatusProvider
 	refineReader      RefineStatusReader
 	checkpointSvc     CheckpointServiceIface
+	cwdPolicy         CwdPolicy
 	allowGitPull      bool
 	bypassAuth        bool
 }
@@ -104,11 +107,20 @@ type Deps struct {
 	// BypassAuth is the loopback single-user mode. Listings are not scoped to a
 	// user id there, because every request is the same implicit user.
 	BypassAuth bool
+	// CwdPolicy validates a task's working folder (allowed folders and the
+	// sensitive-directory blocklist). Nil skips the check (tests).
+	CwdPolicy CwdPolicy
+}
+
+// CwdPolicy is the spawn policy a task working folder must satisfy.
+type CwdPolicy interface {
+	Allow(ctx context.Context, cwd string) error
 }
 
 func NewHandler(deps Deps) *Handler {
 	return &Handler{
 		client:            deps.Client,
+		cwdPolicy:         deps.CwdPolicy,
 		taskRepo:          deps.TaskRepo,
 		srRepo:            deps.SRRepo,
 		srBulkRepo:        deps.SRBulkRepo,
@@ -498,6 +510,9 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) error {
 	if body.Cwd == "" {
 		return apierr.NewAppError(http.StatusBadRequest, "cwd is required")
 	}
+	if err := h.checkCwd(r.Context(), body.Cwd); err != nil {
+		return err
+	}
 	if body.Autonomy != nil {
 		if _, ok := taskcontrol.ValidAutonomyValues[*body.Autonomy]; !ok {
 			return apierr.NewAppError(http.StatusBadRequest, "invalid autonomy")
@@ -586,6 +601,11 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) error {
 	}
 	if body.CurrentStage != nil {
 		return apierr.NewAppError(http.StatusBadRequest, "currentStage cannot be set via PATCH — use /progress, /cancel, or /retry")
+	}
+	if body.Cwd != nil {
+		if err := h.checkCwd(r.Context(), *body.Cwd); err != nil {
+			return err
+		}
 	}
 	if body.Description != nil && len(*body.Description) > maxDescriptionChars {
 		return apierr.NewAppError(http.StatusBadRequest, "description must be <= 10000 characters")
@@ -886,24 +906,28 @@ type stageRunResponse struct {
 	StartedAt   *time.Time     `json:"startedAt"`
 	EndedAt     *time.Time     `json:"endedAt"`
 	LastGrantAt *time.Time     `json:"lastGrantAt"`
+	// FailureCategory is why the run failed (pipeline.Failure*), set by the
+	// server where the failure was known; null when unclassified.
+	FailureCategory *string `json:"failureCategory"`
 }
 
 func toStageRunResponse(sr *ent.StageRun) stageRunResponse {
 	return stageRunResponse{
-		ID:          sr.ID,
-		TaskID:      sr.TaskID,
-		Stage:       sr.Stage,
-		SessionID:   sr.SessionID,
-		SessionName: sr.SessionName,
-		Pid:         sr.Pid,
-		Status:      sr.Status,
-		Iteration:   sr.Iteration,
-		Output:      sr.Output,
-		TokensUsed:  sr.TokensUsed,
-		CostCents:   sr.CostCents,
-		StartedAt:   sr.StartedAt,
-		EndedAt:     sr.EndedAt,
-		LastGrantAt: sr.LastGrantAt,
+		ID:              sr.ID,
+		TaskID:          sr.TaskID,
+		Stage:           sr.Stage,
+		SessionID:       sr.SessionID,
+		SessionName:     sr.SessionName,
+		Pid:             sr.Pid,
+		Status:          sr.Status,
+		Iteration:       sr.Iteration,
+		Output:          sr.Output,
+		TokensUsed:      sr.TokensUsed,
+		CostCents:       sr.CostCents,
+		StartedAt:       sr.StartedAt,
+		EndedAt:         sr.EndedAt,
+		LastGrantAt:     sr.LastGrantAt,
+		FailureCategory: sr.FailureCategory,
 	}
 }
 
@@ -1146,5 +1170,25 @@ func (h *Handler) stream(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		}
+	}
+}
+
+// checkCwd applies the spawn policy to a task's working folder (Phase 4.1): the
+// same allowed folders and sensitive-directory blocklist an agent spawn uses,
+// so a pipeline task can never be pointed at a folder New Agent would refuse.
+func (h *Handler) checkCwd(ctx context.Context, cwd string) error {
+	if h.cwdPolicy == nil {
+		return nil
+	}
+	err := h.cwdPolicy.Allow(ctx, cwd)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, services.ErrCwdBlacklisted):
+		return apierr.NewAppError(http.StatusForbidden, "This is a sensitive folder and cannot be a task's working folder.")
+	case errors.Is(err, services.ErrCwdNotAllowed):
+		return apierr.NewAppError(http.StatusForbidden, "This folder is not allowed for agents. Add it to a Project or allow it in New Agent first.")
+	default:
+		return apierr.NewAppError(http.StatusBadRequest, err.Error())
 	}
 }

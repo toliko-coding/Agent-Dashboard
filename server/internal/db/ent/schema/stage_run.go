@@ -31,6 +31,10 @@ func (StageRun) Fields() []ent.Field {
 		field.Int("retry_count").Default(0),
 		field.Time("next_retry_at").Optional().Nillable(),
 		field.String("pending_user_prompt").Optional().Nillable(),
+		// failure_category is why a run failed, set where the failure is known
+		// (pipeline.FailureCategory*); nil when unclassified. output.error keeps the
+		// human-readable reason.
+		field.String("failure_category").Optional().Nillable(),
 		field.Time("created_at").Default(time.Now).Immutable().Annotations(entsql.Default("datetime('now')")),
 	}
 }

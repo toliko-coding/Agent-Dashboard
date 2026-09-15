@@ -42,7 +42,7 @@ func TestDetectCompletion_CompletedValid(t *testing.T) {
 		IsPidAlive: func(int) bool { return false },
 		ReadOutput: func(cwd, sid string) (pipeline.StageOutputRead, error) {
 			return pipeline.StageOutputRead{
-				Output:  map[string]any{"summary": "done", "commits": []any{"abc"}, "openItems": []any{}},
+				Output:  map[string]any{"summary": "done", "completedWork": []any{"did it"}, "changedFiles": []any{}, "validation": []any{}, "risks": []any{}, "blockers": []any{}, "nextAction": "review", "commits": []any{"abc"}, "openItems": []any{}},
 				RawText: "```json\n{}\n```",
 			}, nil
 		},
@@ -158,9 +158,15 @@ func TestDetectCompletion_ToolOutput_UsedDirectly(t *testing.T) {
 		Stage: "implementation",
 		Pid:   ptr(1),
 		Output: map[string]any{
-			"summary":   "from tool",
-			"commits":   []any{},
-			"openItems": []any{},
+			"summary":       "from tool",
+			"commits":       []any{},
+			"openItems":     []any{},
+			"completedWork": []any{"did it"},
+			"changedFiles":  []any{},
+			"validation":    []any{},
+			"risks":         []any{},
+			"blockers":      []any{},
+			"nextAction":    "review",
 		},
 	}
 	deps := pipeline.CompletionDeps{
@@ -293,7 +299,7 @@ func TestDetectCompletion_InfraAxis(t *testing.T) {
 				IsPidAlive: func(int) bool { return false },
 				ReadOutput: func(string, string) (pipeline.StageOutputRead, error) {
 					return pipeline.StageOutputRead{
-						Output:  map[string]any{"summary": "done", "commits": []any{}, "openItems": []any{}},
+						Output:  map[string]any{"summary": "done", "completedWork": []any{"did it"}, "changedFiles": []any{}, "validation": []any{}, "risks": []any{}, "blockers": []any{}, "nextAction": "review", "commits": []any{}, "openItems": []any{}},
 						RawText: "```json\n{}\n```",
 					}, nil
 				},
@@ -368,7 +374,7 @@ func TestDetectCompletion_RateLimitedThenRecovered_Completes(t *testing.T) {
 		ReadOutput: func(string, string) (pipeline.StageOutputRead, error) {
 			return pipeline.StageOutputRead{
 				APIError: &pipeline.APIError{Status: 429, Kind: "rate_limit"},
-				Output:   map[string]any{"summary": "done", "commits": []any{"abc"}, "openItems": []any{}},
+				Output:   map[string]any{"summary": "done", "completedWork": []any{"did it"}, "changedFiles": []any{}, "validation": []any{}, "risks": []any{}, "blockers": []any{}, "nextAction": "review", "commits": []any{"abc"}, "openItems": []any{}},
 				RawText:  "```json\n{}\n```",
 			}, nil
 		},

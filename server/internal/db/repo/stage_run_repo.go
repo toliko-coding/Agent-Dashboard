@@ -64,6 +64,8 @@ type UpdateStageRunInput struct {
 	NextRetryAtClear  bool
 	StartedAtClear    bool
 	PendingUserPrompt *string
+	// FailureCategory records why the run failed (set with a failed status).
+	FailureCategory *string
 }
 
 type entStageRunRepo struct {
@@ -201,6 +203,9 @@ func (r *entStageRunRepo) Update(ctx context.Context, id string, in UpdateStageR
 	}
 	if in.Output != nil {
 		q = q.SetOutput(in.Output)
+	}
+	if in.FailureCategory != nil {
+		q = q.SetFailureCategory(*in.FailureCategory)
 	}
 	if in.TokensUsed != nil {
 		q = q.SetTokensUsed(*in.TokensUsed)

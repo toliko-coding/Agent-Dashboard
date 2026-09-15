@@ -102,7 +102,7 @@ func TestStageRunService_MarkFailed_SetsFailedEndedAtAndOutput(t *testing.T) {
 	output := map[string]any{"error": "boom"}
 
 	before := time.Now()
-	_, _ = s.MarkFailed(ctx, "run-2", output)
+	_, _ = s.MarkFailed(ctx, "run-2", output, "")
 	after := time.Now()
 
 	if repoFake.updateCalls != 1 {
@@ -123,5 +123,20 @@ func TestStageRunService_MarkFailed_SetsFailedEndedAtAndOutput(t *testing.T) {
 	}
 	if len(got.Output) != 1 || got.Output["error"] != "boom" {
 		t.Fatalf("got Output %v, want %v", got.Output, output)
+	}
+}
+
+// Phase 4.1: a crash-recovered run is persisted with its failure category.
+func TestStageRunService_MarkFailed_PersistsCategory(t *testing.T) {
+	repoFake := &fakeStageRunRepo{}
+	s := newStageRunService(repoFake, nil, nil)
+	_, _ = s.MarkFailed(context.Background(), "run-3", map[string]any{"error": "gone"}, FailureAgentDisappeared)
+	got := repoFake.lastInput
+	if got.FailureCategory == nil || *got.FailureCategory != FailureAgentDisappeared {
+		t.Fatalf("got FailureCategory %v, want %s", got.FailureCategory, FailureAgentDisappeared)
+	}
+	_, _ = s.MarkFailed(context.Background(), "run-4", map[string]any{"error": "?"}, "")
+	if repoFake.lastInput.FailureCategory != nil {
+		t.Fatal("an unclassified failure must not persist a category")
 	}
 }

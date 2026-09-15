@@ -31,7 +31,8 @@ func (o *PipelineOrchestrator) sweepAwaitingUserRuns(ctx context.Context, allRun
 			slog.Warn("orchestrator: awaiting_user run has dead PID — reaping as failed",
 				"runID", run.ID, "stage", run.Stage, "pid", *run.Pid)
 			if _, locked, err := o.sweepApplyTransition(ctx, task, run, FailTransition{
-				Reason: "awaiting_user reaper: stage agent exited while permissions pending",
+				Reason:   "awaiting_user reaper: stage agent exited while permissions pending",
+				Category: FailurePermissionRequired,
 			}); err != nil {
 				slog.Error("sweepAwaitingUserRuns.applyTransition", "err", err)
 			} else if !locked {
@@ -56,7 +57,8 @@ func (o *PipelineOrchestrator) sweepAwaitingUserRuns(ctx context.Context, allRun
 				if fresh != nil && fresh.Status == "awaiting_user" {
 					elapsed := time.Since(*anchor).Seconds()
 					if _, locked, err := o.sweepApplyTransition(ctx, task, fresh, FailTransition{
-						Reason: fmt.Sprintf("awaiting_user timeout: ran %.0fs (limit %ds) — agent likely busy-waiting", elapsed, timeoutSec),
+						Reason:   fmt.Sprintf("awaiting_user timeout: ran %.0fs (limit %ds) — agent likely busy-waiting", elapsed, timeoutSec),
+						Category: FailureTimeout,
 					}); err != nil {
 						slog.Error("sweepAwaitingUserRuns.timeout.applyTransition", "err", err)
 					} else if !locked {
@@ -122,7 +124,8 @@ func (o *PipelineOrchestrator) sweepOrphanRuns(ctx context.Context, allRunning [
 			slog.Warn("orchestrator: orphan stage_run — task is parked, reaping run as failed",
 				"runID", fresh.ID, "taskStage", task.CurrentStage)
 			if _, locked, err := o.sweepApplyTransition(ctx, task, fresh, FailTransition{
-				Reason: fmt.Sprintf("orphan reaper: task reached %s with stage_run still %s", task.CurrentStage, fresh.Status),
+				Reason:   fmt.Sprintf("orphan reaper: task reached %s with stage_run still %s", task.CurrentStage, fresh.Status),
+				Category: FailureCancelled,
 			}); err != nil {
 				slog.Error("sweepOrphanRuns.case1.applyTransition", "err", err)
 			} else if !locked {
@@ -137,7 +140,7 @@ func (o *PipelineOrchestrator) sweepOrphanRuns(ctx context.Context, allRunning [
 				continue
 			}
 			slog.Warn("orchestrator: on_hold run has dead PID — reaping as failed", "runID", fresh.ID)
-			if _, locked, err := o.sweepApplyTransition(ctx, task, fresh, FailTransition{Reason: "orphan reaper: on_hold agent exited"}); err != nil {
+			if _, locked, err := o.sweepApplyTransition(ctx, task, fresh, FailTransition{Reason: "orphan reaper: on_hold agent exited", Category: FailureAgentDisappeared}); err != nil {
 				slog.Error("sweepOrphanRuns.case2.applyTransition", "err", err)
 			} else if !locked {
 				slog.Debug("sweepOrphanRuns case2: task locked by progressTask — deferring to next tick", "taskID", task.ID)
@@ -155,7 +158,8 @@ func (o *PipelineOrchestrator) sweepOrphanRuns(ctx context.Context, allRunning [
 				slog.Warn("orchestrator: pending run stuck without spawn — reaping as failed",
 					"runID", fresh.ID, "elapsedSec", elapsed)
 				if _, locked, err := o.sweepApplyTransition(ctx, task, fresh, FailTransition{
-					Reason: fmt.Sprintf("orphan reaper: pending stage_run never promoted to running (%.0fs elapsed)", elapsed),
+					Reason:   fmt.Sprintf("orphan reaper: pending stage_run never promoted to running (%.0fs elapsed)", elapsed),
+					Category: FailureSpawnFailed,
 				}); err != nil {
 					slog.Error("sweepOrphanRuns.case3.applyTransition", "err", err)
 				} else if !locked {
@@ -200,7 +204,8 @@ func (o *PipelineOrchestrator) sweepOrphanRuns(ctx context.Context, allRunning [
 			slog.Warn("orchestrator: running run predates this orchestrator with nothing to resume — reaping as failed",
 				"runID", fresh.ID, "stage", fresh.Stage, "reason", decision.Reason)
 			if _, locked, err := o.sweepApplyTransition(ctx, task, fresh, FailTransition{
-				Reason: "orphan reaper: run was started by a previous orchestrator process that no longer exists, and no live agent process took it over",
+				Reason:   "orphan reaper: run was started by a previous orchestrator process that no longer exists, and no live agent process took it over",
+				Category: FailureAgentDisappeared,
 			}); err != nil {
 				slog.Error("sweepOrphanRuns.case4.applyTransition", "err", err)
 			} else if !locked {

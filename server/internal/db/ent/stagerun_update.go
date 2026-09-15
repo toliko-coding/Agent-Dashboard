@@ -320,6 +320,26 @@ func (_u *StageRunUpdate) ClearPendingUserPrompt() *StageRunUpdate {
 	return _u
 }
 
+// SetFailureCategory sets the "failure_category" field.
+func (_u *StageRunUpdate) SetFailureCategory(v string) *StageRunUpdate {
+	_u.mutation.SetFailureCategory(v)
+	return _u
+}
+
+// SetNillableFailureCategory sets the "failure_category" field if the given value is not nil.
+func (_u *StageRunUpdate) SetNillableFailureCategory(v *string) *StageRunUpdate {
+	if v != nil {
+		_u.SetFailureCategory(*v)
+	}
+	return _u
+}
+
+// ClearFailureCategory clears the value of the "failure_category" field.
+func (_u *StageRunUpdate) ClearFailureCategory() *StageRunUpdate {
+	_u.mutation.ClearFailureCategory()
+	return _u
+}
+
 // AddPermissionRequestIDs adds the "permission_requests" edge to the PermissionRequest entity by IDs.
 func (_u *StageRunUpdate) AddPermissionRequestIDs(ids ...string) *StageRunUpdate {
 	_u.mutation.AddPermissionRequestIDs(ids...)
@@ -494,6 +514,12 @@ func (_u *StageRunUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.PendingUserPromptCleared() {
 		_spec.ClearField(stagerun.FieldPendingUserPrompt, field.TypeString)
+	}
+	if value, ok := _u.mutation.FailureCategory(); ok {
+		_spec.SetField(stagerun.FieldFailureCategory, field.TypeString, value)
+	}
+	if _u.mutation.FailureCategoryCleared() {
+		_spec.ClearField(stagerun.FieldFailureCategory, field.TypeString)
 	}
 	if _u.mutation.PermissionRequestsCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -851,6 +877,26 @@ func (_u *StageRunUpdateOne) ClearPendingUserPrompt() *StageRunUpdateOne {
 	return _u
 }
 
+// SetFailureCategory sets the "failure_category" field.
+func (_u *StageRunUpdateOne) SetFailureCategory(v string) *StageRunUpdateOne {
+	_u.mutation.SetFailureCategory(v)
+	return _u
+}
+
+// SetNillableFailureCategory sets the "failure_category" field if the given value is not nil.
+func (_u *StageRunUpdateOne) SetNillableFailureCategory(v *string) *StageRunUpdateOne {
+	if v != nil {
+		_u.SetFailureCategory(*v)
+	}
+	return _u
+}
+
+// ClearFailureCategory clears the value of the "failure_category" field.
+func (_u *StageRunUpdateOne) ClearFailureCategory() *StageRunUpdateOne {
+	_u.mutation.ClearFailureCategory()
+	return _u
+}
+
 // AddPermissionRequestIDs adds the "permission_requests" edge to the PermissionRequest entity by IDs.
 func (_u *StageRunUpdateOne) AddPermissionRequestIDs(ids ...string) *StageRunUpdateOne {
 	_u.mutation.AddPermissionRequestIDs(ids...)
@@ -1055,6 +1101,12 @@ func (_u *StageRunUpdateOne) sqlSave(ctx context.Context) (_node *StageRun, err 
 	}
 	if _u.mutation.PendingUserPromptCleared() {
 		_spec.ClearField(stagerun.FieldPendingUserPrompt, field.TypeString)
+	}
+	if value, ok := _u.mutation.FailureCategory(); ok {
+		_spec.SetField(stagerun.FieldFailureCategory, field.TypeString, value)
+	}
+	if _u.mutation.FailureCategoryCleared() {
+		_spec.ClearField(stagerun.FieldFailureCategory, field.TypeString)
 	}
 	if _u.mutation.PermissionRequestsCleared() {
 		edge := &sqlgraph.EdgeSpec{

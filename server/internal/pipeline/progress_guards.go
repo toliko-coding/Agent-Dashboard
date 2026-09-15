@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -10,6 +11,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/repo"
 	"github.com/lx-wnk/agent-dashboard/server/internal/proc"
+	"github.com/lx-wnk/agent-dashboard/server/internal/services"
 )
 
 // runProgressTaskLocked is the core of ProgressTask — called with the per-task
@@ -73,7 +75,7 @@ func (o *PipelineOrchestrator) runProgressTaskLocked(ctx context.Context, taskID
 		wtPath, wtBranch, wtErr := o.opts.EnsureWorktreeFn(ctx, task, o.opts.WorktreeRoot)
 		if wtErr != nil {
 			return o.applyTransition(ctx, task, stageRun,
-				FailTransition{Reason: fmt.Sprintf("worktree creation failed: %v", wtErr)})
+				FailTransition{Reason: fmt.Sprintf("worktree creation failed: %v", wtErr), Category: FailureWorkspaceUnavailable})
 		}
 		upd := repo.UpdateTaskInput{WorktreePath: &wtPath}
 		if task.SourceBranch == nil || *task.SourceBranch == "" {
@@ -81,7 +83,7 @@ func (o *PipelineOrchestrator) runProgressTaskLocked(ctx context.Context, taskID
 		}
 		if task, err = o.opts.TaskRepo.Update(ctx, task.ID, upd); err != nil {
 			return o.applyTransition(ctx, task, stageRun,
-				FailTransition{Reason: fmt.Sprintf("persisting worktree path failed: %v", err)})
+				FailTransition{Reason: fmt.Sprintf("persisting worktree path failed: %v", err), Category: FailureWorkspaceUnavailable})
 		}
 		slog.Info("orchestrator: created worktree", "taskID", taskID, "path", wtPath, "branch", wtBranch)
 
@@ -239,7 +241,11 @@ func (o *PipelineOrchestrator) runProgressTaskLocked(ctx context.Context, taskID
 
 	transition, execErr := handler.Execute(stageCtx)
 	if execErr != nil {
-		transition = FailTransition{Reason: execErr.Error()}
+		category := FailureSpawnFailed
+		if errors.Is(execErr, services.ErrCwdBlacklisted) || errors.Is(execErr, services.ErrCwdNotAllowed) {
+			category = FailureWorkspaceUnavailable
+		}
+		transition = FailTransition{Reason: execErr.Error(), Category: category}
 	}
 
 	return o.applyTransition(ctx, task, stageRun, transition)

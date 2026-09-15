@@ -52,8 +52,12 @@ func ImplementationPrompt(t *ent.Task, conceptOutput map[string]any, reviewFeedb
 
 Work step-by-step through the concept plan. Commit each logical change via git.
 
-When finished, submit your result as your FINAL action by calling the `+"`set_stage_output`"+` MCP tool with an `+"`output`"+` object of exactly this shape:
-{"summary": string, "commits": string[], "openItems": string[]}
+When finished, submit your result as your FINAL action by calling the `+"`set_stage_output`"+` MCP tool with an `+"`output`"+` object of exactly this shape (the Developer handoff the reviewer reads):
+{"summary": string, "completedWork": string[], "changedFiles": string[], "validation": string[], "risks": string[], "blockers": string[], "nextAction": string, "commits": string[], "openItems": string[]}
+- changedFiles lists only files you actually changed; use [] when you changed none — never invent entries.
+- validation lists the checks you actually ran and their results (e.g. "go test ./... — pass"); [] if none.
+- risks and blockers may be []; nextAction says what should happen next.
+A reply without this object is an invalid result, not a success.
 If `+"`set_stage_output`"+` is unavailable, instead emit the same object as a `+"```json```"+` block.`,
 		t.Title,
 		strOrEmpty(t.Description),

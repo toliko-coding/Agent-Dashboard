@@ -654,7 +654,12 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 	if bundle != nil {
 		rawDB = bundle.DB
 	}
-	taskHandler := provideTaskHandler(entClient, rawDB, orch, taskBroadcaster, refineReaderArg, settingsSvc.Bool("git.allowPull"), routerConfig.BypassAuth, checkpointSvc)
+	// A task's working folder passes the same policy as an agent spawn (Phase 4.1).
+	taskCwdPolicy := services.NewSpawnPolicy(services.CombineRootsProviders(
+		services.ProjectFolderRootsProvider(repo.NewProjectRepo(entClient), repo.NewProjectFolderRepo(entClient)),
+		services.WorkingFolderRootsProvider(settingsSvc),
+	))
+	taskHandler := provideTaskHandler(entClient, rawDB, orch, taskBroadcaster, refineReaderArg, settingsSvc.Bool("git.allowPull"), routerConfig.BypassAuth, checkpointSvc, taskCwdPolicy)
 
 	// Scheduler: recurring task firing engine + its REST handler. Reuses the task
 	// handler's create core, so it must be built after taskHandler. nil when no DB.

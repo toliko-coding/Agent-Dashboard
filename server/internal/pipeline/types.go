@@ -27,11 +27,16 @@ type DoneTransition struct {
 type FailTransition struct {
 	Reason string
 	Output map[string]any
+	// Category is the failure category (Failure* constants); empty = unclassified.
+	Category string
 }
 
 type WaitUserTransition struct {
 	Reason string
 	Output map[string]any
+	// Category records why a run is parked on the user when that is a failure
+	// (invalid_result after the bounded retry); empty otherwise.
+	Category string
 	// AgentDone signals that the agent process has already exited normally
 	// (e.g. review cycle limit reached). applyTransition will clear the PID
 	// so the dead-PID reaper does not immediately re-fail the run.
@@ -40,6 +45,9 @@ type WaitUserTransition struct {
 
 type IterateTransition struct {
 	Output map[string]any
+	// Category marks why the run is iterated when that is a failure — an
+	// invalid result retried once (Failure* constants); empty for a review loop.
+	Category string
 }
 
 type OnHoldTransition struct {

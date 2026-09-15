@@ -55,9 +55,15 @@ func TestChannelStageOutput_ValidImplementation_Persists(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{
 		"stageRunId": "run-1",
 		"output": map[string]any{
-			"summary":   "did it",
-			"commits":   []any{"abc"},
-			"openItems": []any{},
+			"summary":       "did it",
+			"commits":       []any{"abc"},
+			"openItems":     []any{},
+			"completedWork": []any{"did it"},
+			"changedFiles":  []any{},
+			"validation":    []any{},
+			"risks":         []any{},
+			"blockers":      []any{},
+			"nextAction":    "review",
 		},
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/channel-stage-output", bytes.NewReader(body))
@@ -195,9 +201,15 @@ func TestChannelStageOutput_TerminalRun_409(t *testing.T) {
 	body, _ := json.Marshal(map[string]any{
 		"stageRunId": "run-done",
 		"output": map[string]any{
-			"summary":   "done",
-			"commits":   []any{"abc"},
-			"openItems": []any{},
+			"summary":       "done",
+			"commits":       []any{"abc"},
+			"openItems":     []any{},
+			"completedWork": []any{"did it"},
+			"changedFiles":  []any{},
+			"validation":    []any{},
+			"risks":         []any{},
+			"blockers":      []any{},
+			"nextAction":    "review",
 		},
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/channel-stage-output", bytes.NewReader(body))
@@ -273,7 +285,7 @@ func TestChannelStageOutput_AcceptedOutput_RecordsTheToolChannel(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{
 		"stageRunId": "run-1",
-		"output":     map[string]any{"summary": "did it", "commits": []any{"abc"}, "openItems": []any{}},
+		"output":     map[string]any{"summary": "did it", "completedWork": []any{"did it"}, "changedFiles": []any{}, "validation": []any{}, "risks": []any{}, "blockers": []any{}, "nextAction": "review", "commits": []any{"abc"}, "openItems": []any{}},
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/channel-stage-output", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer valid-token")
@@ -338,7 +350,7 @@ func TestChannelStageOutput_AuditFailure_StillAccepts(t *testing.T) {
 
 	body, _ := json.Marshal(map[string]any{
 		"stageRunId": "run-1",
-		"output":     map[string]any{"summary": "did it", "commits": []any{"abc"}, "openItems": []any{}},
+		"output":     map[string]any{"summary": "did it", "completedWork": []any{"did it"}, "changedFiles": []any{}, "validation": []any{}, "risks": []any{}, "blockers": []any{}, "nextAction": "review", "commits": []any{"abc"}, "openItems": []any{}},
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/channel-stage-output", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer valid-token")

@@ -1,12 +1,15 @@
 package taskcontrol
 
 // IsAllowAll reports whether the given autonomy level enables the allow-all
-// permission gate (auto-approve all requests, permissive spawn allow-list).
+// permission gate: every permission request is auto-approved and the stage
+// agent's allow-list pre-approves every tool, blanket Bash included (only
+// git push stays denied unless allowed). "spec_gated" and "full" are identical
+// here — no spec approval gates the permissions.
 //
 // Empty-string autonomy intentionally maps to false: rows that pre-date the
-// field (migrated without a value) must keep the old gated behaviour so
-// existing tasks are not silently escalated. New tasks receive "spec_gated"
-// via the schema default.
+// field (migrated without a value) keep the gated behaviour. New tasks default
+// to "manual" (schema default, db.DefaultAutonomy), so allow-all is always an
+// explicit choice.
 func IsAllowAll(autonomy string) bool {
 	return autonomy == "spec_gated" || autonomy == "full"
 }

@@ -225,6 +225,20 @@ func (_c *StageRunCreate) SetNillablePendingUserPrompt(v *string) *StageRunCreat
 	return _c
 }
 
+// SetFailureCategory sets the "failure_category" field.
+func (_c *StageRunCreate) SetFailureCategory(v string) *StageRunCreate {
+	_c.mutation.SetFailureCategory(v)
+	return _c
+}
+
+// SetNillableFailureCategory sets the "failure_category" field if the given value is not nil.
+func (_c *StageRunCreate) SetNillableFailureCategory(v *string) *StageRunCreate {
+	if v != nil {
+		_c.SetFailureCategory(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *StageRunCreate) SetCreatedAt(v time.Time) *StageRunCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -450,6 +464,10 @@ func (_c *StageRunCreate) createSpec() (*StageRun, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.PendingUserPrompt(); ok {
 		_spec.SetField(stagerun.FieldPendingUserPrompt, field.TypeString, value)
 		_node.PendingUserPrompt = &value
+	}
+	if value, ok := _c.mutation.FailureCategory(); ok {
+		_spec.SetField(stagerun.FieldFailureCategory, field.TypeString, value)
+		_node.FailureCategory = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(stagerun.FieldCreatedAt, field.TypeTime, value)
@@ -801,6 +819,24 @@ func (u *StageRunUpsert) UpdatePendingUserPrompt() *StageRunUpsert {
 // ClearPendingUserPrompt clears the value of the "pending_user_prompt" field.
 func (u *StageRunUpsert) ClearPendingUserPrompt() *StageRunUpsert {
 	u.SetNull(stagerun.FieldPendingUserPrompt)
+	return u
+}
+
+// SetFailureCategory sets the "failure_category" field.
+func (u *StageRunUpsert) SetFailureCategory(v string) *StageRunUpsert {
+	u.Set(stagerun.FieldFailureCategory, v)
+	return u
+}
+
+// UpdateFailureCategory sets the "failure_category" field to the value that was provided on create.
+func (u *StageRunUpsert) UpdateFailureCategory() *StageRunUpsert {
+	u.SetExcluded(stagerun.FieldFailureCategory)
+	return u
+}
+
+// ClearFailureCategory clears the value of the "failure_category" field.
+func (u *StageRunUpsert) ClearFailureCategory() *StageRunUpsert {
+	u.SetNull(stagerun.FieldFailureCategory)
 	return u
 }
 
@@ -1163,6 +1199,27 @@ func (u *StageRunUpsertOne) UpdatePendingUserPrompt() *StageRunUpsertOne {
 func (u *StageRunUpsertOne) ClearPendingUserPrompt() *StageRunUpsertOne {
 	return u.Update(func(s *StageRunUpsert) {
 		s.ClearPendingUserPrompt()
+	})
+}
+
+// SetFailureCategory sets the "failure_category" field.
+func (u *StageRunUpsertOne) SetFailureCategory(v string) *StageRunUpsertOne {
+	return u.Update(func(s *StageRunUpsert) {
+		s.SetFailureCategory(v)
+	})
+}
+
+// UpdateFailureCategory sets the "failure_category" field to the value that was provided on create.
+func (u *StageRunUpsertOne) UpdateFailureCategory() *StageRunUpsertOne {
+	return u.Update(func(s *StageRunUpsert) {
+		s.UpdateFailureCategory()
+	})
+}
+
+// ClearFailureCategory clears the value of the "failure_category" field.
+func (u *StageRunUpsertOne) ClearFailureCategory() *StageRunUpsertOne {
+	return u.Update(func(s *StageRunUpsert) {
+		s.ClearFailureCategory()
 	})
 }
 
@@ -1692,6 +1749,27 @@ func (u *StageRunUpsertBulk) UpdatePendingUserPrompt() *StageRunUpsertBulk {
 func (u *StageRunUpsertBulk) ClearPendingUserPrompt() *StageRunUpsertBulk {
 	return u.Update(func(s *StageRunUpsert) {
 		s.ClearPendingUserPrompt()
+	})
+}
+
+// SetFailureCategory sets the "failure_category" field.
+func (u *StageRunUpsertBulk) SetFailureCategory(v string) *StageRunUpsertBulk {
+	return u.Update(func(s *StageRunUpsert) {
+		s.SetFailureCategory(v)
+	})
+}
+
+// UpdateFailureCategory sets the "failure_category" field to the value that was provided on create.
+func (u *StageRunUpsertBulk) UpdateFailureCategory() *StageRunUpsertBulk {
+	return u.Update(func(s *StageRunUpsert) {
+		s.UpdateFailureCategory()
+	})
+}
+
+// ClearFailureCategory clears the value of the "failure_category" field.
+func (u *StageRunUpsertBulk) ClearFailureCategory() *StageRunUpsertBulk {
+	return u.Update(func(s *StageRunUpsert) {
+		s.ClearFailureCategory()
 	})
 }
 

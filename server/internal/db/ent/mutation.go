@@ -25582,6 +25582,7 @@ type StageRunMutation struct {
 	addretry_count             *int
 	next_retry_at              *time.Time
 	pending_user_prompt        *string
+	failure_category           *string
 	created_at                 *time.Time
 	clearedFields              map[string]struct{}
 	task                       *string
@@ -26492,6 +26493,55 @@ func (m *StageRunMutation) ResetPendingUserPrompt() {
 	delete(m.clearedFields, stagerun.FieldPendingUserPrompt)
 }
 
+// SetFailureCategory sets the "failure_category" field.
+func (m *StageRunMutation) SetFailureCategory(s string) {
+	m.failure_category = &s
+}
+
+// FailureCategory returns the value of the "failure_category" field in the mutation.
+func (m *StageRunMutation) FailureCategory() (r string, exists bool) {
+	v := m.failure_category
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFailureCategory returns the old "failure_category" field's value of the StageRun entity.
+// If the StageRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StageRunMutation) OldFailureCategory(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFailureCategory is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFailureCategory requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFailureCategory: %w", err)
+	}
+	return oldValue.FailureCategory, nil
+}
+
+// ClearFailureCategory clears the value of the "failure_category" field.
+func (m *StageRunMutation) ClearFailureCategory() {
+	m.failure_category = nil
+	m.clearedFields[stagerun.FieldFailureCategory] = struct{}{}
+}
+
+// FailureCategoryCleared returns if the "failure_category" field was cleared in this mutation.
+func (m *StageRunMutation) FailureCategoryCleared() bool {
+	_, ok := m.clearedFields[stagerun.FieldFailureCategory]
+	return ok
+}
+
+// ResetFailureCategory resets all changes to the "failure_category" field.
+func (m *StageRunMutation) ResetFailureCategory() {
+	m.failure_category = nil
+	delete(m.clearedFields, stagerun.FieldFailureCategory)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *StageRunMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -26643,7 +26693,7 @@ func (m *StageRunMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *StageRunMutation) Fields() []string {
-	fields := make([]string, 0, 17)
+	fields := make([]string, 0, 18)
 	if m.task != nil {
 		fields = append(fields, stagerun.FieldTaskID)
 	}
@@ -26692,6 +26742,9 @@ func (m *StageRunMutation) Fields() []string {
 	if m.pending_user_prompt != nil {
 		fields = append(fields, stagerun.FieldPendingUserPrompt)
 	}
+	if m.failure_category != nil {
+		fields = append(fields, stagerun.FieldFailureCategory)
+	}
 	if m.created_at != nil {
 		fields = append(fields, stagerun.FieldCreatedAt)
 	}
@@ -26735,6 +26788,8 @@ func (m *StageRunMutation) Field(name string) (ent.Value, bool) {
 		return m.NextRetryAt()
 	case stagerun.FieldPendingUserPrompt:
 		return m.PendingUserPrompt()
+	case stagerun.FieldFailureCategory:
+		return m.FailureCategory()
 	case stagerun.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -26778,6 +26833,8 @@ func (m *StageRunMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldNextRetryAt(ctx)
 	case stagerun.FieldPendingUserPrompt:
 		return m.OldPendingUserPrompt(ctx)
+	case stagerun.FieldFailureCategory:
+		return m.OldFailureCategory(ctx)
 	case stagerun.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	}
@@ -26900,6 +26957,13 @@ func (m *StageRunMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPendingUserPrompt(v)
+		return nil
+	case stagerun.FieldFailureCategory:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFailureCategory(v)
 		return nil
 	case stagerun.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -27028,6 +27092,9 @@ func (m *StageRunMutation) ClearedFields() []string {
 	if m.FieldCleared(stagerun.FieldPendingUserPrompt) {
 		fields = append(fields, stagerun.FieldPendingUserPrompt)
 	}
+	if m.FieldCleared(stagerun.FieldFailureCategory) {
+		fields = append(fields, stagerun.FieldFailureCategory)
+	}
 	return fields
 }
 
@@ -27068,6 +27135,9 @@ func (m *StageRunMutation) ClearField(name string) error {
 		return nil
 	case stagerun.FieldPendingUserPrompt:
 		m.ClearPendingUserPrompt()
+		return nil
+	case stagerun.FieldFailureCategory:
+		m.ClearFailureCategory()
 		return nil
 	}
 	return fmt.Errorf("unknown StageRun nullable field %s", name)
@@ -27124,6 +27194,9 @@ func (m *StageRunMutation) ResetField(name string) error {
 		return nil
 	case stagerun.FieldPendingUserPrompt:
 		m.ResetPendingUserPrompt()
+		return nil
+	case stagerun.FieldFailureCategory:
+		m.ResetFailureCategory()
 		return nil
 	case stagerun.FieldCreatedAt:
 		m.ResetCreatedAt()

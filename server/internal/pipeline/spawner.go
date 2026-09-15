@@ -20,6 +20,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/mcp"
 	"github.com/lx-wnk/agent-dashboard/server/internal/pathutil"
 	"github.com/lx-wnk/agent-dashboard/server/internal/permissions"
+	"github.com/lx-wnk/agent-dashboard/server/internal/services"
 	"github.com/lx-wnk/agent-dashboard/server/internal/taskcontrol"
 )
 
@@ -661,6 +662,13 @@ func SpawnStageAgent(opts SpawnAgentOptions) (SpawnResult, error) {
 	cwd := opts.Task.Cwd
 	if opts.Task.WorktreePath != nil && *opts.Task.WorktreePath != "" {
 		cwd = *opts.Task.WorktreePath
+	}
+	// Whatever a task row says, a stage agent never starts in a sensitive folder
+	// (~/.ssh, ~/.aws, …): the blocklist every agent spawn obeys (Phase 4.1).
+	for _, dir := range []string{opts.Task.Cwd, cwd} {
+		if err := services.NewSpawnPolicy(nil).AllowResume(dir); err != nil {
+			return SpawnResult{}, fmt.Errorf("stage workspace refused: %w", err)
+		}
 	}
 	allowGitPush := IsGitPushAllowed(opts.Task, opts.AllowGitPush)
 	// Resolved once and used twice: as the spawn's permission flags, which are

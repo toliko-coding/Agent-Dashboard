@@ -51,6 +51,8 @@ type StageRun struct {
 	NextRetryAt *time.Time `json:"next_retry_at,omitempty"`
 	// PendingUserPrompt holds the value of the "pending_user_prompt" field.
 	PendingUserPrompt *string `json:"pending_user_prompt,omitempty"`
+	// FailureCategory holds the value of the "failure_category" field.
+	FailureCategory *string `json:"failure_category,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -99,7 +101,7 @@ func (*StageRun) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case stagerun.FieldPid, stagerun.FieldIteration, stagerun.FieldTokensUsed, stagerun.FieldCostCents, stagerun.FieldRetryCount:
 			values[i] = new(sql.NullInt64)
-		case stagerun.FieldID, stagerun.FieldTaskID, stagerun.FieldStage, stagerun.FieldSessionID, stagerun.FieldSessionName, stagerun.FieldStatus, stagerun.FieldPendingUserPrompt:
+		case stagerun.FieldID, stagerun.FieldTaskID, stagerun.FieldStage, stagerun.FieldSessionID, stagerun.FieldSessionName, stagerun.FieldStatus, stagerun.FieldPendingUserPrompt, stagerun.FieldFailureCategory:
 			values[i] = new(sql.NullString)
 		case stagerun.FieldStartedAt, stagerun.FieldEndedAt, stagerun.FieldLastGrantAt, stagerun.FieldNextRetryAt, stagerun.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -230,6 +232,13 @@ func (_m *StageRun) assignValues(columns []string, values []any) error {
 				_m.PendingUserPrompt = new(string)
 				*_m.PendingUserPrompt = value.String
 			}
+		case stagerun.FieldFailureCategory:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field failure_category", values[i])
+			} else if value.Valid {
+				_m.FailureCategory = new(string)
+				*_m.FailureCategory = value.String
+			}
 		case stagerun.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -343,6 +352,11 @@ func (_m *StageRun) String() string {
 	builder.WriteString(", ")
 	if v := _m.PendingUserPrompt; v != nil {
 		builder.WriteString("pending_user_prompt=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.FailureCategory; v != nil {
+		builder.WriteString("failure_category=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

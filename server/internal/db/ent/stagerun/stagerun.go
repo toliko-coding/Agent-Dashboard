@@ -46,6 +46,8 @@ const (
 	FieldNextRetryAt = "next_retry_at"
 	// FieldPendingUserPrompt holds the string denoting the pending_user_prompt field in the database.
 	FieldPendingUserPrompt = "pending_user_prompt"
+	// FieldFailureCategory holds the string denoting the failure_category field in the database.
+	FieldFailureCategory = "failure_category"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// EdgeTask holds the string denoting the task edge name in mutations.
@@ -89,6 +91,7 @@ var Columns = []string{
 	FieldRetryCount,
 	FieldNextRetryAt,
 	FieldPendingUserPrompt,
+	FieldFailureCategory,
 	FieldCreatedAt,
 }
 
@@ -198,6 +201,11 @@ func ByNextRetryAt(opts ...sql.OrderTermOption) OrderOption {
 // ByPendingUserPrompt orders the results by the pending_user_prompt field.
 func ByPendingUserPrompt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPendingUserPrompt, opts...).ToFunc()
+}
+
+// ByFailureCategory orders the results by the failure_category field.
+func ByFailureCategory(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFailureCategory, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

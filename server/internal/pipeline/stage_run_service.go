@@ -119,7 +119,11 @@ func (s *stageRunService) MarkPending(ctx context.Context, id string) (*ent.Stag
 // MarkFailed marks a stage_run failed with an end timestamp and the given
 // output, routed through Update so the terminal write also revokes the run's
 // MCP credentials.
-func (s *stageRunService) MarkFailed(ctx context.Context, id string, output map[string]any) (*ent.StageRun, error) {
+func (s *stageRunService) MarkFailed(ctx context.Context, id string, output map[string]any, category string) (*ent.StageRun, error) {
 	now := time.Now()
-	return s.Update(ctx, id, repo.UpdateStageRunInput{Status: strPtr("failed"), EndedAt: &now, Output: output})
+	in := repo.UpdateStageRunInput{Status: strPtr("failed"), EndedAt: &now, Output: output}
+	if category != "" {
+		in.FailureCategory = strPtr(category)
+	}
+	return s.Update(ctx, id, in)
 }
