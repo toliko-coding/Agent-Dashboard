@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Agent } from '@/types'
 import { computed } from 'vue'
+import { agentTerminalAttachable } from '@/composables/useAgentLifecycle'
 import { workspaceDisplay } from '@/utils/agentGroup'
 import { agentTitle } from '@/utils/agentLabels'
 import ViewPlaceholder from '../../../components/ViewPlaceholder.vue'
@@ -21,9 +22,9 @@ import { useAgents } from '../../agents'
  */
 const { agents, selectAgent } = useAgents({ autoStart: false })
 
-// liveInjectable marks sessions with a pty broker / tmux backing, which is what
-// the terminal socket needs.
-const attachable = computed(() => agents.value.filter(a => a.liveInjectable))
+// Only sessions the user can really attach: a pty terminal on a session Agent
+// Dashboard launched (the server refuses any other).
+const attachable = computed(() => agents.value.filter(agentTerminalAttachable))
 
 function where(agent: Agent): string {
   const ws = agent.workspace
@@ -42,7 +43,7 @@ function where(agent: Agent): string {
       icon="▮"
       title="Terminals attach to a running agent"
       summary="There is no standalone server shell. A terminal session is opened against a specific agent process, from that agent's card or details."
-      requires="Open an agent, then use its terminal (⌨) action"
+      requires="Open an agent Agent Dashboard started, then use Open terminal"
     />
 
     <section v-if="attachable.length" aria-labelledby="terminal-agents-heading" class="flex flex-col gap-2">

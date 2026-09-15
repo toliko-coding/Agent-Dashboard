@@ -404,3 +404,30 @@ describe('agentModal — name and diagnostics (3I)', () => {
     expect(bubbled).not.toHaveBeenCalled()
   })
 })
+
+describe('agentModal terminal access (Phase 4.1.1)', () => {
+  const dialogStub = { AgentTerminalDialog: { props: ['open', 'agent'], template: '<div v-if="open" data-testid="agent-terminal-modal" />' } }
+  const mountWith = (over: Partial<Agent>) => mount(AgentModal, { props: { agent: { ...baseAgent, ...over } }, global: { stubs: { ...stubs, ...dialogStub } } })
+
+  it('offers Respond in terminal for an owned agent waiting on a terminal permission prompt', async () => {
+    const w = mountWith({ dashboardOwned: true, liveInjectable: true, awaitingTerminalPermission: true })
+    expect(w.get('[data-testid="agent-modal-terminal-permission"]').text()).toContain('asking for permission in its terminal')
+    expect(w.find('[data-testid="agent-terminal-modal"]').exists()).toBe(false)
+    await w.get('[data-testid="agent-modal-respond-terminal"]').trigger('click')
+    expect(w.find('[data-testid="agent-terminal-modal"]').exists()).toBe(true)
+  })
+
+  it('opens the terminal from the header for an owned attachable agent, without a prompt', async () => {
+    const w = mountWith({ dashboardOwned: true, liveInjectable: true })
+    expect(w.find('[data-testid="agent-modal-terminal-permission"]').exists()).toBe(false)
+    await w.get('[data-testid="agent-modal-terminal"]').trigger('click')
+    expect(w.find('[data-testid="agent-terminal-modal"]').exists()).toBe(true)
+  })
+
+  it('never offers a terminal for a session the dashboard did not start', () => {
+    const w = mountWith({ liveInjectable: true, awaitingTerminalPermission: true })
+    expect(w.find('[data-testid="agent-modal-terminal"]').exists()).toBe(false)
+    expect(w.find('[data-testid="agent-modal-respond-terminal"]').exists()).toBe(false)
+    expect(w.get('[data-testid="agent-modal-terminal-elsewhere"]').text()).toContain('started this session')
+  })
+})

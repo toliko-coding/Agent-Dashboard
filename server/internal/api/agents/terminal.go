@@ -70,6 +70,14 @@ func (h *TerminalHandler) Terminal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"session has no terminal"}`, http.StatusConflict)
 		return
 	}
+	// Keystrokes are control. A terminal is attached only for a session Agent
+	// Dashboard launched — one it owns, or a pipeline task's stage agent. A
+	// session started elsewhere (a Terminal or VS Code session, or
+	// `agent-dashboard live`) stays observe-only here, as it does for Stop.
+	if !TerminalAttachable(*agent) {
+		http.Error(w, `{"error":"this session was not started by Agent Dashboard; answer it in the terminal or app that started it"}`, http.StatusForbidden)
+		return
+	}
 
 	port, token, err := h.target(pid)
 	if err != nil {
@@ -139,4 +147,13 @@ func pumpFrames(ctx context.Context, src, dst *websocket.Conn) {
 			return
 		}
 	}
+}
+
+// TerminalAttachable reports whether the dashboard may attach a terminal to
+// agent: a local, non-internal session that has a pty terminal and that the
+// dashboard launched (owned, or a pipeline stage agent). The client mirrors it
+// in agentTerminalAttachable (src/composables/useAgentLifecycle.ts).
+func TerminalAttachable(agent sdk.Agent) bool {
+	return agent.LiveInjectable && agent.Machine == "" && !agent.InternalProcess &&
+		(agent.DashboardOwned || agent.PipelineTaskID != "")
 }

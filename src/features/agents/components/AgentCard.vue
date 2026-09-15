@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import type { AttentionItem } from '@/features/attention'
 import type { Agent } from '@/types'
-import { computed, defineAsyncComponent, ref } from 'vue'
+import { computed, ref } from 'vue'
 import MachineBadge from '@/components/MachineBadge.vue'
 import ProviderBadge from '@/components/ProviderBadge.vue'
 import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
-import AppModal from '@/components/ui/AppModal.vue'
 import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
-import { agentIsDashboardOwned, agentIsRunning, editorLabel, lifecyclePresentation, openInEditor, useAgentLifecycle, useAgentProfileEditor } from '@/composables/useAgentLifecycle'
+import { agentIsDashboardOwned, agentIsRunning, agentTerminalAttachable, editorLabel, lifecyclePresentation, openInEditor, useAgentLifecycle, useAgentProfileEditor } from '@/composables/useAgentLifecycle'
 import { useNow } from '@/composables/useNow'
 import { toast } from '@/composables/useToast'
 import AgentServiceChips from '@/features/agents/components/AgentServiceChips.vue'
@@ -18,6 +17,7 @@ import { agentKind } from '@/utils/agentCategory'
 import { agentActivity, agentTechnical, agentTitle, agentTopic, workActivity } from '@/utils/agentLabels'
 import { formatCost, formatRelativeActivity, formatUptime, isAwaitingInput, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
 import { agentDisplayStatus } from '@/utils/statusColors'
+import AgentTerminalDialog from './AgentTerminalDialog.vue'
 
 /*
  * An agent as a compact operational dashboard (3N.2): three to a row on a
@@ -224,7 +224,7 @@ const editor = editorLabel()
 
 // xterm.js is ~490KB — its own chunk, loaded on first open.
 const showTerminal = ref(false)
-const AgentTerminal = defineAsyncComponent(() => import('./AgentTerminal.vue'))
+const terminalAttachable = computed(() => agentTerminalAttachable(props.agent))
 
 const ICON_BUTTON = 'inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-ui-sm leading-none text-fg-mute transition-colors duration-[var(--duration-fast)] ease-standard hover:border-line hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent'
 </script>
@@ -413,7 +413,7 @@ const ICON_BUTTON = 'inline-flex size-8 shrink-0 items-center justify-center rou
         Open in {{ editor }}
       </button>
       <button
-        v-if="agent.liveInjectable"
+        v-if="terminalAttachable"
         type="button"
         :class="ICON_BUTTON"
         aria-label="Open terminal"
@@ -511,28 +511,11 @@ const ICON_BUTTON = 'inline-flex size-8 shrink-0 items-center justify-center rou
       </span>
     </div>
 
-    <AppModal
+    <AgentTerminalDialog
+      v-if="terminalAttachable"
+      :agent="agent"
       :open="showTerminal"
-      :z-index="1100"
-      :labelled-by="`agent-terminal-title-${agent.sessionId}`"
       @close="showTerminal = false"
-    >
-      <div class="flex flex-shrink-0 items-center justify-between bg-raised px-4 py-2.5" @click.stop>
-        <span :id="`agent-terminal-title-${agent.sessionId}`" class="text-sm font-semibold text-fg">
-          Terminal — {{ title }}
-        </span>
-        <button
-          type="button"
-          aria-label="Close terminal"
-          class="cursor-pointer rounded border-none bg-transparent px-2 py-1 text-base text-fg-mute hover:bg-raised hover:text-fg"
-          @click.stop="showTerminal = false"
-        >
-          ✕
-        </button>
-      </div>
-      <div data-testid="agent-terminal-modal" class="min-h-0 flex-1" @click.stop>
-        <AgentTerminal v-if="showTerminal" :key="agent.pid" :pid="agent.pid" />
-      </div>
-    </AppModal>
+    />
   </article>
 </template>

@@ -71,7 +71,7 @@ func TestTerminalProxy_BridgesFramesBothWays(t *testing.T) {
 	port := brokerPort(t, broker)
 
 	getAgents := func(context.Context) ([]sdk.Agent, error) {
-		return []sdk.Agent{{PID: 4242, LiveInjectable: true}}, nil
+		return []sdk.Agent{{PID: 4242, LiveInjectable: true, DashboardOwned: true}}, nil
 	}
 	target := func(pid int) (int, string, error) { return port, "tok", nil }
 
@@ -110,7 +110,7 @@ func TestTerminalProxy_BridgesFramesBothWays(t *testing.T) {
 
 func TestTerminalProxy_NoTerminal_Returns409(t *testing.T) {
 	getAgents := func(context.Context) ([]sdk.Agent, error) {
-		return []sdk.Agent{{PID: 4243, LiveInjectable: true}}, nil
+		return []sdk.Agent{{PID: 4243, LiveInjectable: true, DashboardOwned: true}}, nil
 	}
 	target := func(pid int) (int, string, error) { return 0, "", ErrNoTerminal }
 
@@ -183,7 +183,7 @@ func TestTerminalProxy_CrossOriginRejected(t *testing.T) {
 	port := brokerPort(t, broker)
 
 	getAgents := func(context.Context) ([]sdk.Agent, error) {
-		return []sdk.Agent{{PID: 4245, LiveInjectable: true}}, nil
+		return []sdk.Agent{{PID: 4245, LiveInjectable: true, DashboardOwned: true}}, nil
 	}
 	target := func(pid int) (int, string, error) { return port, "tok", nil }
 
@@ -218,7 +218,7 @@ func TestTerminalProxy_SameOriginAccepted(t *testing.T) {
 	port := brokerPort(t, broker)
 
 	getAgents := func(context.Context) ([]sdk.Agent, error) {
-		return []sdk.Agent{{PID: 4246, LiveInjectable: true}}, nil
+		return []sdk.Agent{{PID: 4246, LiveInjectable: true, DashboardOwned: true}}, nil
 	}
 	target := func(pid int) (int, string, error) { return port, "tok", nil }
 
@@ -258,7 +258,7 @@ func TestTerminalProxy_NoOriginAccepted(t *testing.T) {
 	port := brokerPort(t, broker)
 
 	getAgents := func(context.Context) ([]sdk.Agent, error) {
-		return []sdk.Agent{{PID: 4247, LiveInjectable: true}}, nil
+		return []sdk.Agent{{PID: 4247, LiveInjectable: true, DashboardOwned: true}}, nil
 	}
 	target := func(pid int) (int, string, error) { return port, "tok", nil }
 
@@ -313,7 +313,7 @@ func TestTerminalProxy_LargeReplayFrameSurvives(t *testing.T) {
 	port := brokerPort(t, broker)
 
 	getAgents := func(context.Context) ([]sdk.Agent, error) {
-		return []sdk.Agent{{PID: 4242, LiveInjectable: true}}, nil
+		return []sdk.Agent{{PID: 4242, LiveInjectable: true, DashboardOwned: true}}, nil
 	}
 	target := func(pid int) (int, string, error) { return port, "tok", nil }
 
@@ -357,4 +357,49 @@ func TestTerminalProxy_InvalidPID_Returns400(t *testing.T) {
 	require.Error(t, err)
 	require.NotNil(t, resp)
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+// Phase 4.1.1: a terminal is control, so only a session the dashboard launched
+// may be attached. The broker of any other session is never dialed.
+func TestTerminalProxy_OwnershipBoundary(t *testing.T) {
+	cases := []struct {
+		name   string
+		agent  sdk.Agent
+		status int
+	}{
+		{"external live-injectable session (agent-dashboard live)", sdk.Agent{PID: 4242, LiveInjectable: true}, http.StatusForbidden},
+		{"remote agent", sdk.Agent{PID: 4242, LiveInjectable: true, DashboardOwned: true, Machine: "other-host"}, http.StatusForbidden},
+		{"internal process", sdk.Agent{PID: 4242, LiveInjectable: true, DashboardOwned: true, InternalProcess: true}, http.StatusForbidden},
+		{"pipeline stage agent", sdk.Agent{PID: 4242, LiveInjectable: true, PipelineTaskID: "task-1"}, http.StatusSwitchingProtocols},
+		{"dashboard-owned agent", sdk.Agent{PID: 4242, LiveInjectable: true, DashboardOwned: true}, http.StatusSwitchingProtocols},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			broker, _ := fakeBroker(t)
+			defer broker.Close()
+			port := brokerPort(t, broker)
+			dialed := false
+			getAgents := func(context.Context) ([]sdk.Agent, error) { return []sdk.Agent{tc.agent}, nil }
+			target := func(int) (int, string, error) { dialed = true; return port, "tok", nil }
+			srv := mountTerminalHandler(NewTerminalHandler(getAgents, target))
+			defer srv.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/agents/4242/terminal"
+			c, resp, err := websocket.Dial(ctx, wsURL, nil)
+			if c != nil {
+				defer c.Close(websocket.StatusNormalClosure, "")
+			}
+			require.NotNil(t, resp)
+			require.Equal(t, tc.status, resp.StatusCode)
+			if tc.status == http.StatusForbidden {
+				require.Error(t, err)
+				require.False(t, dialed, "a refused session's broker must never be resolved")
+			} else {
+				require.NoError(t, err)
+				require.True(t, dialed)
+			}
+		})
+	}
 }

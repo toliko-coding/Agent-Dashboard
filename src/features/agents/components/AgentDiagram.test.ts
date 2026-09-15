@@ -70,12 +70,19 @@ describe('agentDiagram', () => {
     expect(leaf.text()).toContain('1/2 done')
   })
 
-  it('draws a terminal branch only when the session is attachable', async () => {
+  it('draws a terminal branch, with a real Open terminal action, only when the user can attach it', async () => {
     const without = await mountDiagram({})
     expect(without.find('[data-testid="diagram-leaf-terminal"]').exists()).toBe(false)
 
-    const with_ = await mountDiagram({ liveInjectable: true })
-    expect(with_.find('[data-testid="diagram-leaf-terminal"]').exists()).toBe(true)
+    // A session with a pty that the dashboard did not start is not attachable here.
+    const external = await mountDiagram({ liveInjectable: true })
+    expect(external.find('[data-testid="diagram-leaf-terminal"]').exists()).toBe(false)
+    expect(external.find('[data-testid="diagram-open-terminal"]').exists()).toBe(false)
+
+    const owned = await mountDiagram({ liveInjectable: true, dashboardOwned: true })
+    expect(owned.find('[data-testid="diagram-leaf-terminal"]').exists()).toBe(true)
+    await owned.get('[data-testid="diagram-open-terminal"]').trigger('click')
+    expect(owned.emitted('openTerminal')).toHaveLength(1)
   })
 
   /*
@@ -122,7 +129,7 @@ describe('agentDiagram', () => {
   })
 
   it('describes itself for assistive tech', async () => {
-    const w = await mountDiagram({ liveInjectable: true })
+    const w = await mountDiagram({ liveInjectable: true, dashboardOwned: true })
     const label = w.get('svg').attributes('aria-label')
     expect(label).toContain('LocalScope')
     expect(label).toContain('Terminal')

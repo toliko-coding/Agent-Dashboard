@@ -61,6 +61,18 @@ export function agentIsDashboardOwned(agent: Agent): boolean {
   return !!agent.dashboardOwned && !agent.machine && !agent.internalProcess && !agent.pipelineTaskId
 }
 
+/**
+ * Whether the user may attach Claude's own terminal for agent (Phase 4.1.1): a
+ * local, running session with a pty terminal that Agent Dashboard launched —
+ * owned, or a pipeline task's stage agent. Keystrokes are control, so a session
+ * started elsewhere stays observe-only. The server enforces the same rule
+ * (agents.TerminalAttachable).
+ */
+export function agentTerminalAttachable(agent: Agent): boolean {
+  return !!agent.liveInjectable && !agent.machine && !agent.internalProcess && agent.status !== 'finished'
+    && (!!agent.dashboardOwned || !!agent.pipelineTaskId)
+}
+
 export const EXTERNAL_SESSION_NOTE = 'External session — stop it from the terminal or application that started it.'
 export const PIPELINE_AGENT_NOTE = 'Managed by its pipeline task — stop or cancel the task instead.'
 

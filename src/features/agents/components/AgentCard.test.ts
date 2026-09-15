@@ -212,9 +212,9 @@ describe('agentCard internal process badge', () => {
 
 describe('agentCard terminal access', () => {
   // AppModal teleports to <body>, so the overlay is asserted through the document.
-  it('offers a terminal for a live-injectable agent', async () => {
+  it('offers a terminal for a live-injectable agent Agent Dashboard started', async () => {
     const w = mount(AgentCard, {
-      props: { agent: { ...baseAgent, liveInjectable: true } },
+      props: { agent: { ...baseAgent, liveInjectable: true, dashboardOwned: true } },
       global: { stubs },
       attachTo: document.body,
     })
@@ -227,6 +227,10 @@ describe('agentCard terminal access', () => {
 
   it('offers none when the session cannot be driven', () => {
     expect(render({ liveInjectable: false }).find('[data-testid="agent-card-terminal"]').exists()).toBe(false)
+  })
+
+  it('offers none for a session Agent Dashboard did not start, even with a terminal (Phase 4.1.1)', () => {
+    expect(render({ liveInjectable: true }).find('[data-testid="agent-card-terminal"]').exists()).toBe(false)
   })
 })
 

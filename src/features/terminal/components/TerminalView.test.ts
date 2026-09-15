@@ -24,6 +24,7 @@ function agent(over: Partial<Agent>): Agent {
     status: 'active',
     working: false,
     liveInjectable: true,
+    dashboardOwned: true,
     workspace: { id: 'ws1', name: 'app-wt', kind: 'git-worktree', branch: 'feat/x', repository: { id: 'r1', name: 'app' } },
     ...over,
   } as unknown as Agent
@@ -41,6 +42,11 @@ describe('terminalView (3L)', () => {
     expect(w.html()).not.toContain('secret-folder')
     expect(w.html()).not.toContain('/Users/')
     expect(w.text()).not.toContain('4242')
+  })
+
+  it('lists only sessions Agent Dashboard started (Phase 4.1.1)', () => {
+    agents.value = [agent({}), agent({ sessionId: 'external', dashboardOwned: false }), agent({ sessionId: 'stage', dashboardOwned: false, pipelineTaskId: 't1' })]
+    expect(mount(TerminalView).findAll('[data-testid="terminal-agent"]')).toHaveLength(2)
   })
 
   it('says Workspace unknown rather than guessing', () => {

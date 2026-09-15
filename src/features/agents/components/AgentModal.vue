@@ -12,7 +12,7 @@ import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
-import { agentIsDashboardOwned, agentIsRunning, editorLabel, getAgentControl, lifecyclePresentation, openInEditor, useAgentLifecycle, useAgentProfileEditor } from '@/composables/useAgentLifecycle'
+import { agentIsDashboardOwned, agentIsRunning, agentTerminalAttachable, editorLabel, getAgentControl, lifecyclePresentation, openInEditor, useAgentLifecycle, useAgentProfileEditor } from '@/composables/useAgentLifecycle'
 import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { toast } from '@/composables/useToast'
@@ -23,6 +23,7 @@ import { formatCost, formatRelativeActivity, formatTokens, secondsSince, shortMo
 import { agentDisplayStatus } from '@/utils/statusColors'
 import AgentChatStream from './AgentChatStream.vue'
 import AgentIntelligencePanel from './AgentIntelligencePanel.vue'
+import AgentTerminalDialog from './AgentTerminalDialog.vue'
 import MetricsPopover from './MetricsPopover.vue'
 import SubAgentList from './SubAgentList.vue'
 
@@ -50,6 +51,13 @@ const canAct = computed(() => !!props.agent && !props.agent.machine && !props.ag
 const owned = computed(() => !!props.agent && agentIsDashboardOwned(props.agent))
 const running = computed(() => owned.value && agentIsRunning(props.agent!))
 const presentation = computed(() => props.agent ? lifecyclePresentation(props.agent) : null)
+// Claude's own terminal (Phase 4.1.1): the one place a terminal permission
+// prompt can be answered, offered only for a session the dashboard launched.
+const canAttachTerminal = computed(() => !!props.agent && agentTerminalAttachable(props.agent))
+const terminalOpen = ref(false)
+watch(() => props.agent?.pid, () => {
+  terminalOpen.value = false
+})
 // What sending a message does when there is no live input path.
 const composerNote = computed(() => {
   if (!props.agent)
@@ -263,6 +271,15 @@ watch(() => props.agent?.sessionId, (sessionId) => {
 
           <div class="ml-auto flex shrink-0 items-center gap-2" data-testid="agent-modal-actions">
             <button
+              v-if="canAttachTerminal"
+              type="button"
+              class="inline-flex h-8 cursor-pointer items-center rounded-lg border border-line bg-raised/50 px-3 text-ui-sm text-accent hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+              data-testid="agent-modal-terminal"
+              @click="terminalOpen = true"
+            >
+              Open terminal
+            </button>
+            <button
               v-if="canAct && agent.cwd"
               type="button"
               class="inline-flex h-8 cursor-pointer items-center rounded-lg border border-line bg-raised/50 px-3 text-ui-sm text-accent hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
@@ -298,6 +315,28 @@ watch(() => props.agent?.sessionId, (sessionId) => {
           >
             ✕
           </button>
+        </div>
+
+        <div
+          v-if="agent.awaitingTerminalPermission && agent.status !== 'finished'"
+          class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-warning-line bg-app/40 px-3 py-2 text-ui-sm"
+          role="status"
+          data-testid="agent-modal-terminal-permission"
+        >
+          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span class="font-medium text-fg">Claude is asking for permission in its terminal</span>
+            <span class="text-fg-soft">Nothing runs until you choose an answer there. Agent Dashboard does not answer it for you.</span>
+          </span>
+          <button
+            v-if="canAttachTerminal"
+            type="button"
+            class="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-accent/50 bg-accent-soft/40 px-3 text-ui-sm font-medium text-accent hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+            data-testid="agent-modal-respond-terminal"
+            @click="terminalOpen = true"
+          >
+            Respond in terminal
+          </button>
+          <span v-else class="text-fg-mute" data-testid="agent-modal-terminal-elsewhere">Answer it in the terminal or app that started this session.</span>
         </div>
 
         <!--
@@ -399,6 +438,7 @@ watch(() => props.agent?.sessionId, (sessionId) => {
           v-if="!openSubagent"
           :agent="agent"
           class="hidden lg:col-start-2 lg:row-start-1 lg:flex"
+          @open-terminal="terminalOpen = true"
         />
 
         <section class="flex flex-col min-h-0 min-w-0 lg:col-start-1 lg:row-start-1" aria-label="Conversation">
@@ -476,5 +516,11 @@ watch(() => props.agent?.sessionId, (sessionId) => {
         </section>
       </div>
     </div>
+    <AgentTerminalDialog
+      v-if="agent && canAttachTerminal"
+      :agent="agent"
+      :open="terminalOpen"
+      @close="terminalOpen = false"
+    />
   </AppModal>
 </template>

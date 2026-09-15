@@ -18,6 +18,7 @@ import AgentWorkspaceProcesses from './AgentWorkspaceProcesses.vue'
  * as it writes more.
  */
 const props = defineProps<{ agent: Agent }>()
+const emit = defineEmits<{ openTerminal: [] }>()
 
 const { nowMs } = useNow()
 
@@ -70,7 +71,7 @@ const recentTools = computed(() => props.agent.lastTools.slice(-4).reverse())
       <h3 class="text-[10px] uppercase tracking-wider text-fg-faint font-bold">
         Connections
       </h3>
-      <AgentDiagram :agent="agent" />
+      <AgentDiagram :agent="agent" @open-terminal="emit('openTerminal')" />
     </section>
 
     <!--

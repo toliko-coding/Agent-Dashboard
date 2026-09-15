@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Agent } from '@/types'
 import { computed } from 'vue'
+import { agentTerminalAttachable } from '@/composables/useAgentLifecycle'
 import { agentTitle } from '@/utils/agentLabels'
 import { useAgentServices } from '../composables/useAgentServices'
 
@@ -18,6 +19,10 @@ import { useAgentServices } from '../composables/useAgentServices'
  * the old rule its server appeared on the main checkout's agent.
  */
 const props = defineProps<{ agent: Agent }>()
+const emit = defineEmits<{ openTerminal: [] }>()
+
+// Drawn only when the user can really attach it (agentTerminalAttachable).
+const attachable = computed(() => agentTerminalAttachable(props.agent))
 
 // The same correlation the agent card uses — one rule, not two.
 const { services: relatedServices } = useAgentServices(() => props.agent)
@@ -54,7 +59,7 @@ const leaves = computed<Leaf[]>(() => {
     out.push({ id: 'tasks', label: 'Tasks', sub: `${doneCount.value}/${taskCount.value} done`, kind: 'work' })
   if (subagentCount.value > 0)
     out.push({ id: 'subagents', label: 'Subagents', sub: `${subagentCount.value}`, kind: 'work' })
-  if (props.agent.liveInjectable)
+  if (attachable.value)
     out.push({ id: 'terminal', label: 'Terminal', sub: 'attachable', kind: 'surface' })
   if (props.agent.pipelineTaskId)
     out.push({ id: 'pipeline', label: 'Pipeline', sub: 'linked task', kind: 'work' })
@@ -141,6 +146,15 @@ const positions = computed(() => {
         </g>
       </template>
     </svg>
+    <button
+      v-if="attachable"
+      type="button"
+      class="mt-1 inline-flex h-7 cursor-pointer items-center rounded-lg border border-line bg-raised/50 px-2.5 text-ui-sm text-accent hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+      data-testid="diagram-open-terminal"
+      @click="emit('openTerminal')"
+    >
+      Open terminal
+    </button>
 
     <!-- Legend lists only the kinds actually drawn, so it never advertises a
          node type this agent has no data for. -->
