@@ -120,3 +120,27 @@ func TestGetAgents_PendingQuestion_NonInjectableAgentProbeNotCalled(t *testing.T
 	assert.False(t, called, "probe must not be called for a non-injectable agent")
 	assert.Nil(t, agents[0].PendingQuestion)
 }
+
+// Phase 4.1.1: Claude's own tool permission prompt on a readable screen means
+// the session waits for a person — it must reach Needs you, not read as Working.
+func TestGetAgents_ToolPermissionScreen_AwaitsTerminalNotWorking(t *testing.T) {
+	fs := fakespawn.New(t)
+	ag := fs.Spawn(fakespawn.SpawnOpts{LiveInjectable: true})
+
+	m := merger.New(
+		merger.WithScanFn(fs.ScanFn()),
+		merger.WithScreenProbe(func(pid int) *sdk.PendingScreen {
+			if pid == ag.PID {
+				return &sdk.PendingScreen{Permission: &sdk.DetectedPermission{Question: "Do you want to proceed?", OptionCount: 3}}
+			}
+			return nil
+		}),
+	)
+
+	agents, err := m.GetAgents(context.Background(), merger.GetAgentsOpts{})
+	require.NoError(t, err)
+	require.Len(t, agents, 1)
+	assert.True(t, agents[0].AwaitingTerminalPermission, "a permission prompt on screen must surface")
+	assert.False(t, agents[0].Working, "a session blocked on a permission prompt is not working")
+	assert.Nil(t, agents[0].PendingQuestion)
+}

@@ -431,6 +431,22 @@ export interface PendingScreen {
    * FolderTrust is Claude's workspace trust question, before any session exists.
    */
   folderTrust?: DetectedFolderTrust
+  /**
+   * Permission is Claude Code's own tool permission prompt ("Do you want to
+   * proceed?" with Yes … No options). It is answered only in the session's
+   * terminal; the dashboard reports it so the session is not shown as working.
+   */
+  permission?: DetectedPermission
+}
+/**
+ * DetectedPermission is a tool permission prompt read from a session's screen.
+ * Only the question and how many options it offers are kept: an option label
+ * can repeat the command or file the prompt is about, which the transcript
+ * already names, and none of it is needed to say that the session is waiting.
+ */
+export interface DetectedPermission {
+  question: string
+  optionCount: number
 }
 export const SpawnerSourceTask = 'task'
 export const SpawnerSourceEnv = 'env'

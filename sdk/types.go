@@ -402,6 +402,19 @@ type PendingScreen struct {
 	Confirm  *DetectedConfirm  `json:"confirm,omitempty"`
 	// FolderTrust is Claude's workspace trust question, before any session exists.
 	FolderTrust *DetectedFolderTrust `json:"folderTrust,omitempty"`
+	// Permission is Claude Code's own tool permission prompt ("Do you want to
+	// proceed?" with Yes … No options). It is answered only in the session's
+	// terminal; the dashboard reports it so the session is not shown as working.
+	Permission *DetectedPermission `json:"permission,omitempty"`
+}
+
+// DetectedPermission is a tool permission prompt read from a session's screen.
+// Only the question and how many options it offers are kept: an option label
+// can repeat the command or file the prompt is about, which the transcript
+// already names, and none of it is needed to say that the session is waiting.
+type DetectedPermission struct {
+	Question    string `json:"question"`
+	OptionCount int    `json:"optionCount"`
 }
 
 // How an agent's spawner attribution was established: recorded from the pipeline

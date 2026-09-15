@@ -364,7 +364,82 @@ func DetectScreen(rows []string) *sdk.PendingScreen {
 	if t := DetectFolderTrust(rows); t != nil {
 		return &sdk.PendingScreen{FolderTrust: t}
 	}
+	if p := DetectToolPermission(rows); p != nil {
+		return &sdk.PendingScreen{Permission: p}
+	}
 	return nil
+}
+
+const (
+	permissionQuestionPrefix = "do you want to"
+	permissionFooterPrefix   = "esc to"
+	// Option labels can wrap onto continuation rows ("Yes, and don't ask again
+	// for <long command>"), so consecutive option numbers may be this many
+	// content rows apart.
+	permissionOptionMaxGap = 3
+)
+
+// DetectToolPermission reports Claude Code's own tool permission prompt:
+//
+//	Bash command
+//	  <command>
+//	Do you want to proceed?
+//	❯ 1. Yes
+//	  2. Yes, and don't ask again for …
+//	  3. No
+//	Esc to cancel · Tab to amend
+//
+// Gate: the last numbered block is 1..N with option 1 starting "Yes" and the
+// last option starting "No"; a "Do you want to …" line sits above it (Bash
+// "proceed?", Edit "make this edit to …?", Write "create …?"); no
+// AskUserQuestion meta-row is on screen; and nothing but the "Esc to …" footer
+// follows the options, so an answered prompt still in scrollback does not count.
+func DetectToolPermission(rows []string) *sdk.DetectedPermission {
+	contentLines := parseRows(rows)
+	numbered := numberedEntries(contentLines)
+	if len(numbered) < 2 {
+		return nil
+	}
+	for _, e := range numbered {
+		if metaLabelMatches(e.row.label, typeSomethingLabel) || metaLabelMatches(e.row.label, chatAboutLabel) {
+			return nil
+		}
+	}
+
+	end := len(numbered) - 1
+	start := end
+	for start > 0 {
+		prev, cur := numbered[start-1], numbered[start]
+		if prev.row.num != cur.row.num-1 || cur.idx-prev.idx > permissionOptionMaxGap {
+			break
+		}
+		start--
+	}
+	first, last := numbered[start], numbered[end]
+	if first.row.num != 1 || end-start < 1 {
+		return nil
+	}
+	if !strings.HasPrefix(normalizeLabel(first.row.label), "yes") || !strings.HasPrefix(normalizeLabel(last.row.label), "no") {
+		return nil
+	}
+
+	for _, l := range contentLines[last.idx+1:] {
+		if !strings.HasPrefix(strings.ToLower(l.text), permissionFooterPrefix) {
+			return nil
+		}
+	}
+
+	question := ""
+	for i := first.idx - 1; i >= 0 && i >= first.idx-4; i-- {
+		if strings.HasPrefix(strings.ToLower(contentLines[i].text), permissionQuestionPrefix) {
+			question = contentLines[i].text
+			break
+		}
+	}
+	if question == "" {
+		return nil
+	}
+	return &sdk.DetectedPermission{Question: question, OptionCount: end - start + 1}
 }
 
 // DetectedFolderTrust is aliased like the modal types above.

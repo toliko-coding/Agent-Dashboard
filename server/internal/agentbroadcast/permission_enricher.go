@@ -44,7 +44,9 @@ func NewPermissionBridgeEnricher(bridge PermissionBridgeReader) merger.Enricher 
 			// endpoint. Sharing the slice let a hook UUID ride along in the
 			// pipeline's bulk-resolve payload.
 			agents[i].HeldPermissions = held
-			agents[i].AwaitingTerminalPermission = atTerminal
+			// Either source is evidence: the bridge's terminal notice, or the
+			// merger having read the prompt off the session's own screen.
+			agents[i].AwaitingTerminalPermission = agents[i].AwaitingTerminalPermission || atTerminal
 			agents[i].TerminalPermissionToolUseID = terminalToolUseID
 			agents[i].PermissionBridgeArmed = armed
 		}

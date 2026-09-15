@@ -299,3 +299,27 @@ func TestLocateTranscript_IgnoresDirectories(t *testing.T) {
 
 	require.Empty(t, locateTranscript(sessionID))
 }
+
+// Phase 4.1.1: a tool call without a file path says what it is about, so the
+// conversation row is never an unexplained "no target".
+func TestParseOutputMessages_ToolUseDetail(t *testing.T) {
+	bash, _ := json.Marshal(map[string]any{"command": "shasum -a 256 notes/sample.md", "description": "Fingerprint the sample"})
+	bare, _ := json.Marshal(map[string]any{"command": "ls -la"})
+	read, _ := json.Marshal(map[string]any{"file_path": "/foo/bar.go", "description": "ignored"})
+	line := buildAssistantLine(t, []map[string]any{
+		{"type": "tool_use", "id": "tu_1", "name": "Bash", "input": json.RawMessage(bash)},
+		{"type": "tool_use", "id": "tu_2", "name": "Bash", "input": json.RawMessage(bare)},
+		{"type": "tool_use", "id": "tu_3", "name": "Read", "input": json.RawMessage(read)},
+	})
+
+	msgs := parseOutputMessages(line, false)
+
+	require.Len(t, msgs, 3)
+	require.NotNil(t, msgs[0].Detail)
+	require.Equal(t, "Fingerprint the sample", *msgs[0].Detail, "the description wins over the command")
+	require.Nil(t, msgs[0].FilePath)
+	require.NotNil(t, msgs[1].Detail)
+	require.Equal(t, "ls -la", *msgs[1].Detail)
+	require.Nil(t, msgs[2].Detail, "a file tool keeps its path as the target")
+	require.Equal(t, "/foo/bar.go", *msgs[2].FilePath)
+}

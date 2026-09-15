@@ -102,6 +102,8 @@ export interface OutputMessage {
   timestamp?: string
   toolName?: string
   filePath?: string
+  /** What a tool call without a file path is about (a command's description). */
+  detail?: string
   taskStatus?: 'pending' | 'in_progress' | 'completed'
   taskId?: string
   subagentType?: string

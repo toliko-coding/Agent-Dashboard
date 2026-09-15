@@ -621,57 +621,64 @@ func (m *Merger) buildAgent(ctx context.Context, proc scanner.ProcessInfo, sessi
 	discovery := readAgentChannelState(proc.PID)
 	var pendingQuestion *sdk.DetectedQuestion
 	var pendingConfirm *sdk.DetectedConfirm
+	// Claude's own tool permission prompt on a screen the dashboard can read:
+	// positive evidence the session is waiting for a person, not working, even
+	// though its tool call stays open in the transcript. Without it the session
+	// read as Working indefinitely and never reached Needs you.
+	terminalPermission := false
 	if discovery.liveInjectable && m.screenProbe != nil {
 		if screen := m.screenProbe(proc.PID); screen != nil {
 			pendingQuestion, pendingConfirm = screen.Question, screen.Confirm
+			terminalPermission = screen.Permission != nil
 		}
 	}
 	health := ComputeHealthScore(session, c.Total, c.Unknown, baselineCost)
 
 	return sdk.Agent{
-		PID:                       proc.PID,
-		SessionID:                 session.SessionID,
-		Provider:                  prov,
-		ProjectPath:               proc.CWD,
-		ProjectName:               filepath.Base(proc.CWD),
-		CWD:                       proc.CWD,
-		Workspace:                 m.workspaceRef(ctx, proc.CWD),
-		ClaudeConfigDir:           proc.ClaudeConfigDir,
-		ClaudeConfigDirKnown:      proc.ClaudeConfigDirKnown,
-		Entrypoint:                session.Entrypoint,
-		Status:                    CalculateStatus(session.LastActivity),
-		Working:                   session.TurnOpen || discovery.recentOutput,
-		ChannelAvailable:          discovery.channelAvailable,
-		LiveInjectable:            discovery.liveInjectable,
-		InternalProcess:           proc.InternalProcess,
-		PermissionsBypassed:       parser.PermissionsBypassedFromArgs(proc.Command),
-		PendingQuestion:           pendingQuestion,
-		PendingConfirm:            pendingConfirm,
-		Uptime:                    proc.Uptime,
-		LastActivity:              formatActivity(session.LastActivity),
-		Title:                     session.Title,
-		TitleSource:               session.TitleSource,
-		CurrentAction:             strPtr(session.CurrentAction),
-		LastTools:                 append(make([]sdk.RecentTool, 0), session.LastTools...),
-		Tasks:                     append(make([]sdk.TaskInfo, 0), session.Tasks...),
-		Subagents:                 buildSubagents(session),
-		TokenUsage:                session.TokenUsage,
-		CostEstimate:              c.Total,
-		CacheCreationCostEstimate: c.CacheCreate,
-		CacheReadCostEstimate:     c.CacheRead,
-		CostUnknown:               c.Unknown,
-		CostLocal:                 costLocal,
-		HealthScore:               health,
-		Model:                     strPtr(session.Model),
-		ConversationTurns:         session.ConversationTurns,
-		ToolCounts:                session.ToolCounts,
-		Meta:                      session.Meta,
-		ConvergenceAlert:          session.ConvergenceAlert,
-		ConvergenceToolName:       strPtr(session.ConvergenceToolName),
-		ErrorState:                errorStatePtr(session.ErrorState),
-		LastOutput:                strPtr(session.LastOutput),
-		LastBtw:                   session.LastBtw,
-		PendingToolUse:            session.PendingToolUse,
+		PID:                        proc.PID,
+		SessionID:                  session.SessionID,
+		Provider:                   prov,
+		ProjectPath:                proc.CWD,
+		ProjectName:                filepath.Base(proc.CWD),
+		CWD:                        proc.CWD,
+		Workspace:                  m.workspaceRef(ctx, proc.CWD),
+		ClaudeConfigDir:            proc.ClaudeConfigDir,
+		ClaudeConfigDirKnown:       proc.ClaudeConfigDirKnown,
+		Entrypoint:                 session.Entrypoint,
+		Status:                     CalculateStatus(session.LastActivity),
+		Working:                    (session.TurnOpen || discovery.recentOutput) && !terminalPermission,
+		AwaitingTerminalPermission: terminalPermission,
+		ChannelAvailable:           discovery.channelAvailable,
+		LiveInjectable:             discovery.liveInjectable,
+		InternalProcess:            proc.InternalProcess,
+		PermissionsBypassed:        parser.PermissionsBypassedFromArgs(proc.Command),
+		PendingQuestion:            pendingQuestion,
+		PendingConfirm:             pendingConfirm,
+		Uptime:                     proc.Uptime,
+		LastActivity:               formatActivity(session.LastActivity),
+		Title:                      session.Title,
+		TitleSource:                session.TitleSource,
+		CurrentAction:              strPtr(session.CurrentAction),
+		LastTools:                  append(make([]sdk.RecentTool, 0), session.LastTools...),
+		Tasks:                      append(make([]sdk.TaskInfo, 0), session.Tasks...),
+		Subagents:                  buildSubagents(session),
+		TokenUsage:                 session.TokenUsage,
+		CostEstimate:               c.Total,
+		CacheCreationCostEstimate:  c.CacheCreate,
+		CacheReadCostEstimate:      c.CacheRead,
+		CostUnknown:                c.Unknown,
+		CostLocal:                  costLocal,
+		HealthScore:                health,
+		Model:                      strPtr(session.Model),
+		ConversationTurns:          session.ConversationTurns,
+		ToolCounts:                 session.ToolCounts,
+		Meta:                       session.Meta,
+		ConvergenceAlert:           session.ConvergenceAlert,
+		ConvergenceToolName:        strPtr(session.ConvergenceToolName),
+		ErrorState:                 errorStatePtr(session.ErrorState),
+		LastOutput:                 strPtr(session.LastOutput),
+		LastBtw:                    session.LastBtw,
+		PendingToolUse:             session.PendingToolUse,
 	}
 }
 

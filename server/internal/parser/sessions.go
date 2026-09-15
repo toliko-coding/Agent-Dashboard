@@ -36,11 +36,14 @@ type SessionInfo struct {
 
 // OutputMessage is a single displayable message from a session transcript.
 type OutputMessage struct {
-	Role         string  `json:"role"` // assistant | tool_call | tool_result | human | task | subagent
-	Content      string  `json:"content"`
-	Timestamp    *string `json:"timestamp,omitempty"`
-	ToolName     *string `json:"toolName,omitempty"`
-	FilePath     *string `json:"filePath,omitempty"`
+	Role      string  `json:"role"` // assistant | tool_call | tool_result | human | task | subagent
+	Content   string  `json:"content"`
+	Timestamp *string `json:"timestamp,omitempty"`
+	ToolName  *string `json:"toolName,omitempty"`
+	FilePath  *string `json:"filePath,omitempty"`
+	// Detail says what a tool call without a file path is about: its
+	// description, or else its command, cut to toolDetailMaxRunes.
+	Detail       *string `json:"detail,omitempty"`
 	TaskStatus   *string `json:"taskStatus,omitempty"`
 	TaskID       *string `json:"taskId,omitempty"`
 	SubagentType *string `json:"subagentType,omitempty"`
@@ -436,9 +439,14 @@ type agentInput struct {
 }
 
 type toolInput struct {
-	FilePath string `json:"file_path"`
-	Path     string `json:"path"`
+	FilePath    string `json:"file_path"`
+	Path        string `json:"path"`
+	Description string `json:"description"`
+	Command     string `json:"command"`
 }
+
+// toolDetailMaxRunes bounds a tool call's detail in the conversation view.
+const toolDetailMaxRunes = 120
 
 type queuedAttachment struct {
 	Type   string          `json:"type"`
@@ -591,6 +599,19 @@ func (a *outputAccumulator) handleToolUse(b rawBlock, ts *string) {
 		} else if inp.Path != "" {
 			fp = &inp.Path
 		}
+		var detail *string
+		if fp == nil {
+			d := inp.Description
+			if d == "" {
+				d = inp.Command
+			}
+			if r := []rune(d); len(r) > toolDetailMaxRunes {
+				d = string(r[:toolDetailMaxRunes]) + "…"
+			}
+			if d != "" {
+				detail = &d
+			}
+		}
 		toolName := b.Name
 		a.messages = append(a.messages, OutputMessage{
 			Role:      "tool_call",
@@ -598,6 +619,7 @@ func (a *outputAccumulator) handleToolUse(b rawBlock, ts *string) {
 			Timestamp: ts,
 			ToolName:  &toolName,
 			FilePath:  fp,
+			Detail:    detail,
 		})
 	}
 }

@@ -21,7 +21,7 @@ const props = defineProps<{
 
 interface ToolGroup {
   kind: 'tool_group'
-  calls: Array<{ toolName: string, filePath?: string, result?: string }>
+  calls: Array<{ toolName: string, filePath?: string, detail?: string, result?: string }>
 }
 
 interface TaskGroup {
@@ -103,7 +103,7 @@ const chatEntries = computed<ChatEntry[]>(() => {
       flushTaskGroup()
       if (!currentToolGroup)
         currentToolGroup = { kind: 'tool_group', calls: [] }
-      currentToolGroup.calls.push({ toolName: msg.toolName || msg.content, filePath: msg.filePath })
+      currentToolGroup.calls.push({ toolName: msg.toolName || msg.content, filePath: msg.filePath, detail: msg.detail })
     }
     else if (msg.role === 'tool_result') {
       if (currentToolGroup) {
@@ -263,6 +263,33 @@ watch(() => props.agent?.status, () => {
 
 onUnmounted(stopRefresh)
 
+// A tool call without a result is one of three things, and the row must say
+// which instead of an empty "no output": still open (the last call of a session
+// whose tool call is unresolved), blocked on Claude's permission prompt in the
+// terminal, or finished without output.
+type CallState = 'output' | 'none' | 'running' | 'permission'
+const CALL_STATE_LABEL: Record<CallState, string> = {
+  output: 'with output',
+  none: 'no output',
+  running: 'no result yet',
+  permission: 'waiting for your permission in its terminal',
+}
+const CALL_STATE_DETAIL: Record<CallState, string> = {
+  output: '',
+  none: 'Finished without output.',
+  running: 'Still running — no result yet.',
+  permission: 'Claude is asking for permission to run this. Answer the prompt in the agent\'s terminal.',
+}
+function callState(entry: ToolGroup, entryIndex: number, callIndex: number): CallState {
+  const call = entry.calls[callIndex]
+  if (call.result)
+    return 'output'
+  const isLastCall = entryIndex === chatEntries.value.length - 1 && callIndex === entry.calls.length - 1
+  if (isLastCall && props.agent?.pendingToolUse && props.agent.status !== 'finished')
+    return props.agent.awaitingTerminalPermission ? 'permission' : 'running'
+  return 'none'
+}
+
 // Latest plain-text message for the sr-only live region — avoids re-announcing the full transcript.
 const latestMessageText = computed<string>(() => {
   for (let i = chatEntries.value.length - 1; i >= 0; i--) {
@@ -295,9 +322,12 @@ defineExpose({ scrollToBottom })
               <details v-for="(call, j) in entry.calls" :key="j" class="px-2.5">
                 <summary class="py-0.5 text-fg-mute text-[11px] cursor-pointer hover:text-fg-soft">
                   {{ call.toolName }}
-                  <span class="text-fg-mute ml-1.5 text-[10px]">— {{ call.filePath || 'no target' }}</span>
-                  <span class="text-fg-mute ml-1.5 text-[10px]">({{ call.result ? 'with output' : 'no output' }})</span>
+                  <span class="text-fg-mute ml-1.5 text-[10px]">— {{ call.filePath || call.detail || 'no target' }}</span>
+                  <span class="ml-1.5 text-[10px]" :class="callState(entry, i, j) === 'permission' ? 'text-warning-text' : 'text-fg-mute'" :data-testid="`tool-call-state-${callState(entry, i, j)}`">({{ CALL_STATE_LABEL[callState(entry, i, j)] }})</span>
                 </summary>
+                <p v-if="!call.result" class="m-0 mt-1 mb-1 text-[11px]" :class="callState(entry, i, j) === 'permission' ? 'text-warning-text' : 'text-fg-mute'">
+                  {{ CALL_STATE_DETAIL[callState(entry, i, j)] }}
+                </p>
                 <pre v-if="call.result" tabindex="0" :aria-label="`${call.toolName} output`" class="bg-raised rounded p-2 text-[11px] text-fg-mute max-h-[200px] overflow-y-auto mt-1 mb-1 whitespace-pre-wrap break-words focus-visible:outline-2 focus-visible:outline-ring">{{ call.result }}</pre>
               </details>
             </div>
