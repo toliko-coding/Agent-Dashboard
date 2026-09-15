@@ -154,5 +154,14 @@
     "context": "Phase 4C: a durable Resume Editor agent with a stable role across restarts and Resume under Dashboard, without a Project or Git.",
     "decision": "services.ProjectlessTemplate (first: resume-editor) is applied only to the folder a projectless spawn just created (O_EXCL, never over existing files) and rolled back on a failed spawn. The specialist's rules live in the workspace CLAUDE.md, which Claude Code loads on every start and resume, instead of a spawn-time system prompt that resume would drop.",
     "consequences": "The role is visible and editable by the user in their folder. New specialists are new template entries, not new agent types."
+  },
+  {
+    "id": "AD-2026-09-15-autonomy-manual-default",
+    "title": "New pipeline tasks default to manual autonomy; task folders pass the spawn policy; failures carry a persisted category",
+    "status": "accepted",
+    "date": "2026-09-15",
+    "context": "Phase 4.1 audit: taskcontrol.IsAllowAll treats spec_gated exactly like full — PermissiveAllowList (Write/Edit/blanket Bash/WebFetch…) plus auto-approval of every permission request, only git push denied — and there is no spec gate. spec_gated was the schema/form default. Task create/update never checked cwd against the spawn policy. Failures were free-text output.error only.",
+    "decision": "db.DefaultAutonomy and the ent default are manual (existing rows unchanged). UI labels state what each level pre-approves. tasks.Deps.CwdPolicy (services.SpawnPolicy over project folders + spawn.workingFolders) refuses task create/update cwd outside allowed roots or in a sensitive dir (403); SpawnStageAgent refuses a sensitive cwd for any autonomy. stage_run.failure_category (nullable) is set by the producer that knows the failure (pipeline/failure_category.go); output.error keeps the reason; clients never classify text. The implementation stage output is validated (summary, completedWork, changedFiles, validation, risks, blockers, nextAction).",
+    "consequences": "Allow-all is an explicit user choice. A pre-4.1 task in a now-disallowed folder still runs unless sensitive. Budget and iteration-limit failures stay unclassified. backlog/plan_review outputs remain unvalidated."
   }
 ]

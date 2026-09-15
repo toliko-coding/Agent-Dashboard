@@ -69,10 +69,15 @@ bounded by `maxParallelOrchestrators` (3). There is no unbounded loop anywhere i
 
 ### 4. Structured handoff
 
-A handoff is a stage's structured output, not a forwarded transcript. Today
-`ValidateStageOutput` enforces fields for two stages only — `self_review` (`passed`, `findings`,
-`summary`) and `finalization` (`summary`, `insights`, `openTodos`, `testPlan`); other stages'
-outputs are accepted as returned. The target contract every agent-driven stage converges on is:
+A handoff is a stage's structured output, not a forwarded transcript. `ValidateStageOutput`
+enforces fields for three stages — `self_review` (`passed`, `findings`, `summary`),
+`finalization` (`summary`, `insights`, `openTodos`, `testPlan`) and, since Phase 4.1,
+`implementation`, the Developer handoff (`summary`, `completedWork`, `changedFiles`, `validation`,
+`risks`, `blockers` as string lists, and `nextAction`; lists may be empty, so a task that changes
+no files reports `changedFiles: []`). A reply without a valid object is an invalid result, never a
+success: the first one is iterated once with the error quoted back, the second waits for the user
+with `failure_category = invalid_result`. `backlog` and `plan_review` outputs are still accepted as
+returned. The target contract every agent-driven stage converges on is:
 
 ```
 objective        the task title/description the stage was given
@@ -94,9 +99,14 @@ the prior conversation.
 
 Everything that needs a person goes through the existing Needs you queue: permission requests,
 capability decisions, `awaiting_user` runs (plan approval, escalations), folder trust for new
-spawns. The pipeline never passes `--dangerously-skip-permissions`; `autonomy` only decides which
-permission requests are auto-approved inside Claude Code's own permission system, and workspace
-trust stays Claude's.
+spawns. The pipeline never passes `--dangerously-skip-permissions`, and workspace trust stays
+Claude's. `autonomy` is not a spec gate: `manual` (the default for new tasks since Phase 4.1)
+pre-approves only the task's granted permissions and routes every other request to a person;
+`spec_gated` and `full` are identical today — every tool is pre-approved for the stage agent,
+blanket `Bash` included, every permission request is approved automatically, and only
+`git push` stays denied unless allowed. Whatever the level, a task's working folder must pass the
+same spawn policy as New Agent (allowed folders, sensitive-directory blocklist) when it is set,
+and a stage agent refuses a sensitive folder at spawn.
 
 ### 6. Ownership
 
@@ -109,12 +119,14 @@ attaches an existing session to a task.
 ### 7. Failure categories
 
 The canonical categories are `spawn_failed`, `permission_required`, `agent_failed`,
-`agent_disappeared`, `workspace_unavailable`, `cancelled`, `timeout`, `invalid_result`. Today the
-server persists the facts for `cancelled` (task stage), `permission_required` (awaiting_user /
-pending requests), `invalid_result` (schema iteration → wait_user), `timeout` and
-`agent_disappeared` (sweep reasons), but stores them as a free-text `output.error` reason. Clients
-must not classify that text. Until a structured `failure_category` is persisted on `stage_run`,
-the client reports `cancelled`, `permission_required` and a generic `agent_failed` only.
+`agent_disappeared`, `workspace_unavailable`, `cancelled`, `timeout`, `invalid_result`. Since
+Phase 4.1 they are persisted on `stage_run.failure_category` (nullable) by the producer that knows
+the failure — `pipeline/failure_category.go` lists them; the completion detector, orchestrator,
+sweeps and progress guards set them — and `output.error` keeps the human reason beside it. The
+stage-run API returns `failureCategory` (null when unclassified). A budget or iteration-limit
+failure stays unclassified rather than squeezed into a category, and a hard failure the detector
+did not name is `agent_failed`. Clients read the persisted value only and never classify the
+reason text; a value they do not know is shown as unclassified.
 
 ### 8. Observability
 
@@ -129,9 +141,11 @@ monitor.
 - Phase 4B (Project Intelligence) and 4C (Resume Editor) need no orchestration changes.
 - Phase 4D's smallest slice is a real task through the existing pipeline in a scratch workspace,
   presented with the canonical run states, not a new executor.
-- Gaps recorded for later work: schema validation for the `backlog`, `plan_review` and
-  `implementation` outputs; a persisted `failure_category` on `stage_run`; a Project Manager
-  role above the task (decomposition into child tasks already has `parent_task_id`); an explicit
-  handoff schema shared across stages rather than per-stage validators.
+- Closed in Phase 4.1: the `implementation` (Developer) handoff schema and a persisted
+  `failure_category` on `stage_run`.
+- Gaps recorded for later work: schema validation for the `backlog` and `plan_review` outputs; a
+  Project Manager role above the task (decomposition into child tasks already has
+  `parent_task_id`); an explicit handoff schema shared across stages rather than per-stage
+  validators.
 - Any future orchestration feature that is tempted to add a new run table must first show why a
   `task` + `stage_run` view cannot express it.

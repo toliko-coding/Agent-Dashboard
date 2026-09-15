@@ -147,6 +147,24 @@ Stage agents run with an allow-list derived from `task_permissions` rows. Grants
 
 Spawned agents request anything missing via the channel's `request_permission` MCP tool — prefer the bulk form so the user grants everything as one batch decision. The full self-service flow is documented in [`.agent-context/permissions.md`](../../.agent-context/permissions.md).
 
+### Task autonomy
+
+A pipeline task's **Autonomy** decides how much its stage agents may do without asking. It is not a spec approval step.
+
+| Autonomy | What the task's agents may do without you |
+| --- | --- |
+| **Manual** (default for new tasks) | Only what the task was granted (its `task_permissions`, resolved through the capability gate; blanket `Bash` and bare `WebFetch` grants are never pre-approved). Every other permission request waits for you in **Needs you**. |
+| **Spec-gated** | Every tool is pre-approved — `Read`, `Write`, `Edit`, any `Bash` command, `WebFetch`, `WebSearch`, subagents — and every permission request the agent sends is approved automatically. Only `git push` stays denied unless pushing is allowed for the task. No spec approval gates this. |
+| **Full** | The same as Spec-gated today. |
+
+Some things hold at every level:
+
+- A task's working folder must be a project folder or an allowed folder, and never a sensitive directory (`~/.ssh`, `~/.aws`, …) — the same rule as New Agent. Creating or editing a task with any other folder is refused, and a stage agent refuses to start in a sensitive folder.
+- The pipeline never passes `--dangerously-skip-permissions`, and Claude Code's folder trust stays Claude's; you answer it.
+- Autonomy applies only to the agents a task's stages start. It never reaches a session you started yourself, and a task in one project never borrows another project's grants.
+
+Tasks created before new tasks defaulted to Manual keep the autonomy they were saved with; check it in the task's overview.
+
 ### Answering a permission prompt from the dashboard
 
 By default a session that needs approval stops and asks in its own terminal, and
