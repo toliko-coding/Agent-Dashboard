@@ -135,6 +135,17 @@ func (h *SpawnHandler) createProjectlessForSpawn(w http.ResponseWriter, r *http.
 		writeFolderJSON(w, http.StatusBadRequest, map[string]string{"error": "missing or invalid prompt"})
 		return services.ProjectlessWorkspace{}, spawnProvenance{}, false
 	}
+	templateID, _ := body["template"].(string)
+	var tmpl services.ProjectlessTemplate
+	if templateID != "" {
+		t, terr := services.LookupProjectlessTemplate(templateID)
+		if terr != nil {
+			writeFolderJSON(w, http.StatusBadRequest, map[string]string{"error": terr.Error()})
+			return services.ProjectlessWorkspace{}, spawnProvenance{}, false
+		}
+		tmpl = t
+	}
+	delete(body, "template")
 	ws, err := services.CreateProjectlessWorkspace(r.Context(), h.workingFolders, name)
 	if err != nil {
 		status := http.StatusBadRequest
@@ -147,6 +158,14 @@ func (h *SpawnHandler) createProjectlessForSpawn(w http.ResponseWriter, r *http.
 		writeFolderJSON(w, status, map[string]string{"error": err.Error()})
 		return services.ProjectlessWorkspace{}, spawnProvenance{}, false
 	}
+	// A specialist template goes only into the folder this request just created.
+	if templateID != "" {
+		if terr := services.ApplyProjectlessTemplate(ws.Path, tmpl); terr != nil {
+			h.undoProjectlessWorkspace(r.Context(), ws, templateID)
+			writeFolderJSON(w, http.StatusInternalServerError, map[string]string{"error": "could not prepare the workspace"})
+			return services.ProjectlessWorkspace{}, spawnProvenance{}, false
+		}
+	}
 	// A projectless workspace belongs to no Project and resumes nothing.
 	body["cwd"] = ws.Path
 	delete(body, "projectId")
@@ -154,12 +173,16 @@ func (h *SpawnHandler) createProjectlessForSpawn(w http.ResponseWriter, r *http.
 	if h.auditRepo != nil {
 		_ = h.auditRepo.RecordAudit(r.Context(), nil, "projectless_workspace_create", "folder:"+ws.Folder, nil)
 	}
-	return ws, spawnProvenance{workspaceCreated: true, allowedFolder: ws.Path}, true
+	return ws, spawnProvenance{workspaceCreated: true, allowedFolder: ws.Path, template: templateID}, true
 }
 
 // undoProjectlessWorkspace reverts a workspace whose agent failed to start: its
-// allowed-folder entry goes, and the folder is removed only if still empty.
-func (h *SpawnHandler) undoProjectlessWorkspace(ctx context.Context, ws services.ProjectlessWorkspace) {
+// allowed-folder entry goes, the template scaffold it wrote goes, and the folder
+// is removed only if then empty.
+func (h *SpawnHandler) undoProjectlessWorkspace(ctx context.Context, ws services.ProjectlessWorkspace, templateID string) {
+	if t, err := services.LookupProjectlessTemplate(templateID); err == nil {
+		services.RemoveProjectlessTemplate(ws.Path, t)
+	}
 	if _, err := services.RemoveWorkingFolder(ctx, h.workingFolders, ws.Path); err != nil {
 		slog.Warn("projectless: allowed folder not removed after a failed spawn", "err", err)
 	}

@@ -87,3 +87,25 @@ func TestProjectlessSpawn_NeverReusesAnExistingFolder(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "mine", string(content))
 }
+
+// 4C: a specialist template is written only into the folder the request created,
+// an unknown template creates nothing, and a failed spawn leaves nothing behind.
+func TestProjectlessSpawn_TemplateScaffoldAndRollback(t *testing.T) {
+	_, folders, root, rr := projectlessSpawn(t, map[string]any{
+		"projectless": true, "displayName": "Resume Editor", "prompt": "hello", "template": "no-such-template",
+	})
+	require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+	entries, err := os.ReadDir(root)
+	require.NoError(t, err)
+	require.Empty(t, entries, "an unknown template creates no folder")
+	require.Empty(t, services.WorkingFolders(folders))
+
+	_, folders, root, rr = projectlessSpawn(t, map[string]any{
+		"projectless": true, "displayName": "Resume Editor", "prompt": "hello", "template": services.TemplateResumeEditor,
+		"permissionMode": "not-a-mode", // the spawn fails after the scaffold is written
+	})
+	require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+	_, err = os.Stat(filepath.Join(root, "Resume-Editor"))
+	require.True(t, os.IsNotExist(err), "the scaffold and the folder are rolled back")
+	require.Empty(t, services.WorkingFolders(folders))
+}

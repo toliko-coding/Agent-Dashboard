@@ -187,6 +187,8 @@ type spawnProvenance struct {
 	// resumeWithoutPrompt lets a resume start with no first message (resume
 	// under Dashboard control); a fresh spawn still needs a prompt.
 	resumeWithoutPrompt bool
+	// template is the specialist scaffold written into the new workspace (4C).
+	template string
 }
 
 // SetScreenProbe installs the probe used to see Claude Code's folder trust
@@ -1061,7 +1063,7 @@ func (h *SpawnHandler) Spawn(w http.ResponseWriter, r *http.Request) {
 		workspace = &ws
 		outcome, err = h.manager.spawn(sub, body, prov)
 		if err != nil {
-			h.undoProjectlessWorkspace(r.Context(), ws)
+			h.undoProjectlessWorkspace(r.Context(), ws, prov.template)
 		}
 	} else {
 		outcome, err = h.manager.SpawnWithOutcome(sub, body)
