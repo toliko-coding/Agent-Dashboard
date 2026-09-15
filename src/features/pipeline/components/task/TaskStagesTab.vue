@@ -29,7 +29,9 @@ const { byStageRun, loading, denied, error } = useStageInjections(stageRuns)
     </div>
     <div v-for="run in stageRuns" v-else :key="run.id" :data-testid="`stage-run-${run.id}`" class="px-3 py-2.5 bg-app rounded-md mb-2">
       <div class="flex items-center gap-2.5 mb-1">
-        <span class="font-semibold text-xs text-fg">{{ run.stage }}</span>
+        <h3 class="m-0 font-semibold text-xs text-fg">
+          {{ run.stage }}
+        </h3>
         <span class="font-mono text-[11px] text-fg-mute">iter {{ run.iteration }}</span>
         <AppChip :tone="runStatusTone(run.status)" mono uppercase class="ml-auto">
           {{ run.status }}

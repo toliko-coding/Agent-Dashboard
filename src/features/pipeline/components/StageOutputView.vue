@@ -114,7 +114,7 @@ function shortPath(full: string): string {
             <code
               class="font-mono text-[10px] px-1.5 py-px rounded font-semibold"
               :class="pretty.passed
-                ? 'bg-green-50 dark:bg-green-950/50 text-green-600 dark:text-green-400'
+                ? 'bg-green-50 dark:bg-green-950/50 text-success-text'
                 : 'bg-red-50 dark:bg-red-950/50 text-danger-text'"
             >
               {{ pretty.passed ? '✓ PASSED' : '✗ FAILED' }}

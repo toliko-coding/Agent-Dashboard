@@ -228,7 +228,9 @@
      4.5:1 for body text. Not overridden in .dark, so this covers both themes.
      --success-text green-600 -> green-800 and --info-text blue-600 -> blue-700
      (Phase 4.1): status text measured 3.2:1 on white and 2.9:1 / 4.3:1 on its
-     soft badge. Both are overridden in .dark (green-400 / blue-400). */
+     soft badge. Both are overridden in .dark (green-400 / blue-400).
+     --danger-text red-600 -> red-700 (Phase 4.1.1): the failed chip measured
+     3.9:1 on its soft badge. Overridden in .dark (red-400). */
   --success: var(--color-green-700);
   --success-soft: #dcfce7;
   --success-text: var(--color-green-800);
@@ -241,7 +243,7 @@
   --warning-line: var(--color-yellow-200);
   --danger: var(--color-red-600);
   --danger-soft: #fee2e2;
-  --danger-text: var(--color-red-600);
+  --danger-text: var(--color-red-700);
   --danger-dot: var(--color-red-400);
   --danger-line: var(--color-red-200);
   --info: var(--color-blue-600);

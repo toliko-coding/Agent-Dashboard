@@ -24,14 +24,16 @@ const actions = computed(() =>
   renderableActions(task.value?.availableActions).filter(a => a.action !== 'approve_spec'),
 )
 
-// Show the prompt textarea when retry or resume is among the available actions.
+// Show the prompt textarea only when retry or resume can actually run: the
+// server lists every action for a terminal task too, each disabled with a reason.
 const hasRetryOrResume = computed(() =>
-  actions.value.some(a => a.action === 'retry' || a.action === 'resume'),
+  actions.value.some(a => (a.action === 'retry' || a.action === 'resume') && a.enabled),
 )
 
-// Show analyze when any failure-related action is present (retry implies failed run).
+// Show analyze only when a retry is possible (an enabled retry implies a failed
+// run); a done or cancelled task lists retry as disabled and has nothing to analyze.
 const showAnalyze = computed(() =>
-  actions.value.some(a => a.action === 'retry'),
+  actions.value.some(a => a.action === 'retry' && a.enabled),
 )
 
 // Body payload for actions that accept an additional prompt.
