@@ -127,5 +127,14 @@
     "context": "Phase 3N.2.3: the hero's random polyline read as fake graph data; 'Finished + Observe only + Resume' was confusing for an ended unmanaged session; Runtime Workspaces port pills were not links while Services ports were.",
     "decision": "CommandHero draws five fixed nodes (Dashboard, Agents, Runtime, Workspaces, Needs you) whose states come only from props CockpitView already has (agent stream live, working count, attention queue, LocalScope snapshot source); motion is stroke-dashoffset/opacity CSS, paused on visibilitychange, not rendered under prefers-reduced-motion, hidden below xl. lifecyclePresentation(agent) maps dashboardOwned + running + pipelineTaskId to owned/observed/ended-unmanaged/pipeline presentation with no new backend state. LocalServicePort is the single port pill for Runtime surfaces, built on localServiceUrl; process port lists stay plain because they carry no protocol/bind data.",
     "consequences": "No new polling or endpoints. The network intentionally shows categories, not per-item telemetry; if it ever needs more meaning, it should gain it from real state, not more nodes."
+  },
+  {
+    "id": "AD-2026-09-15-orchestration-run-model",
+    "title": "Phase 4 orchestration is a view over task + stage_run, not a new run model",
+    "status": "accepted",
+    "date": "2026-09-15",
+    "context": "Phase 4A asked for runs, stages, roles, handoffs, attention, failure, bounded retries/review loops and recovery. The task pipeline already persists and enforces all of them.",
+    "decision": "ADR-0014: Run = task, execution = stage_run, role = stage, handoff = structured stage output, attention = awaiting_user/permission requests via Needs you, bounds = max_iterations/maxAutoRetries/maxParallelOrchestrators/plan cap, recovery = DecideRecovery + sweeps. Clients use src/utils/runState.ts (queued/preparing/running/waiting_user/succeeded/failed/cancelled, timeline) derived from persisted fields only; failure categories only where persisted state proves them.",
+    "consequences": "No duplicate run tables. Gaps: per-stage output schemas for backlog/plan_review/implementation, a persisted failure_category, a Project Manager role above tasks."
   }
 ]
