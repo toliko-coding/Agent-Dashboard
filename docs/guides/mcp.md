@@ -155,7 +155,7 @@ instead.
 
 The MCP connection above lets a session **report to** the dashboard (task tools, replies,
 permission requests). To also **control** a session from the dashboard — answer its
-AskUserQuestion prompts, inject prompts, drive it from the Terminal tab — start it with:
+AskUserQuestion prompts and inject prompts — start it with:
 
 ```sh
 agent-dashboard live -- <your usual claude args>
@@ -165,8 +165,10 @@ agent-dashboard live -- <your usual claude args>
 exactly as before) but wraps it so the dashboard owns an input path to it: it auto-loads the
 channel MCP and picks a transport automatically — inside/with tmux it uses the tmux pane, otherwise
 a built-in pty broker (no tmux required). Either way the session becomes **live-injectable**: its
-AskUserQuestion prompts surface as answerable cards in the needs-you band and Terminal tab, and you
-can push prompts to it. Add `--yolo` to skip permission prompts.
+AskUserQuestion prompts surface as answerable cards in the needs-you band, and you
+can push prompts to it. Add `--yolo` to skip permission prompts. Its terminal is not attachable from
+the dashboard: you already have it in front of you, and a terminal is attached only to sessions the
+dashboard spawned (see [Agent control](agent-control.md)).
 
 Sessions the dashboard **spawns** for you already run this way. A plain `claude` you started
 yourself (not via `live`, not in tmux) is monitor-only — the dashboard can see it but has no input
