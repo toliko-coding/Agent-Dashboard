@@ -163,5 +163,14 @@
     "context": "Phase 4.1 audit: taskcontrol.IsAllowAll treats spec_gated exactly like full — PermissiveAllowList (Write/Edit/blanket Bash/WebFetch…) plus auto-approval of every permission request, only git push denied — and there is no spec gate. spec_gated was the schema/form default. Task create/update never checked cwd against the spawn policy. Failures were free-text output.error only.",
     "decision": "db.DefaultAutonomy and the ent default are manual (existing rows unchanged). UI labels state what each level pre-approves. tasks.Deps.CwdPolicy (services.SpawnPolicy over project folders + spawn.workingFolders) refuses task create/update cwd outside allowed roots or in a sensitive dir (403); SpawnStageAgent refuses a sensitive cwd for any autonomy. stage_run.failure_category (nullable) is set by the producer that knows the failure (pipeline/failure_category.go); output.error keeps the reason; clients never classify text. The implementation stage output is validated (summary, completedWork, changedFiles, validation, risks, blockers, nextAction).",
     "consequences": "Allow-all is an explicit user choice. A pre-4.1 task in a now-disallowed folder still runs unless sensitive. Budget and iteration-limit failures stay unclassified. backlog/plan_review outputs remain unvalidated."
+  },
+  {
+    "id": "AD-2026-09-15-roadmap-ownership",
+    "title": "Roadmap updates are user-triggered and proposal-reviewed until an Architect/PM role exists",
+    "status": "accepted",
+    "date": "2026-09-15",
+    "context": "Phase 4.1.1 acceptance: Project Intelligence can be maintained by hand and updated from AI proposals the user reviews (Add new phases / Replace / Reject). The user accepted the current roadmap implementation as good enough for this stage.",
+    "decision": "For now roadmap changes happen only through the user: inline edits, or an AI proposal they review. Later, the Architect/Project Manager maintains roadmap state as work progresses, through the intended flow Architect plans → Developer → Reviewer → QA → verified result → Architect proposes/updates the roadmap from that structured evidence. The Architect never declares its own work verified: Verified stays server-assigned from linked pipeline tasks of the same project, and User / Suggested / Verified provenance is kept.",
+    "consequences": "No autonomous roadmap writes before the Architect/PM phase. That phase must add proposal-from-structured-evidence, not direct writes, and must not bypass the provenance rules."
   }
 ]
