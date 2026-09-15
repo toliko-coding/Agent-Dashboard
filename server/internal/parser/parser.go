@@ -225,13 +225,23 @@ func TailRead(filePath string) (string, error) {
  * session at 32 KB and bounds the pathological one.
  */
 func tailReadConversation(filePath string) (string, error) {
+	return TailReadGrowing(filePath, containsConversationEntry)
+}
+
+// TailReadGrowing reads the end of a session log, doubling the window from
+// 32 KB until done reports the content holds what the caller needs, the whole
+// file is read, or maxConversationTailBytes is reached. A fixed tail misses an
+// entry followed by a large record (Claude Code writes attachment records of
+// 100 KB and more after a reply), so a caller that needs a specific entry must
+// grow the window rather than assume it sits near the end.
+func TailReadGrowing(filePath string, done func(content string) bool) (string, error) {
 	window := int64(tailBytes)
 	for {
 		content, size, err := tailReadN(filePath, window)
 		if err != nil {
 			return "", err
 		}
-		if window >= size || window >= maxConversationTailBytes || containsConversationEntry(content) {
+		if window >= size || window >= maxConversationTailBytes || done(content) {
 			return content, nil
 		}
 		window *= 2

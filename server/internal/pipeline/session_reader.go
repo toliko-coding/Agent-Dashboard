@@ -199,12 +199,22 @@ func lastAssistantText(entries []JsonlEntry) string {
 	return ""
 }
 
+// tailReadStageOutput reads enough of a session log to hold its last assistant
+// reply. A fixed 32 KB tail silently missed a finished reply whenever Claude
+// Code wrote a large attachment record after it (seen live: 122 KB), which read
+// as "no structured output" — a valid result misreported as an invalid one.
+func tailReadStageOutput(filePath string) (string, error) {
+	return parser.TailReadGrowing(filePath, func(content string) bool {
+		return lastAssistantText(parseJsonlLines(content)) != ""
+	})
+}
+
 func ReadLastStageJsonOutput(cwd, sessionID string) (StageOutputRead, error) {
 	filePath := findSessionFilePath(cwd, sessionID)
 	if filePath == "" {
 		return StageOutputRead{}, nil
 	}
-	raw, err := parser.TailRead(filePath)
+	raw, err := tailReadStageOutput(filePath)
 	if err != nil {
 		return StageOutputRead{}, nil
 	}
@@ -221,7 +231,7 @@ func ReadLastStageJsonOutput(cwd, sessionID string) (StageOutputRead, error) {
 // directly, bypassing the normal ~/.claude/projects/... discovery. Used by
 // non-Claude adapters that write their own synthetic JSONL sessions.
 func ReadLastStageJsonOutputFromFile(filePath string) (StageOutputRead, error) {
-	raw, err := parser.TailRead(filePath)
+	raw, err := tailReadStageOutput(filePath)
 	if err != nil {
 		return StageOutputRead{}, fmt.Errorf("reading synthetic session file: %w", err)
 	}
