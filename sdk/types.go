@@ -586,6 +586,12 @@ type Agent struct {
 	// never stops for a tool-permission prompt. An unresolved tool_use in such a
 	// session means the tool is running, not that someone has to approve it.
 	PermissionsBypassed bool `json:"permissionsBypassed"`
+	// SessionPermissionMode is the permission mode this running process was
+	// started with, read from its own command line: "default" when argv carried
+	// no flag, and empty when no command line was observed. It describes the
+	// session as it is running now, which a saved configuration cannot change —
+	// claude reads its mode once, at startup.
+	SessionPermissionMode string `json:"sessionPermissionMode,omitempty"`
 	// LiveInjectable is true when the dashboard can deliver a prompt to this
 	// running interactive session as real keyboard input — either via the pty
 	// broker (`agent-dashboard ptyhost`) or `tmux send-keys`. When false, sending

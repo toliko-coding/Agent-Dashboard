@@ -3,6 +3,7 @@ import type { FolderCheck } from '../composables/useAgentFolders'
 import type { ProjectlessWorkspace } from '../composables/useAgentLifecycle'
 import type { Project } from '../types'
 import type { AgentPurpose } from '../utils/agentPurpose'
+import type { PermissionMode } from '../utils/permissionModes'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { allowWorkingFolder, checkFolder, listWorkingFolders } from '../composables/useAgentFolders'
 import { previewProjectlessWorkspace } from '../composables/useAgentLifecycle'
@@ -16,6 +17,7 @@ import { useAgents } from '../features/agents'
 import { workspaceDisplay } from '../utils/agentGroup'
 import { DEFAULT_AGENT_PURPOSE } from '../utils/agentPurpose'
 import { errorMessage } from '../utils/errorMessage'
+import { isDangerousPermissionMode, PERMISSION_MODE_OPTIONS } from '../utils/permissionModes'
 import { SPAWN_AUTOCLOSE_MS } from '../utils/timing'
 import FolderTrustDecision from './FolderTrustDecision.vue'
 import QuickCreateProjectPanel from './QuickCreateProjectPanel.vue'
@@ -136,7 +138,6 @@ watch(template, (t) => {
     category.value = 'document'
 })
 
-type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'auto' | 'bypassPermissions' | 'dontAsk'
 const permissionMode = ref<PermissionMode>('default')
 const bypassConfirmed = ref(false)
 const isSpawning = ref(false)
@@ -207,19 +208,11 @@ const spawnerOptions = computed(() => [
   ...spawners.value.map(s => ({ value: s.id, label: `${s.name}${s.builtIn ? ' (built-in)' : ''}` })),
 ])
 
-const permissionModeOptions: Array<{ value: PermissionMode, label: string }> = [
-  { value: 'default', label: 'Ask for permission (default)' },
-  { value: 'plan', label: 'Plan mode (read-only)' },
-  { value: 'acceptEdits', label: 'Auto-accept edits' },
-  { value: 'auto', label: 'Auto (smart approvals)' },
-  { value: 'bypassPermissions', label: 'Bypass all permissions (dangerous)' },
-  { value: 'dontAsk', label: 'Never ask (dangerous)' },
-]
+const permissionModeOptions = PERMISSION_MODE_OPTIONS
 
 // Modes that skip every confirmation prompt are gated behind a click-again
 // confirmation. 'auto' and 'plan' are not dangerous and need no gate.
-const dangerousMode = computed(() =>
-  permissionMode.value === 'bypassPermissions' || permissionMode.value === 'dontAsk')
+const dangerousMode = computed(() => isDangerousPermissionMode(permissionMode.value))
 
 /* ── Working folder ─────────────────────────────────────────────── */
 

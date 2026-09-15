@@ -21,6 +21,7 @@ import { useMetricsDisclosure } from '@/features/agents/composables/useMetricsDi
 import { PluginSlot } from '@/features/plugins'
 import { agentTechnical, agentTitle, agentTopic } from '@/utils/agentLabels'
 import { formatCost, formatRelativeActivity, formatTokens, secondsSince, shortModel, totalTokenCount } from '@/utils/format'
+import { isDangerousPermissionMode, permissionModeShortLabel } from '@/utils/permissionModes'
 import { agentDisplayStatus } from '@/utils/statusColors'
 import AgentChatStream from './AgentChatStream.vue'
 import AgentIntelligencePanel from './AgentIntelligencePanel.vue'
@@ -71,6 +72,15 @@ watch([() => props.agent?.pid, terminalRequest, canAttachTerminal], ([pid, reque
     terminalRequest.value = null
   }
 }, { immediate: true })
+
+/*
+ * The permission mode this session is actually running under, read by the
+ * server from the process's own command line. claude reads its mode once, at
+ * startup, so this is the session's posture for its whole life: nothing saved
+ * later can change it, and the chip says what IS rather than what is wanted.
+ * Empty means no command line was observed, which is not the same as default.
+ */
+const sessionMode = computed(() => props.agent?.sessionPermissionMode ?? '')
 
 // Approve once / Deny on the recognised prompt (Phase 4); the terminal stays the fallback.
 const permissionPrompt = computed(() => props.agent?.terminalPermission ?? null)
@@ -268,6 +278,13 @@ watch(() => props.agent?.sessionId, (sessionId) => {
                 <WorkspaceBadge :workspace="agent.workspace" class="max-w-[16rem]" />
               </template>
               <span v-if="topic" class="min-w-0 truncate text-fg-soft" data-testid="agent-modal-topic">{{ topic }}</span>
+              <span
+                v-if="sessionMode"
+                class="shrink-0 rounded-control border border-line px-1.5 py-px text-label"
+                :class="isDangerousPermissionMode(sessionMode) || agent.permissionsBypassed ? 'font-semibold text-danger-text' : 'text-fg-mute'"
+                data-testid="agent-modal-session-mode"
+                :title="`This session is running with permission mode “${sessionMode}”. Claude reads its mode once, at startup, so it cannot be changed while the session runs.`"
+              >{{ permissionModeShortLabel(sessionMode) }}</span>
             </div>
           </div>
           <MachineBadge v-if="agent.machine" :machine="agent.machine" />

@@ -101,6 +101,53 @@ func PermissionsBypassedFromArgs(command string) bool {
 
 const bypassPermissionsMode = "bypassPermissions"
 
+// defaultPermissionMode is claude's own default when no flag is given.
+const defaultPermissionMode = "default"
+
+/*
+ * PermissionModeFromArgs reports the permission mode a running process was
+ * actually started with, read from its own command line.
+ *
+ * This is observation, not configuration: it answers "what did this session
+ * inherit", which is the only honest basis for showing a running agent's
+ * posture next to whatever is saved for it. A saved value can differ from a
+ * running one, and the difference is the thing worth showing.
+ *
+ * "" means the mode is unknown because no command line was observed - kept
+ * distinct from "default", which is a claim that argv was read and carried no
+ * flag. Both dangerously-skip spellings report as bypassPermissions, because
+ * that is what they do.
+ *
+ * The bare-token stop is the same rule PermissionsBypassedFromArgs uses and
+ * exists for the same reason: the command line arrives flattened, so a prompt
+ * containing "--permission-mode bypassPermissions" would otherwise be read as
+ * the agent's own posture.
+ */
+func PermissionModeFromArgs(command string) string {
+	if strings.TrimSpace(command) == "" {
+		return ""
+	}
+	fields := strings.Fields(command)
+	for i, f := range fields {
+		if i > 0 && !strings.HasPrefix(f, "-") && !strings.HasPrefix(fields[i-1], "-") {
+			break
+		}
+		switch {
+		case f == "--dangerously-skip-permissions", f == "--allow-dangerously-skip-permissions":
+			return bypassPermissionsMode
+		case f == "--permission-mode":
+			if i+1 < len(fields) {
+				return fields[i+1]
+			}
+		case strings.HasPrefix(f, "--permission-mode="):
+			if v := strings.TrimPrefix(f, "--permission-mode="); v != "" {
+				return v
+			}
+		}
+	}
+	return defaultPermissionMode
+}
+
 // SessionRequest carries everything needed to resolve the session bound to one
 // running process.
 type SessionRequest struct {

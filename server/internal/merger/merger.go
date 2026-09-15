@@ -678,6 +678,7 @@ func (m *Merger) buildAgent(ctx context.Context, proc scanner.ProcessInfo, sessi
 		LiveInjectable:             discovery.liveInjectable,
 		InternalProcess:            proc.InternalProcess,
 		PermissionsBypassed:        parser.PermissionsBypassedFromArgs(proc.Command),
+		SessionPermissionMode:      parser.PermissionModeFromArgs(proc.Command),
 		PendingQuestion:            pendingQuestion,
 		PendingConfirm:             pendingConfirm,
 		Uptime:                     proc.Uptime,
