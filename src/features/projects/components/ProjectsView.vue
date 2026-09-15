@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import { useSettingsSection } from '@/composables/useSettingsSection'
 import { useProjects } from '../../../composables/useProjects'
+import ProjectIntelligenceView from '../roadmap/ProjectIntelligenceView.vue'
+import { selectedProjectId } from '../roadmap/useRoadmap'
 
 /*
  * Projects are a real, server-backed entity (GET /api/projects + SSE), so this
@@ -25,12 +27,16 @@ function folderName(path: string): string {
 
 const sorted = computed(() => [...projects.value].sort((a, b) => a.name.localeCompare(b.name)))
 
+// Phase 4B: a project opens into Project Intelligence (its roadmap); Command can open one directly.
+const openProject = computed(() => projects.value.find(p => p.id === selectedProjectId.value) ?? null)
+
 // The empty state's pointer to Settings is a link to that section, not an instruction.
 const { openSettings } = useSettingsSection()
 </script>
 
 <template>
-  <section class="flex flex-col gap-3" aria-labelledby="projects-heading">
+  <ProjectIntelligenceView v-if="openProject" :project="openProject" @back="selectedProjectId = null" />
+  <section v-else class="flex flex-col gap-3" aria-labelledby="projects-heading">
     <h2 id="projects-heading" class="sr-only">
       Projects
     </h2>
@@ -62,6 +68,15 @@ const { openSettings } = useSettingsSection()
             {{ p.folderCount ?? p.folders?.length ?? 0 }}
             {{ (p.folderCount ?? p.folders?.length ?? 0) === 1 ? 'folder' : 'folders' }}
           </span>
+          <button
+            type="button"
+            class="shrink-0 cursor-pointer rounded-md border border-line bg-transparent px-2 py-0.5 text-ui-sm text-accent hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+            :aria-label="`Open ${p.name} roadmap`"
+            :data-testid="`project-open-${p.id}`"
+            @click="selectedProjectId = p.id"
+          >
+            Roadmap →
+          </button>
         </div>
 
         <p v-if="p.description" class="m-0 text-ui-sm text-fg-mute leading-snug line-clamp-2">

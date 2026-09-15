@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { PanelState } from '../panelState'
-import { computed } from 'vue'
+import type { ProjectRoadmapSummary } from '@/features/projects'
+import { computed, onMounted, ref } from 'vue'
 import { useProjects } from '@/composables/useProjects'
 import { useAgents } from '@/features/agents'
+import { fetchRoadmapSummaries, selectedProjectId, STATUS_GLYPHS } from '@/features/projects'
 import { summarizeProjectAgents } from '@/utils/projectAgents'
 import CockpitPanel from './CockpitPanel.vue'
 
@@ -21,6 +23,21 @@ const emit = defineEmits<{ navigate: [] }>()
 
 const { projects, isLoading, error } = useProjects()
 const { agents } = useAgents({ autoStart: false })
+
+// Roadmap position per project (Phase 4B): read once when Command opens, not polled.
+const roadmaps = ref<Map<string, ProjectRoadmapSummary>>(new Map())
+onMounted(() => {
+  fetchRoadmapSummaries()
+    .then((list) => { roadmaps.value = new Map(list.map(r => [r.projectId, r])) })
+    .catch(() => { roadmaps.value = new Map() })
+})
+const blockedTotal = computed(() => [...roadmaps.value.values()].reduce((n, r) => n + r.summary.blocked, 0))
+const withCurrent = computed(() => [...roadmaps.value.values()].filter(r => r.currentPhase).length)
+
+function openRoadmap(projectId: string): void {
+  selectedProjectId.value = projectId
+  emit('navigate')
+}
 
 const rows = computed(() =>
   [...projects.value]
@@ -54,6 +71,10 @@ const state = computed<PanelState>(() => {
       </button>
     </template>
 
+    <p v-if="roadmaps.size" class="m-0 mb-2 flex flex-wrap gap-x-3 text-ui-sm text-fg-mute" data-testid="projects-roadmap-counts">
+      <span><span class="font-mono text-fg">{{ withCurrent }}</span> current {{ withCurrent === 1 ? 'milestone' : 'milestones' }}</span>
+      <span v-if="blockedTotal" class="text-warning-text">⚠ {{ blockedTotal }} blocked</span>
+    </p>
     <ul class="flex flex-col gap-1.5" data-testid="projects-summary">
       <li
         v-for="{ project, counts } in rows.slice(0, 6)"
@@ -66,7 +87,17 @@ const state = computed<PanelState>(() => {
           :style="project.color ? { backgroundColor: project.color } : undefined"
           aria-hidden="true"
         />
-        <span class="truncate text-fg">{{ project.name }}</span>
+        <span class="flex min-w-0 flex-col">
+          <span class="truncate text-fg">{{ project.name }}</span>
+          <button
+            v-if="roadmaps.get(project.id)?.currentPhase"
+            type="button"
+            class="cursor-pointer truncate border-none bg-transparent p-0 text-left text-label text-live-text hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent rounded"
+            :data-testid="`project-current-${project.id}`"
+            :aria-label="`Open ${project.name} roadmap, current phase ${roadmaps.get(project.id)!.currentPhase}`"
+            @click="openRoadmap(project.id)"
+          >◉ {{ roadmaps.get(project.id)!.currentPhase }}<template v-if="roadmaps.get(project.id)!.summary.blocked"> · {{ STATUS_GLYPHS.blocked }} {{ roadmaps.get(project.id)!.summary.blocked }} blocked</template></button>
+        </span>
 
         <!-- "—" means the project has no folder registered, so agents cannot be
              attributed to it. It is not a zero. -->

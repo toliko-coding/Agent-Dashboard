@@ -737,3 +737,42 @@ aside[tabindex="0"]:focus-visible {
   outline: 3px solid var(--ring);
   outline-offset: -3px;
 }
+
+/*
+ * Project Intelligence roadmap (Phase 4B). The current phase lifts off the
+ * rail; its node pulses slowly (the "you are here" signal); completed nodes are
+ * a static success mark; blocked is a static warning; future phases are quiet.
+ * The rail's flow toward the current phase is .cc-rail-flow, shown only while an
+ * agent works in the project. Reduced motion stills the pulse.
+ */
+.rm-rail-done { background: color-mix(in oklch, var(--accent) 45%, var(--line-strong)); }
+.rm-rail-future { background: var(--line); }
+.rm-node { background: var(--card); }
+.rm-node-completed { border-color: color-mix(in oklch, var(--state-success) 60%, var(--line)); color: var(--state-success); }
+.rm-node-current { border-color: var(--state-live); color: var(--state-live); box-shadow: 0 0 0 3px color-mix(in oklch, var(--state-live) 16%, transparent); }
+.rm-node-active { border-color: color-mix(in oklch, var(--state-live) 55%, var(--line)); color: var(--state-live); }
+.rm-node-blocked { border-color: var(--state-waiting); color: var(--state-waiting); }
+.rm-node-future { border-color: var(--line-strong); color: var(--fg-faint, var(--line-strong)); }
+.rm-place-future .rm-phase { opacity: 0.78; }
+.rm-phase { border-color: transparent; background: transparent; transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard); }
+.rm-phase:hover { background: color-mix(in oklch, var(--fg) 4%, transparent); }
+.rm-phase-current {
+  border-color: color-mix(in oklch, var(--state-live) 38%, var(--line));
+  background: linear-gradient(90deg, color-mix(in oklch, var(--state-live) 9%, transparent), transparent 70%);
+}
+.rm-phase-selected { border-color: color-mix(in oklch, var(--accent) 60%, var(--line)); }
+.rm-pulse { border: 1px solid var(--state-live); opacity: 0.35; animation: rm-pulse 3200ms var(--ease-standard) infinite; }
+@keyframes rm-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.08; transform: scale(1.18); }
+}
+.rm-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.75rem; min-height: 1.75rem; border-radius: 0.375rem;
+  border: 1px solid var(--line); background: transparent; color: var(--fg-mute, currentColor);
+  cursor: pointer; font-size: 12px;
+}
+.rm-icon-btn:hover:not(:disabled) { background: color-mix(in oklch, var(--fg) 6%, transparent); }
+.rm-icon-btn:disabled { opacity: 0.4; cursor: default; }
+.rm-icon-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); }
+
