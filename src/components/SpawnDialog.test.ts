@@ -675,6 +675,41 @@ describe('spawnDialog — new projectless workspace (3N.2)', () => {
     wrapper.unmount()
   })
 
+  // 4C: the Resume Editor specialist starts from the server's template.
+  it('sends a specialist template with the projectless spawn, and fills its name and Documents icon', async () => {
+    const wrapper = await openNewWorkspace('')
+    const trigger = document.querySelector('[data-testid="spawn-template"]') as HTMLButtonElement
+    trigger.focus()
+    const key = async (k: string) => {
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }))
+      await flushPromises()
+    }
+    await key('ArrowDown')
+    for (let i = 0; i < 4; i++) {
+      const active = document.getElementById(trigger.getAttribute('aria-activedescendant') ?? '')
+      if (active?.textContent?.includes('Resume Editor'))
+        break
+      await key('ArrowDown')
+    }
+    await key('Enter')
+    await new Promise(resolve => setTimeout(resolve, 350))
+    await flushPromises()
+    expect((document.querySelector('[data-testid="spawn-name-wrap"]') as HTMLInputElement).value).toBe('Resume Editor')
+    expect(document.querySelector('[data-testid="spawn-template-help"]')).not.toBeNull()
+
+    ;(document.querySelector('[data-testid="spawn-btn"]') as HTMLButtonElement).click()
+    await flushPromises()
+    const spawn = calls().find(c => c[0] === '/api/agents/spawn')!
+    const body = JSON.parse(spawn[1].body as string)
+    expect(body.template).toBe('resume-editor')
+    expect(body.projectless).toBe(true)
+    expect(body.displayName).toBe('Resume Editor')
+    expect(body.category).toBe('document')
+    expect(body).not.toHaveProperty('cwd')
+    expect(body).not.toHaveProperty('projectId')
+    wrapper.unmount()
+  })
+
   it('20: never reuses an existing folder', async () => {
     existing.add('Portfolio')
     const wrapper = await openNewWorkspace('Portfolio')

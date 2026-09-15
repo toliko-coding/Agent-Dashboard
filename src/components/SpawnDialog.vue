@@ -115,6 +115,27 @@ watch(workspaceMode, (mode) => {
 })
 const newWorkspaceReady = computed(() => !!displayName.value.trim() && !!newWorkspace.value && !newWorkspace.value.exists)
 
+/*
+ * Specialist templates (4C): a new projectless workspace can start from a
+ * server-side scaffold. The server writes it into the folder it creates; the
+ * client only names the template. Resume Editor fills in its name and the
+ * Documents icon when they are still empty or default.
+ */
+type WorkspaceTemplate = '' | 'resume-editor'
+const TEMPLATE_OPTIONS: { value: WorkspaceTemplate, label: string }[] = [
+  { value: '', label: 'None — a plain folder' },
+  { value: 'resume-editor', label: 'Resume Editor — CV tailoring' },
+]
+const template = ref<WorkspaceTemplate>('')
+watch(template, (t) => {
+  if (t !== 'resume-editor')
+    return
+  if (!displayName.value.trim())
+    displayName.value = 'Resume Editor'
+  if (category.value === DEFAULT_AGENT_PURPOSE)
+    category.value = 'document'
+})
+
 type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'auto' | 'bypassPermissions' | 'dontAsk'
 const permissionMode = ref<PermissionMode>('default')
 const bypassConfirmed = ref(false)
@@ -318,6 +339,7 @@ function resetForm() {
   displayName.value = ''
   category.value = DEFAULT_AGENT_PURPOSE
   workspaceMode.value = 'existing'
+  template.value = ''
   permissionMode.value = 'default'
   bypassConfirmed.value = false
   isSpawning.value = false
@@ -355,10 +377,14 @@ async function handleSpawn() {
   }
   // A new workspace is created by the server as part of this spawn, so it can
   // record that it made the folder and the allowed-folder entry (3N.2.1).
-  if (newWorkspace)
+  if (newWorkspace) {
     body.projectless = true
-  else
+    if (template.value)
+      body.template = template.value
+  }
+  else {
     body.cwd = cwd
+  }
   if (systemPrompt.value.trim())
     body.systemPrompt = systemPrompt.value.trim()
   // Presentation only: sent when given, never derived from the folder or Project.
@@ -559,6 +585,15 @@ onUnmounted(() => {
         <p v-else class="m-0 text-ui-sm text-fg-mute">
           Naming the workspace folder…
         </p>
+        <div class="flex flex-col gap-1 pt-1">
+          <AppFieldLabel for="spawn-template">
+            Specialist
+          </AppFieldLabel>
+          <AppSelect id="spawn-template" v-model="template" :options="TEMPLATE_OPTIONS" data-testid="spawn-template" />
+          <p v-if="template === 'resume-editor'" class="m-0 text-ui-sm text-fg-mute" data-testid="spawn-template-help">
+            Adds master-cv, job-descriptions, tailored, exports and notes folders, and working rules the agent follows: your master CV is the source of truth and is never overwritten.
+          </p>
+        </div>
         <p class="m-0 text-label text-fg-faint">
           Change where these folders go in Settings → Agent folders.
         </p>
