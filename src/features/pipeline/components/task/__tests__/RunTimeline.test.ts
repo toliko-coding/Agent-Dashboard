@@ -42,6 +42,22 @@ describe('runTimeline component', () => {
     expect(waiting.get('[data-testid="run-step-implementation"]').text()).toContain('Waiting for you')
   })
 
+  it('names the persisted failure category and keeps the human reason beside it (Phase 4.1)', () => {
+    const w = mount(RunTimeline, { props: { task: { currentStage: 'implementation', latestStageRunStatus: 'failed' }, stageRuns: [run({ status: 'failed', failureCategory: 'invalid_result', output: { error: 'missing required field: changedFiles (array of strings)' } })] } })
+    expect(w.get('[data-testid="run-step-category-implementation"]').text()).toContain('Invalid result')
+    const failure = w.get('[data-testid="run-failure"]')
+    expect(failure.attributes('data-category')).toBe('invalid_result')
+    expect(failure.text()).toContain('Developer: Invalid result')
+    expect(failure.text()).toContain('missing required field: changedFiles')
+  })
+
+  it('never infers a category from the reason text', () => {
+    const w = mount(RunTimeline, { props: { task: { currentStage: 'implementation', latestStageRunStatus: 'failed' }, stageRuns: [run({ status: 'failed', output: { error: 'stage timeout: ran 900s (limit 600s)' } })] } })
+    expect(w.find('[data-testid="run-step-category-implementation"]').exists()).toBe(false)
+    expect(w.get('[data-testid="run-failure"]').attributes('data-category')).toBe('unclassified')
+    expect(w.get('[data-testid="run-failure"]').text()).toContain('failed (unclassified)')
+  })
+
   it('has no axe violations', async () => {
     const w = mount(RunTimeline, { props: { task: { currentStage: 'implementation', latestStageRunStatus: 'running' }, stageRuns: [run({})] }, attachTo: document.body })
     expect(await axe(w.element as Element)).toHaveNoViolations()

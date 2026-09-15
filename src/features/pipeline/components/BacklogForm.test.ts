@@ -183,9 +183,10 @@ describe('backlogForm single-screen', () => {
     expect(wrapper.findComponent({ name: 'QuickCreateProjectPanel' }).exists()).toBe(true)
   })
 
-  it('renders the autonomy selector with spec_gated as default', () => {
+  it('renders the autonomy selector with manual as the safe default', () => {
     const wrapper = mount(BacklogForm)
-    expect(wrapper.get('[data-testid="details-autonomy"]').text()).toContain('Spec-gated')
+    expect(wrapper.get('[data-testid="details-autonomy"]').text()).toContain('Manual')
+    expect(wrapper.get('[data-testid="details-autonomy-help"]').text()).toContain('waits for you')
   })
 
   it('includes the selected autonomy in the create payload', async () => {
@@ -196,7 +197,7 @@ describe('backlogForm single-screen', () => {
     await flushPromises()
     await wrapper.get('[data-testid="details-title"]').setValue('Demo task')
     panel = await openListbox(wrapper.get('[data-testid="details-autonomy"]'))
-    optionByLabel(panel, 'Full — fully autonomous').dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    optionByLabel(panel, 'Full — pre-approves every tool, including shell').dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await flushPromises()
     await wrapper.get('[data-testid="details-submit-refine"]').trigger('click')
     await flushPromises()
@@ -217,7 +218,7 @@ describe('backlogForm single-screen', () => {
       title: 'Demo task',
       slug: 'demo-task',
       cwd: '/repos/web',
-      autonomy: 'spec_gated',
+      autonomy: 'manual',
     }))
     expect(createTaskMock).toHaveBeenCalledWith(expect.not.objectContaining({ stage: expect.anything() }))
     expect(wrapper.emitted('createdAndRefine')).toBeTruthy()

@@ -1,6 +1,6 @@
 import type { StageRun } from '@/types'
 import { describe, expect, it } from 'vitest'
-import { failureCategoryOf, runStateOf, runTimeline, stageRole } from './runState'
+import { failureCategoryOf, failureReasonOf, runStateOf, runTimeline, stageRole } from './runState'
 
 // ADR-0014: the canonical run view over task + stage_run, from persisted state only.
 
@@ -48,11 +48,21 @@ describe('runStateOf', () => {
 })
 
 describe('failureCategoryOf', () => {
-  it('reports only the categories persisted state proves', () => {
-    expect(failureCategoryOf({ currentStage: 'cancelled', latestStageRunStatus: null })).toBe('cancelled')
-    expect(failureCategoryOf({ currentStage: 'implementation', latestStageRunStatus: 'failed', blockedByPendingPermissions: true })).toBe('permission_required')
-    expect(failureCategoryOf({ currentStage: 'implementation', latestStageRunStatus: 'failed' })).toBe('agent_failed')
-    expect(failureCategoryOf({ currentStage: 'implementation', latestStageRunStatus: 'running' })).toBeNull()
+  it('reads only the category the server persisted, never error text', () => {
+    expect(failureCategoryOf({ failureCategory: 'invalid_result' })).toBe('invalid_result')
+    expect(failureCategoryOf({ failureCategory: 'agent_disappeared' })).toBe('agent_disappeared')
+    expect(failureCategoryOf({ failureCategory: null })).toBeNull()
+    expect(failureCategoryOf({})).toBeNull()
+    expect(failureCategoryOf(null)).toBeNull()
+    // An unknown value from a newer server stays unclassified rather than guessed.
+    expect(failureCategoryOf({ failureCategory: 'rate_limited' as never })).toBeNull()
+    // A reason that reads like a timeout is still not a category.
+    expect(failureCategoryOf({ failureCategory: null, ...{ output: { error: 'stage timeout: ran 900s' } } } as never)).toBeNull()
+  })
+
+  it('keeps the human reason separately', () => {
+    expect(failureReasonOf({ output: { error: 'no session JSONL found' } })).toBe('no session JSONL found')
+    expect(failureReasonOf({ output: null })).toBeNull()
   })
 })
 

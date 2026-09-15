@@ -1,4 +1,4 @@
-import type { PipelineStage, PipelineTask, StageRun, StageRunStatus } from '@/types'
+import type { PipelineStage, PipelineTask, StageRun, StageRunFailureCategory, StageRunStatus } from '@/types'
 
 /*
  * The canonical run view over the task pipeline (ADR-0014).
@@ -72,21 +72,32 @@ export function runStateOf(task: TaskFacts): RunState {
   return STATUS_STATES[status]
 }
 
-export type FailureCategory = 'cancelled' | 'permission_required' | 'agent_failed'
+/** A person-readable name per persisted failure category (Phase 4.1). */
+export const FAILURE_CATEGORY_LABELS: Record<StageRunFailureCategory, string> = {
+  spawn_failed: 'Agent could not start',
+  permission_required: 'Needed a permission',
+  agent_failed: 'Agent failed',
+  agent_disappeared: 'Agent process disappeared',
+  workspace_unavailable: 'Workspace unavailable',
+  timeout: 'Timed out',
+  invalid_result: 'Invalid result',
+  cancelled: 'Cancelled',
+}
 
 /**
- * Only the categories the persisted state proves (ADR-0014 §7). The server's
- * failure reason is free text today and is deliberately not classified here.
+ * The failure category the server persisted on a stage run, where the failure
+ * was known (ADR-0014 §7). Never inferred from error text: an unclassified or
+ * unknown value is null.
  */
-export function failureCategoryOf(task: TaskFacts): FailureCategory | null {
-  const state = runStateOf(task)
-  if (state === 'cancelled')
-    return 'cancelled'
-  if (task.blockedByPendingPermissions)
-    return 'permission_required'
-  if (state === 'failed')
-    return 'agent_failed'
-  return null
+export function failureCategoryOf(run: Pick<StageRun, 'failureCategory'> | null | undefined): StageRunFailureCategory | null {
+  const category = run?.failureCategory ?? null
+  return category !== null && Object.hasOwn(FAILURE_CATEGORY_LABELS, category) ? category : null
+}
+
+/** The human reason the server recorded with a failure (output.error), if any. */
+export function failureReasonOf(run: Pick<StageRun, 'output'> | null | undefined): string | null {
+  const reason = run?.output?.error ?? run?.output?.validation_error
+  return typeof reason === 'string' && reason.trim() ? reason : null
 }
 
 export type TimelineStepState = 'done' | 'current' | 'waiting' | 'failed' | 'pending' | 'skipped'

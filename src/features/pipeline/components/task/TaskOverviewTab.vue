@@ -22,7 +22,7 @@ import { formatDateTime } from '@/utils/format'
 import { STAGE_LABELS } from '@/utils/stageLabels'
 import { runStatusLabel, runStatusTone } from '@/utils/statusColors'
 import { activeRuntime, formatCents, taskRuntime } from '@/utils/taskFormat'
-import { TASK_AUTONOMY_OPTIONS } from '@/utils/taskOptions'
+import { TASK_AUTONOMY_HELP, TASK_AUTONOMY_OPTIONS } from '@/utils/taskOptions'
 
 const emit = defineEmits<{ openChat: [task: PipelineTask] }>()
 
@@ -276,12 +276,15 @@ watch(
       </label>
       <AppSelect
         :id="`task-modal-autonomy-${task.id}`"
-        :model-value="task.autonomy ?? 'spec_gated'"
+        :model-value="task.autonomy || 'manual'"
         :options="TASK_AUTONOMY_OPTIONS"
         data-testid="task-autonomy-select"
         size="compact"
         @update:model-value="onAutonomyChange"
       />
+      <p class="m-0 text-ui-sm" :class="(task.autonomy || 'manual') === 'manual' ? 'text-fg-mute' : 'text-warning-text'" data-testid="task-autonomy-help">
+        {{ TASK_AUTONOMY_HELP[task.autonomy || 'manual'] }}
+      </p>
     </section>
 
     <section v-if="hasConcept" class="border-t border-line pt-3 flex flex-col gap-2" data-testid="concept-viewer">

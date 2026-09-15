@@ -15,7 +15,7 @@ import { useTrackerImport } from '@/composables/useTrackerImport'
 import { createTask } from '@/features/pipeline/composables/useTasks'
 import { errorMessage } from '@/utils/errorMessage'
 import { derivedSlugHint } from '@/utils/slugHint'
-import { TASK_AUTONOMY_OPTIONS, TASK_PRIORITY_OPTIONS } from '@/utils/taskOptions'
+import { DEFAULT_TASK_AUTONOMY, TASK_AUTONOMY_HELP, TASK_AUTONOMY_OPTIONS, TASK_PRIORITY_OPTIONS } from '@/utils/taskOptions'
 import { slugFollowingName } from '@/utils/validation'
 
 const emit = defineEmits<{
@@ -37,7 +37,7 @@ const cwd = ref('')
 const priority = ref<'high' | 'medium' | 'low'>('medium')
 const selectedTemplate = ref<PermissionTemplateId | null>('feature_implementation')
 const selectedSpawnerId = ref<string>('')
-const autonomy = ref<'manual' | 'spec_gated' | 'full'>('spec_gated')
+const autonomy = ref<'manual' | 'spec_gated' | 'full'>(DEFAULT_TASK_AUTONOMY)
 const folderSuggestions = ref<ProjectFolder[]>([])
 const isSubmitting = ref(false)
 const importRef = ref('')
@@ -292,6 +292,9 @@ async function onCreateAndRefine(): Promise<void> {
         data-testid="details-autonomy"
         class="w-full"
       />
+      <p class="m-0 text-ui-sm" :class="autonomy === 'manual' ? 'text-fg-mute' : 'text-warning-text'" data-testid="details-autonomy-help">
+        {{ TASK_AUTONOMY_HELP[autonomy] }}
+      </p>
     </div>
 
     <PermissionTemplatePicker v-model="selectedTemplate" />

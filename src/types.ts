@@ -260,7 +260,15 @@ export interface StageRun {
   // responding user does not get the agent killed at the 4h timeout.
   // Null until at least one permission has been resolved on this run.
   lastGrantAt: string | null
+  /**
+   * Why the run failed, set by the server where the failure was known (Phase 4.1).
+   * Null when unclassified; the human reason stays in output.error.
+   */
+  failureCategory?: StageRunFailureCategory | null
 }
+
+export const STAGE_RUN_FAILURE_CATEGORIES = ['spawn_failed', 'permission_required', 'agent_failed', 'agent_disappeared', 'workspace_unavailable', 'timeout', 'invalid_result', 'cancelled'] as const
+export type StageRunFailureCategory = typeof STAGE_RUN_FAILURE_CATEGORIES[number]
 
 export interface TaskPermission {
   id: string

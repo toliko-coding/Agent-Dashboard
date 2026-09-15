@@ -3,7 +3,7 @@ import type { PipelineTask, StageRun } from '@/types'
 import type { TimelineStepState } from '@/utils/runState'
 import { computed } from 'vue'
 import { formatDateTime } from '@/utils/format'
-import { RUN_ROLE_LABELS, RUN_STATE_LABELS, runStateOf, runTimeline } from '@/utils/runState'
+import { FAILURE_CATEGORY_LABELS, failureCategoryOf, failureReasonOf, RUN_ROLE_LABELS, RUN_STATE_LABELS, runStateOf, runTimeline } from '@/utils/runState'
 
 /*
  * A task's run as a timeline (Phase 4D, ADR-0014): Queued → Preparing →
@@ -19,6 +19,15 @@ const props = defineProps<{
 
 const state = computed(() => runStateOf(props.task))
 const steps = computed(() => runTimeline(props.task, props.stageRuns))
+
+// Why the run stopped (Phase 4.1): the category the server persisted where the
+// failure was known, and its human reason beside it. Never guessed from text.
+const problem = computed(() => {
+  const step = [...steps.value].reverse().find(s => s.run && (s.state === 'failed' || (s.state === 'waiting' && failureCategoryOf(s.run))))
+  if (!step?.run)
+    return null
+  return { step, category: failureCategoryOf(step.run), reason: failureReasonOf(step.run) }
+})
 
 const GLYPH: Record<TimelineStepState, string> = {
   done: '✓',
@@ -65,10 +74,23 @@ const TONE: Record<TimelineStepState, string> = {
           </span>
           <span class="font-medium">{{ step.label }}</span>
           <span class="sr-only">: {{ WORD[step.state] }}<template v-if="step.role">, {{ RUN_ROLE_LABELS[step.role] }}</template></span>
+          <span v-if="failureCategoryOf(step.run)" class="text-label" :data-testid="`run-step-category-${step.key}`">· {{ FAILURE_CATEGORY_LABELS[failureCategoryOf(step.run)!] }}</span>
           <span v-if="step.run?.startedAt" class="hidden font-mono text-label text-fg-faint md:inline" :title="`Started ${formatDateTime(step.run.startedAt)}`">it {{ step.run.iteration }}</span>
         </span>
         <span v-if="i < steps.length - 1" class="text-fg-faint" aria-hidden="true">→</span>
       </li>
     </ol>
+    <p
+      v-if="problem"
+      class="m-0 text-ui-sm"
+      :class="problem.step.state === 'failed' ? 'text-danger-text' : 'text-warning-text'"
+      data-testid="run-failure"
+      :data-category="problem.category ?? 'unclassified'"
+    >
+      <span class="font-medium">{{ problem.step.label }}: {{ problem.category ? FAILURE_CATEGORY_LABELS[problem.category] : 'failed (unclassified)' }}</span>
+      <template v-if="problem.reason">
+        — <span class="break-words text-fg-soft">{{ problem.reason }}</span>
+      </template>
+    </p>
   </section>
 </template>
