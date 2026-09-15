@@ -182,3 +182,86 @@ export function nextPhase(roadmap: Roadmap): RoadmapPhase | null {
     return null
   return roadmap.phases.slice(currentIndex + 1).find(p => p.status !== 'completed' && p.status !== 'skipped') ?? null
 }
+
+/*
+ * Current vs Suggested (Phase 4.1): how a proposal differs from the roadmap,
+ * phase by phase, so accepting never surprises. Phases match by normalized
+ * title — the server's roadmap.NormalizeTitle matches the same way, and Add
+ * imports only the phases marked 'add'.
+ */
+export type ProposalChangeKind = 'add' | 'change' | 'remove' | 'unchanged'
+
+export interface ProposalDiffRow {
+  kind: ProposalChangeKind
+  title: string
+  current: RoadmapPhase | null
+  proposed: ProposedPhase | null
+  /** What differs, in words. Empty unless kind is 'change'. */
+  changes: string[]
+}
+
+const WHITESPACE = /\s+/
+
+export function normalizeTitle(title: string): string {
+  return title.trim().split(WHITESPACE).filter(Boolean).join(' ').toLowerCase()
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`
+}
+
+function phaseChanges(current: RoadmapPhase, proposed: ProposedPhase): string[] {
+  const changes: string[] = []
+  if (current.status !== proposed.status)
+    changes.push(`Status: ${STATUS_LABELS[current.status]} → ${STATUS_LABELS[proposed.status]}`)
+  if (current.current !== proposed.current)
+    changes.push(proposed.current ? 'Would become the current phase' : 'Would no longer be the current phase')
+  if (proposed.description.trim() && proposed.description.trim() !== current.description.trim())
+    changes.push('Description differs')
+  const currentItems = new Map(current.items.map(i => [normalizeTitle(i.title), i]))
+  const proposedItems = proposed.items ?? []
+  const added = proposedItems.filter(i => !currentItems.has(normalizeTitle(i.title))).length
+  const proposedTitles = new Set(proposedItems.map(i => normalizeTitle(i.title)))
+  const dropped = current.items.filter(i => !proposedTitles.has(normalizeTitle(i.title))).length
+  const restatused = proposedItems.filter((i) => {
+    const match = currentItems.get(normalizeTitle(i.title))
+    return match && match.status !== i.status
+  }).length
+  if (added)
+    changes.push(`${plural(added, 'item')} not on the roadmap`)
+  if (dropped)
+    changes.push(`${plural(dropped, 'current item')} not in the proposal`)
+  if (restatused)
+    changes.push(`${plural(restatused, 'item status')} ${restatused === 1 ? 'differs' : 'differ'}`)
+  return changes
+}
+
+export function proposalDiff(roadmap: Roadmap | null, payload: RoadmapProposal['payload']): ProposalDiffRow[] {
+  const existing = new Map((roadmap?.phases ?? []).map(p => [normalizeTitle(p.title), p]))
+  const matched = new Set<string>()
+  const rows: ProposalDiffRow[] = []
+  for (const proposed of payload.phases) {
+    const key = normalizeTitle(proposed.title)
+    const current = existing.get(key) ?? null
+    if (!current || matched.has(key)) {
+      rows.push({ kind: 'add', title: proposed.title, current: null, proposed, changes: [] })
+      matched.add(key)
+      continue
+    }
+    matched.add(key)
+    const changes = phaseChanges(current, proposed)
+    rows.push({ kind: changes.length ? 'change' : 'unchanged', title: current.title, current, proposed, changes })
+  }
+  for (const current of roadmap?.phases ?? []) {
+    if (!matched.has(normalizeTitle(current.title)))
+      rows.push({ kind: 'remove', title: current.title, current, proposed: null, changes: [] })
+  }
+  return rows
+}
+
+export function diffCounts(rows: ProposalDiffRow[]): Record<ProposalChangeKind, number> {
+  const counts: Record<ProposalChangeKind, number> = { add: 0, change: 0, remove: 0, unchanged: 0 }
+  for (const row of rows)
+    counts[row.kind]++
+  return counts
+}

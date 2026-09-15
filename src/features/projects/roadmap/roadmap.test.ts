@@ -1,10 +1,11 @@
-import type { Roadmap, RoadmapPhase } from './roadmapModel'
+import type { Roadmap, RoadmapPhase, RoadmapProposal } from './roadmapModel'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { axe } from '@/utils/testA11y'
 import RoadmapMap from './RoadmapMap.vue'
-import { currentPhase, nextPhase, overallLabel, phasePlace, progressLabel, progressPercent } from './roadmapModel'
+import { currentPhase, diffCounts, nextPhase, normalizeTitle, overallLabel, phasePlace, progressLabel, progressPercent, proposalDiff } from './roadmapModel'
+import RoadmapProposals from './RoadmapProposals.vue'
 
 // Phase 4B: the roadmap model and mission map — position, provenance, honest progress.
 
@@ -190,5 +191,139 @@ describe('projectIntelligenceView', () => {
   it('has no axe violations', async () => {
     const w = await mountView()
     expect(await axe(w.element as Element)).toHaveNoViolations()
+  })
+})
+
+// Phase 4.1: Current vs Suggested — what accepting a proposal would change.
+const NOW = roadmap([
+  phase({ id: 'r1', title: 'Communication reliability', status: 'completed', items: [{ id: 'i1', title: 'Channel', status: 'completed', provenance: 'user', position: 0, updatedAt: '' }] }),
+  phase({ id: 'r2', title: 'Project Intelligence', status: 'active', current: true }),
+  phase({ id: 'r3', title: 'Smarter Command Center', status: 'planned' }),
+])
+const PROPOSAL: RoadmapProposal = {
+  id: 'prop-1',
+  status: 'pending',
+  source: 'agent',
+  summary: 'Moves current to Orchestration.',
+  createdAt: '2026-09-15T11:20:00Z',
+  payload: {
+    objective: 'One command center for local agents',
+    summary: '',
+    phases: [
+      { title: '  communication   RELIABILITY ', description: '', status: 'completed', current: false, evidence: ['git log: #115'], items: [{ title: 'channel', status: 'completed' }] },
+      { title: 'Project Intelligence', description: '', status: 'active', current: false, evidence: null, items: [{ title: 'Review the first proposal', status: 'active' }] },
+      { title: 'Orchestration', description: 'Run tasks', status: 'active', current: true, evidence: ['ADR-0014'], items: null },
+    ],
+  },
+}
+
+describe('proposalDiff', () => {
+  it('matches phases by normalized title and names every difference in words', () => {
+    expect(normalizeTitle('  communication   RELIABILITY ')).toBe('communication reliability')
+    const rows = proposalDiff(NOW, PROPOSAL.payload)
+    expect(rows.map(r => [r.kind, r.title])).toEqual([
+      ['unchanged', 'Communication reliability'],
+      ['change', 'Project Intelligence'],
+      ['add', 'Orchestration'],
+      ['remove', 'Smarter Command Center'],
+    ])
+    expect(rows[1].changes).toEqual(['Would no longer be the current phase', '1 item not on the roadmap'])
+    expect(diffCounts(rows)).toEqual({ add: 1, change: 1, remove: 1, unchanged: 1 })
+  })
+
+  it('treats every phase as new when there is no roadmap', () => {
+    expect(proposalDiff(null, PROPOSAL.payload).every(r => r.kind === 'add')).toBe(true)
+  })
+})
+
+describe('roadmapProposals', () => {
+  const mountReview = (props: Record<string, unknown> = {}) => mount(RoadmapProposals, {
+    props: { proposals: [PROPOSAL], roadmap: NOW, agents: [], busy: false, ...props },
+    attachTo: document.body,
+  })
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('shows Current vs Suggested with New, Changed, Not in proposal and Unchanged — never raw JSON', () => {
+    const w = mountReview()
+    expect(w.text()).toContain('Current vs Suggested')
+    expect(w.get('[data-testid="roadmap-diff-counts"]').findAll('span').map(c => c.text())).toEqual(['+ 1 new', '~ 1 changed', '− 1 not in proposal', '= 1 unchanged'])
+    expect(w.findAll('[data-testid="roadmap-diff-row"]').map(r => r.attributes('data-kind'))).toEqual(['unchanged', 'change', 'add', 'remove'])
+    expect(w.text()).toContain('kept by Add, deleted by Replace')
+    const items = w.findAll('[data-testid="roadmap-diff-items"]')
+    expect(items[1].text().replace(/\s+/g, ' ')).toContain('Review the first proposal — Active · not on the roadmap')
+    expect(w.text()).not.toContain('{"')
+    expect(w.get('[data-testid="roadmap-proposal-explain"]').text()).toContain('imports only the 1 phase marked New')
+  })
+
+  it('adds only the new phases, and replaces only after saying what is deleted', async () => {
+    const w = mountReview()
+    const add = w.get('[data-testid="roadmap-accept-prop-1"]')
+    expect(add.text()).toBe('Add 1 phase')
+    await add.trigger('click')
+    expect(w.emitted('accept')).toEqual([['prop-1', 'append']])
+    expect(w.find('[data-testid="roadmap-replace-prop-1"]').exists()).toBe(false)
+    await w.get('[data-testid="roadmap-replace-start-prop-1"]').trigger('click')
+    expect(w.get('[data-testid="roadmap-replace-warning"]').text()).toContain('Deletes all 3 phases')
+    await w.get('[data-testid="roadmap-replace-prop-1"]').trigger('click')
+    expect(w.emitted('accept')?.[1]).toEqual(['prop-1', 'replace'])
+    await w.get('[data-testid="roadmap-reject-prop-1"]').trigger('click')
+    expect(w.emitted('reject')).toEqual([['prop-1']])
+  })
+
+  it('disables Add when the proposal has nothing new', () => {
+    const onlyKnown = { ...PROPOSAL, payload: { ...PROPOSAL.payload, phases: PROPOSAL.payload.phases.slice(0, 2) } }
+    const w = mountReview({ proposals: [onlyKnown] })
+    expect(w.get('[data-testid="roadmap-accept-prop-1"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('has no axe violations', async () => {
+    const w = mountReview()
+    expect(await axe(w.element as Element)).toHaveNoViolations()
+  })
+})
+
+describe('projectIntelligenceView freshness', () => {
+  let gets: string[]
+  let now: number
+  const project = { id: 'proj', slug: 'p', name: 'P', folders: [], createdAt: '', updatedAt: '' }
+  beforeEach(() => {
+    gets = []
+    now = 1_000_000
+    vi.spyOn(Date, 'now').mockImplementation(() => now)
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if ((init?.method ?? 'GET') === 'GET')
+        gets.push(url)
+      return { ok: true, json: async () => (url.endsWith('/proposals') ? [] : NOW) }
+    }))
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    Reflect.deleteProperty(document, 'visibilityState')
+    document.body.innerHTML = ''
+  })
+
+  it('refetches when the window regains focus, at most every 5 s, and never on a timer', async () => {
+    const { default: View } = await import('./ProjectIntelligenceView.vue')
+    const w = mount(View, { props: { project }, attachTo: document.body })
+    await flushPromises()
+    const roadmapGets = () => gets.filter(u => u.endsWith('/roadmap')).length
+    expect(roadmapGets()).toBe(1)
+    window.dispatchEvent(new Event('focus'))
+    await flushPromises()
+    expect(roadmapGets()).toBe(1)
+    now += 6_000
+    window.dispatchEvent(new Event('focus'))
+    await flushPromises()
+    expect(roadmapGets()).toBe(2)
+    expect(gets.filter(u => u.endsWith('/proposals'))).toHaveLength(2)
+    w.unmount()
+    now += 6_000
+    window.dispatchEvent(new Event('focus'))
+    await flushPromises()
+    expect(roadmapGets()).toBe(2)
   })
 })

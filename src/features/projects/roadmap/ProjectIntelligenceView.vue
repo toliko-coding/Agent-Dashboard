@@ -4,6 +4,7 @@ import type { Project } from '@/types'
 import { computed, onMounted, ref, watch } from 'vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
+import { useRefreshWhenShown } from '@/composables/useRefreshWhenShown'
 import { useAgents } from '@/features/agents'
 import { attentionFor } from '@/utils/attention'
 import { agentsForProject } from '@/utils/projectAgents'
@@ -54,6 +55,14 @@ onMounted(() => {
   void rm.load()
   void rm.loadProposals()
 })
+
+// Freshness (Phase 4.1): the roadmap changes through this page, an accepted
+// proposal in another tab, or a linked task moving on. Refetch when the page is
+// shown again or the window regains focus — never on a timer.
+useRefreshWhenShown(() => {
+  void rm.load()
+  void rm.loadProposals()
+}, { skip: () => busy.value })
 watch(() => props.project.id, () => {
   selectedId.value = null
   void rm.load()
@@ -236,7 +245,7 @@ function onAddItem(title: string, status: RoadmapStatus) {
           :proposals="proposals"
           :agents="projectAgents"
           :busy="busy"
-          :has-roadmap="roadmap.phases.length > 0"
+          :roadmap="roadmap"
           @analyze="analyze"
           @import="pid => rm.importProposal(pid).catch(ignore)"
           @accept="(id, mode) => rm.acceptProposal(id, mode).catch(ignore)"

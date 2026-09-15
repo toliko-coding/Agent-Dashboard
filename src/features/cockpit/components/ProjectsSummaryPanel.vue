@@ -3,6 +3,7 @@ import type { PanelState } from '../panelState'
 import type { ProjectRoadmapSummary } from '@/features/projects'
 import { computed, onMounted, ref } from 'vue'
 import { useProjects } from '@/composables/useProjects'
+import { useRefreshWhenShown } from '@/composables/useRefreshWhenShown'
 import { useAgents } from '@/features/agents'
 import { fetchRoadmapSummaries, selectedProjectId, STATUS_GLYPHS } from '@/features/projects'
 import { summarizeProjectAgents } from '@/utils/projectAgents'
@@ -24,13 +25,17 @@ const emit = defineEmits<{ navigate: [] }>()
 const { projects, isLoading, error } = useProjects()
 const { agents } = useAgents({ autoStart: false })
 
-// Roadmap position per project (Phase 4B): read once when Command opens, not polled.
+// Roadmap position per project (Phase 4B): read when Command opens and again
+// when the window regains focus (Phase 4.1) — never polled. Until the first read
+// lands nothing is shown, so a count is never a placeholder zero.
 const roadmaps = ref<Map<string, ProjectRoadmapSummary>>(new Map())
-onMounted(() => {
+function loadRoadmaps() {
   fetchRoadmapSummaries()
     .then((list) => { roadmaps.value = new Map(list.map(r => [r.projectId, r])) })
-    .catch(() => { roadmaps.value = new Map() })
-})
+    .catch(() => {})
+}
+onMounted(loadRoadmaps)
+useRefreshWhenShown(loadRoadmaps)
 const blockedTotal = computed(() => [...roadmaps.value.values()].reduce((n, r) => n + r.summary.blocked, 0))
 const withCurrent = computed(() => [...roadmaps.value.values()].filter(r => r.currentPhase).length)
 
