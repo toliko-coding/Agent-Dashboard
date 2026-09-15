@@ -225,10 +225,13 @@
   /* Status tokens — light values reproduce existing hardcoded Tailwind steps.
      --success darkened green-600 -> green-700: text-white on bg-success (AppButton
      success variant, PromptInput approve button) was ~3.2:1, below WCAG 1.4.3's
-     4.5:1 for body text. Not overridden in .dark, so this covers both themes. */
+     4.5:1 for body text. Not overridden in .dark, so this covers both themes.
+     --success-text green-600 -> green-800 and --info-text blue-600 -> blue-700
+     (Phase 4.1): status text measured 3.2:1 on white and 2.9:1 / 4.3:1 on its
+     soft badge. Both are overridden in .dark (green-400 / blue-400). */
   --success: var(--color-green-700);
   --success-soft: #dcfce7;
-  --success-text: var(--color-green-600);
+  --success-text: var(--color-green-800);
   --success-dot: var(--color-green-400);
   --success-line: var(--color-green-200);
   --warning: var(--color-yellow-500);
@@ -243,7 +246,7 @@
   --danger-line: var(--color-red-200);
   --info: var(--color-blue-600);
   --info-soft: #dbeafe;
-  --info-text: var(--color-blue-600);
+  --info-text: var(--color-blue-700);
   --info-dot: var(--color-blue-400);
   --info-line: var(--color-blue-300);
   --neutral-soft: var(--color-slate-100);

@@ -79,7 +79,7 @@ watch(
   },
   { immediate: true },
 )
-const resumable = computed(() => !owned.value && control.value?.resume.available === true)
+const resumable = computed(() => !owned.value && control.value?.resume?.available === true)
 // What resuming would do, in the user's terms; only once the server has said it can.
 const resumeHelp = computed(() => {
   const resume = control.value?.resume

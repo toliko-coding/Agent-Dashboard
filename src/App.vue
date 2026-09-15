@@ -460,8 +460,8 @@ onMounted(() => usageComposable.start())
       @approved="showPlanReview = false; activePlanTask = null"
       @rejected="showPlanReview = false; activePlanTask = null"
     />
-    <AppModal :open="showBacklogForm" width="560px" @close="showBacklogForm = false">
-      <AppModalHeader title="New Task" @close="showBacklogForm = false" />
+    <AppModal :open="showBacklogForm" width="560px" labelled-by="new-task-title" @close="showBacklogForm = false">
+      <AppModalHeader id="new-task-title" title="New Task" @close="showBacklogForm = false" />
       <div class="flex-1 min-h-0 overflow-y-auto p-5">
         <BacklogForm @created-and-refine="onCreateTaskAndRefine" />
       </div>
