@@ -82,7 +82,7 @@ const metrics = computed(() => {
         would read as "measured, and idle". When a collector lands this row
         becomes a real metric with no layout change.
       -->
-      <div class="flex items-center gap-2 opacity-55" data-testid="machine-network-unavailable">
+      <div class="flex items-center gap-2" data-testid="machine-network-unavailable">
         <span class="text-[10px] text-fg-faint w-12 shrink-0">Network</span>
         <span class="flex-1 text-[10px] text-fg-faint font-mono">—</span>
         <span class="text-[9px] text-fg-faint">n/a</span>

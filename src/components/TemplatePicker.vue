@@ -55,7 +55,7 @@ function apply() {
       v-if="selectedId"
       type="button"
       data-apply
-      class="px-2 py-1 bg-accent text-white rounded text-[12px] cursor-pointer hover:brightness-110 border-none"
+      class="px-2 py-1 bg-accent text-accent-contrast rounded text-[12px] cursor-pointer hover:brightness-110 border-none"
       @click="apply"
     >
       Insert

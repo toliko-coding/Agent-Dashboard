@@ -93,7 +93,7 @@ async function save() {
         <button
           type="button"
           :disabled="saving"
-          class="px-4 py-2 rounded bg-accent text-white text-sm disabled:opacity-50"
+          class="px-4 py-2 rounded bg-accent text-accent-contrast text-sm disabled:opacity-50"
           data-action="save"
           @click="save"
         >
