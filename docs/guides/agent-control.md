@@ -147,6 +147,16 @@ Stage agents run with an allow-list derived from `task_permissions` rows. Grants
 
 Spawned agents request anything missing via the channel's `request_permission` MCP tool — prefer the bulk form so the user grants everything as one batch decision. The full self-service flow is documented in [`.agent-context/permissions.md`](../../.agent-context/permissions.md).
 
+### Answering Claude's own permission prompt
+
+When an agent Agent Dashboard started stops at Claude Code's own permission prompt ("Do you want to proceed?"), the prompt appears in **Needs you** and in the agent's workspace with the tool and what it is about — the command for Bash, the file path for Write and Edit.
+
+- **Approve once** answers that one request with Claude's plain "Yes". It never picks "Yes, and don't ask again" or "switch to auto mode", and it changes no permission, rule or autonomy setting.
+- **Deny** answers that one request with Claude's "No". Claude then stops or re-plans as it normally does after a refusal.
+- **Open terminal** / **Respond in terminal** opens the session's own terminal, where every option — including the broader ones — stays available to you.
+
+The buttons appear only when the dashboard recognises the prompt with confidence: a Bash, Write or Edit prompt whose first option is a plain "Yes" and last option a "No". Anything else shows **Respond in terminal** only. Before sending anything the server re-reads the session's screen and refuses when the session was not started by Agent Dashboard, when no recognised prompt is open, or when the prompt differs from the one you were shown; a second click on the same prompt is refused. Sessions started elsewhere (Terminal, VS Code, `agent-dashboard live`) never get these buttons.
+
 ### Task autonomy
 
 A pipeline task's **Autonomy** decides how much its stage agents may do without asking. It is not a spec approval step.
