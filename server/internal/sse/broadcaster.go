@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 const subscriberBufferSize = 10
@@ -41,7 +42,17 @@ type Broadcaster struct {
 	// instead. nil until the first Broadcast call. Comment frames (heartbeats)
 	// do not update it. atomic.Pointer avoids lock contention with Subscribe/
 	// Unsubscribe/snapshot, which guard the subscriber map separately.
-	lastFrame atomic.Pointer[[]byte]
+	//
+	// It carries the time it was produced because frames stop being produced
+	// while nothing is subscribed: without an age, a reader cannot tell a frame
+	// from this tick from one left over from an hour ago.
+	lastFrame atomic.Pointer[frameSnapshot]
+}
+
+// frameSnapshot is one broadcast payload and when it was broadcast.
+type frameSnapshot struct {
+	payload []byte
+	at      time.Time
 }
 
 // NewBroadcaster creates a ready-to-use Broadcaster.
@@ -126,7 +137,7 @@ func send(s *subscriber, data []byte) {
 // blocking the broadcaster goroutine.
 // Subscribers are snapshotted under RLock; iteration happens without lock. (F-PERF-018)
 func (b *Broadcaster) Broadcast(payload []byte) {
-	b.lastFrame.Store(&payload)
+	b.lastFrame.Store(&frameSnapshot{payload: payload, at: time.Now()})
 	frame := fmt.Appendf(nil, "data: %s\n\n", payload)
 	for _, s := range b.snapshot() {
 		send(s, frame)
@@ -142,7 +153,23 @@ func (b *Broadcaster) LastFrame() []byte {
 	if p == nil {
 		return nil
 	}
-	return *p
+	return p.payload
+}
+
+// LastFrameAge reports how long ago the most recent frame was broadcast, and
+// whether one exists at all.
+//
+// A cached frame is only worth serving while it still describes the present.
+// The broadcast loop produces frames for subscribers, so with no browser open
+// none are produced at all and the last one ages indefinitely — which is how a
+// finished agent could still be served as running. Callers bound the age they
+// will accept and scan again past it.
+func (b *Broadcaster) LastFrameAge() (time.Duration, bool) {
+	p := b.lastFrame.Load()
+	if p == nil {
+		return 0, false
+	}
+	return time.Since(p.at), true
 }
 
 // BroadcastComment sends a fully-formed SSE comment frame (": <text>\n\n") to
