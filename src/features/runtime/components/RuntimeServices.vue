@@ -2,8 +2,11 @@
 import type { MachineService } from '@/features/localscope'
 import { computed, ref } from 'vue'
 import LocalServicePort from '@/components/ui/LocalServicePort.vue'
+import { useAgents } from '@/features/agents'
 import { DataFreshnessIndicator, useMachineServices } from '@/features/localscope'
 import { runtimeLabel } from '../format'
+import { classifyService, viewingPortOf } from '../serviceAuthority'
+import { useRuntimeSelf } from '../useRuntimeSelf'
 import RuntimeWorkspaceLabel from './RuntimeWorkspaceLabel.vue'
 
 /*
@@ -28,6 +31,37 @@ import RuntimeWorkspaceLabel from './RuntimeWorkspaceLabel.vue'
  * speaks HTTP; the browser shows what is there.
  */
 const { data, loaded } = useMachineServices()
+
+/*
+ * Who each service belongs to, as far as the dashboard can actually tell.
+ *
+ * Seeing a pid is not owning a process: nothing links a listening port back to
+ * the agent that started it, so this classification never offers control. What
+ * it does do is mark the services that ARE the dashboard — the server process
+ * and the origin serving this page — so they are recognisable before any
+ * control exists, and label an agent-workspace service as attributed rather
+ * than owned.
+ */
+const { self } = useRuntimeSelf()
+const { agents } = useAgents({ autoStart: false })
+const ownedWorkspaceIds = computed(() => {
+  const ids = new Set<string>()
+  for (const agent of agents.value) {
+    if (agent.dashboardOwned && agent.workspace)
+      ids.add(agent.workspace.id)
+  }
+  return ids
+})
+// The page's own port is fixed for the life of the page.
+const viewingPort = typeof window === 'undefined' ? null : viewingPortOf(window.location)
+
+function authority(service: MachineService) {
+  return classifyService(service, {
+    self: self.value,
+    ownedWorkspaceIds: ownedWorkspaceIds.value,
+    viewingPort,
+  })
+}
 
 const items = computed(() => Array.isArray(data.value.items) ? data.value.items : null)
 const sorted = computed(() => items.value ? [...items.value].sort((a, b) => a.port - b.port) : [])
@@ -93,6 +127,13 @@ function startedLabel(iso: string | null): string | null {
           <div class="flex min-w-0 flex-col">
             <span class="flex min-w-0 items-center gap-1.5">
               <span class="truncate text-ui font-semibold text-fg">{{ name(s) }}</span>
+              <span
+                v-if="authority(s).badge"
+                class="shrink-0 rounded-control border px-1 text-label uppercase tracking-wide"
+                :class="authority(s).isProtected ? 'border-accent/50 text-accent' : 'border-line text-fg-mute'"
+                :data-testid="`service-authority-${authority(s).authority}`"
+                :title="authority(s).reason"
+              >{{ authority(s).badge }}</span>
               <span
                 v-if="s.confidence === 'low'"
                 class="shrink-0 rounded-control border border-line px-1 text-label text-fg-mute"
@@ -173,6 +214,14 @@ function startedLabel(iso: string | null): string | null {
             </dt>
             <dd class="m-0 text-ui-sm text-fg-soft">
               {{ s.kind }} · {{ s.confidence }} confidence
+            </dd>
+          </div>
+          <div class="col-span-2 min-w-0">
+            <dt class="text-label uppercase tracking-wider text-fg-mute">
+              Dashboard authority
+            </dt>
+            <dd class="m-0 text-ui-sm text-fg-soft" data-testid="service-authority-reason">
+              {{ authority(s).reason }}
             </dd>
           </div>
           <div v-if="startedLabel(s.startedAt)" class="min-w-0">

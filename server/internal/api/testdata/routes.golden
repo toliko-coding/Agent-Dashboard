@@ -84,6 +84,7 @@ GET /api/spawners/{id}
 GET /api/system
 GET /api/system/config
 GET /api/system/health
+GET /api/system/self
 GET /api/system/system
 GET /api/tasks
 GET /api/tasks/export

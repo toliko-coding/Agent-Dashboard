@@ -43,6 +43,8 @@ func provideRouterConfig(cfg config.Config, settingsSvc *settings.Service, oauth
 		AuthPluginSecret:   cfg.AuthPluginSecret,
 		PluginLoginURL:     pluginLoginURL,
 		LocalScopePort:     cfg.LocalScopePort,
+		Host:               cfg.Host,
+		Port:               cfg.Port,
 	}
 }
 

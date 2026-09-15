@@ -124,6 +124,11 @@ type RouterConfig struct {
 	// LocalScopePort is the loopback port of the optional LocalScope collector.
 	// Zero disables the read-only /localscope proxy.
 	LocalScopePort int
+	// Host and Port are the address this server bound, reported verbatim by
+	// GET /api/system/self so Runtime can recognise the dashboard's own
+	// service. Zero values simply produce an identity nothing matches.
+	Host string
+	Port int
 }
 
 // RouterDeps holds all dependencies injected into the router.
@@ -385,6 +390,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 		}
 		r.Get("/api/config", system.Config)        // frontend expects /api/config
 		r.Get("/api/system/config", system.Config) // keep old path for compatibility
+		// The server's own pid and address, so Runtime can recognise the
+		// dashboard's own service by equality instead of by port number.
+		r.Get("/api/system/self", system.NewSelfHandler(deps.Config.Host, deps.Config.Port).ServeHTTP)
 		r.Get("/api/system", system.System)        // frontend expects /api/system
 		r.Get("/api/system/system", system.System) // keep old path for compatibility
 
