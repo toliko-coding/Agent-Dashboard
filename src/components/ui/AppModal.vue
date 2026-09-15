@@ -49,7 +49,36 @@ const panelStyle = computed(() =>
 )
 
 const modalPanelRef = ref<HTMLElement | null>(null)
+const overlayRef = ref<HTMLElement | null>(null)
 const previouslyFocused = ref<HTMLElement | null>(null)
+
+/*
+ * Escape has to work even when focus has left the panel. A control inside a
+ * dialog can be removed by the very action it triggered — answering a
+ * permission prompt removes its Approve/Deny buttons — and focus then falls
+ * back to <body>, where a keydown never reaches the overlay's own handler, so
+ * the dialog could no longer be closed with the keyboard.
+ *
+ * The listener is on window, so every open dialog sees the key; only the
+ * top-most one acts on it, and a dialog opened from another one (the terminal
+ * over the agent workspace) closes alone. The DOM is the shared state: every
+ * overlay teleports to the end of <body>, so the last [role="dialog"] in
+ * document order is the one stacked on top.
+ */
+function isTopMost() {
+  const dialogs = document.querySelectorAll('[role="dialog"]')
+  return dialogs.length > 0 && dialogs[dialogs.length - 1] === overlayRef.value
+}
+function onWindowKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !isTopMost())
+    return
+  emit('close')
+}
+function watchWindowEscape(active: boolean) {
+  window.removeEventListener('keydown', onWindowKeydown)
+  if (active)
+    window.addEventListener('keydown', onWindowKeydown)
+}
 
 // Lock body scroll when open to prevent background movement making modal appear to jump.
 // Compensate scrollbar width so layout doesn't shift on systems with classic scrollbars.
@@ -61,6 +90,7 @@ watch(() => props.open, (isOpen) => {
       document.body.style.paddingRight = `${scrollbarWidth}px`
     // Capture currently focused element so it can be restored on close
     previouslyFocused.value = document.activeElement as HTMLElement | null
+    watchWindowEscape(true)
     // Focus the modal panel so keyboard events are captured immediately
     nextTick(() => {
       if (modalPanelRef.value)
@@ -70,6 +100,7 @@ watch(() => props.open, (isOpen) => {
   else {
     document.body.style.overflow = ''
     document.body.style.paddingRight = ''
+    watchWindowEscape(false)
     restoreFocus()
   }
 }, { immediate: true })
@@ -77,6 +108,7 @@ watch(() => props.open, (isOpen) => {
 onUnmounted(() => {
   document.body.style.overflow = ''
   document.body.style.paddingRight = ''
+  watchWindowEscape(false)
   restoreFocus()
 })
 
@@ -128,6 +160,7 @@ function trapFocus(event: KeyboardEvent) {
     <Transition :name="placement === 'end' ? 'drawer' : 'dialog'">
       <div
         v-if="open"
+        ref="overlayRef"
         class="fixed inset-0 flex bg-black/55 backdrop-blur-sm"
         :class="backdropLayout"
         :style="{ zIndex }"
@@ -135,7 +168,6 @@ function trapFocus(event: KeyboardEvent) {
         aria-modal="true"
         :aria-labelledby="labelledBy || undefined"
         @click.self="emit('close')"
-        @keydown.escape="emit('close')"
       >
         <div
           ref="modalPanelRef"
