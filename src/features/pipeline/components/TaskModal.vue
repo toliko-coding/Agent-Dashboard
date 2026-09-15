@@ -78,7 +78,7 @@ watch(() => props.task?.id, (id, prevId) => {
 <template>
   <AppModal :open="!!task" :z-index="1000" :labelled-by="task ? `task-modal-title-${task.id}` : undefined" @close="emit('close')">
     <template v-if="task">
-      <header class="flex items-center justify-between px-5 py-4 border-b border-line">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-line">
         <div class="flex items-center gap-2.5 flex-wrap">
           <AppChip :tone="stageTone(task.currentStage ?? '')" mono uppercase>
             {{ task.currentStage ? (STAGE_LABELS[task.currentStage] ?? task.currentStage) : '' }}
@@ -113,7 +113,7 @@ watch(() => props.task?.id, (id, prevId) => {
         <button type="button" aria-label="Close" class="bg-transparent border-none text-fg-mute text-2xl cursor-pointer px-1 leading-none hover:text-fg" title="Close (Esc)" @click="emit('close')">
           &times;
         </button>
-      </header>
+      </div>
 
       <nav role="tablist" aria-label="Task details" class="flex border-b border-line flex-shrink-0" @keydown="onKeydown">
         <button

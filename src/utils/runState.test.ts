@@ -97,6 +97,12 @@ describe('runTimeline', () => {
     expect(done.find(s => s.key === 'self_review')!.state).toBe('skipped')
   })
 
+  it('a run parked on permission requests waits for the user instead of reading failed', () => {
+    const steps = runTimeline({ currentStage: 'implementation', latestStageRunStatus: 'failed', blockedByPendingPermissions: true }, [run({ status: 'failed' })])
+    expect(steps.find(s => s.key === 'implementation')!.state).toBe('waiting')
+    expect(steps.find(s => s.key === 'result')!.state).toBe('pending')
+  })
+
   it('names roles for agent stages only', () => {
     expect(stageRole('implementation')).toBe('developer')
     expect(stageRole('self_review')).toBe('reviewer')

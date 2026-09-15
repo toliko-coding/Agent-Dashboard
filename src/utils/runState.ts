@@ -129,7 +129,11 @@ export function runTimeline(task: TaskFacts, stageRuns: StageRun[]): TimelineSte
   for (const stage of AGENT_STAGES) {
     const run = latest.get(stage) ?? null
     let stepState: TimelineStepState = 'pending'
-    if (run) {
+    if (run && run.status === 'failed' && task.blockedByPendingPermissions && task.currentStage === stage) {
+      // Parked on permission requests: the pipeline restarts this run once they are answered.
+      stepState = 'waiting'
+    }
+    else if (run) {
       stepState = run.status === 'done'
         ? 'done'
         : run.status === 'failed'
