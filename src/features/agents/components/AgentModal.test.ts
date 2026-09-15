@@ -2,6 +2,7 @@ import type { Agent } from '@/types'
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
+import { requestTerminal, terminalRequest } from '@/composables/useAgentLifecycle'
 
 import AgentModal from './AgentModal.vue'
 
@@ -424,10 +425,62 @@ describe('agentModal terminal access (Phase 4.1.1)', () => {
     expect(w.find('[data-testid="agent-terminal-modal"]').exists()).toBe(true)
   })
 
+  it('opens the terminal when Needs you asks for it before the agent is selected', async () => {
+    // Needs you sets the request, then opens the workspace, so the modal sees
+    // the pid arrive after the request — the order that used to close the
+    // terminal again as soon as it opened.
+    const agent = { ...baseAgent, dashboardOwned: true, liveInjectable: true, awaitingTerminalPermission: true }
+    // Selecting an agent focuses the prompt field, so the stub needs that method.
+    const promptStub = { PromptInput: { template: '<div />', methods: { focus() {} } } }
+    terminalRequest.value = null
+    const w = mount(AgentModal, { props: { agent: null }, global: { stubs: { ...stubs, ...dialogStub, ...promptStub } } })
+    await nextTick()
+    requestTerminal(agent.pid)
+    await w.setProps({ agent })
+    await nextTick()
+    expect(w.find('[data-testid="agent-terminal-modal"]').exists()).toBe(true)
+    expect(terminalRequest.value).toBeNull()
+  })
+
   it('never offers a terminal for a session the dashboard did not start', () => {
     const w = mountWith({ liveInjectable: true, awaitingTerminalPermission: true })
     expect(w.find('[data-testid="agent-modal-terminal"]').exists()).toBe(false)
     expect(w.find('[data-testid="agent-modal-respond-terminal"]').exists()).toBe(false)
     expect(w.get('[data-testid="agent-modal-terminal-elsewhere"]').text()).toContain('started this session')
+  })
+})
+
+describe('agentModal terminal permission decisions (Phase 4)', () => {
+  const dialogStub = { AgentTerminalDialog: { props: ['open', 'agent'], template: '<div v-if="open" data-testid="agent-terminal-modal" />' } }
+  const mountWith = (over: Partial<Agent>) => mount(AgentModal, { props: { agent: { ...baseAgent, ...over } }, global: { stubs: { ...stubs, ...dialogStub } } })
+  const prompt = { id: 'mp1', tool: 'Write', detail: 'tailored/demo/resume.md', question: 'Do you want to create resume.md?', decidable: true }
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('decides a recognised prompt from the workspace', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }))
+    vi.stubGlobal('fetch', fetchMock)
+    const w = mountWith({ dashboardOwned: true, liveInjectable: true, awaitingTerminalPermission: true, terminalPermission: prompt })
+    expect(w.get('[data-testid="agent-modal-permission-title"]').text()).toBe('Claude wants permission to use Write')
+    expect(w.get('[data-testid="agent-modal-permission-detail"]').text()).toBe('tailored/demo/resume.md')
+    await w.get('[data-testid="agent-modal-permission-approve"]').trigger('click')
+    await nextTick()
+    const call = fetchMock.mock.calls.find(c => String((c as unknown[])[0]).endsWith('/terminal-permission')) as unknown as [string, RequestInit]
+    expect(call[0]).toBe('/api/agents/1234/terminal-permission')
+    expect(JSON.parse(String(call[1].body))).toEqual({ promptId: 'mp1', decision: 'approve_once' })
+    expect(w.get('[data-testid="agent-modal-respond-terminal"]').text()).toBe('Open terminal')
+  })
+
+  it('keeps the terminal as the only answer for a prompt it cannot decide', () => {
+    const w = mountWith({ dashboardOwned: true, liveInjectable: true, awaitingTerminalPermission: true, terminalPermission: { ...prompt, id: 'mp2', decidable: false } })
+    expect(w.find('[data-testid="agent-modal-permission-approve"]').exists()).toBe(false)
+    expect(w.get('[data-testid="agent-modal-respond-terminal"]').text()).toBe('Respond in terminal')
+  })
+
+  it('never decides for a session the dashboard did not start', () => {
+    const w = mountWith({ liveInjectable: true, awaitingTerminalPermission: true, terminalPermission: { ...prompt, id: 'mp3' } })
+    expect(w.find('[data-testid="agent-modal-permission-approve"]').exists()).toBe(false)
+    expect(w.find('[data-testid="agent-modal-respond-terminal"]').exists()).toBe(false)
   })
 })

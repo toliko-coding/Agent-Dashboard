@@ -1,6 +1,7 @@
 import type { PermissionItem } from '@/composables/usePendingPermissions'
 import type { PendingCapabilityDecision } from '@/sdk.generated'
 import type { Agent, PendingPermission, PipelineTask, RepositoryRef, WorkspaceRef } from '@/types'
+import { agentTerminalAttachable } from '@/composables/useAgentLifecycle'
 import { agentTitle } from '@/utils/agentLabels'
 import { attentionFor } from '@/utils/attention'
 import { formatErrorState } from '@/utils/format'
@@ -92,6 +93,15 @@ export interface AttentionItem {
   reason: string
   /** A safe qualifier — a tool or capability name, a stage, a count. Never a path, command or transcript text. */
   detail?: string
+  /** The agent's process, for actions that address the running session. */
+  agentPid?: number
+  /**
+   * The permission prompt open in the agent's terminal (Phase 4): the tool and
+   * what it is about, so the user can decide from Needs you. `attachable` is
+   * whether this session is one Agent Dashboard started; only then may it be
+   * decided or its terminal opened here. Kept apart from `detail` on purpose.
+   */
+  permission?: NonNullable<Agent['terminalPermission']> & { attachable: boolean }
   /** When the wait began, only from a timestamp the request itself carries. */
   since: string | null
   /** The subject's last recorded activity — a different fact from `since`, labelled as such. */
@@ -177,7 +187,18 @@ function agentItem(agent: Agent): AttentionItem | null {
       const stored = agent.pendingPermissions ?? []
       if (stored.length > 0)
         return { ...base, level: 'blocking', kind: 'permission', reason: 'Permission request waiting', detail: permissionDetail(stored), since: oldest(stored.map(p => p.requestedAt)) }
-      return { ...base, level: 'blocking', kind: 'terminal-permission', reason: 'Permission prompt open in its terminal', since: null }
+      if (agent.terminalPermission) {
+        return {
+          ...base,
+          level: 'blocking',
+          kind: 'terminal-permission',
+          reason: 'Wants permission',
+          since: null,
+          agentPid: agent.pid,
+          permission: { ...agent.terminalPermission, attachable: agentTerminalAttachable(agent) },
+        }
+      }
+      return { ...base, level: 'blocking', kind: 'terminal-permission', reason: 'Permission prompt open in its terminal', since: null, agentPid: agent.pid }
     }
     case 'error':
       if (agent.working || !agent.errorState)

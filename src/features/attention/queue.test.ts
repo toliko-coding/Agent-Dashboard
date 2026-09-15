@@ -309,3 +309,15 @@ describe('attention model — privacy', () => {
       expect(text).not.toContain(secret)
   })
 })
+
+describe('terminal permission prompt in the queue (Phase 4)', () => {
+  const prompt = { id: 'p1', tool: 'Bash', detail: 'ls -la notes', question: 'Do you want to proceed?', decidable: true }
+  it('carries the prompt and whether this session may be decided here, never in detail', () => {
+    const owned = makeAgent({ awaitingTerminalPermission: true, terminalPermission: prompt, liveInjectable: true, dashboardOwned: true })
+    const [item] = queue({ agents: [owned] })
+    expect(item).toMatchObject({ kind: 'terminal-permission', reason: 'Wants permission', agentPid: owned.pid, permission: { ...prompt, attachable: true } })
+    expect(item.detail).toBeUndefined()
+    const [external] = queue({ agents: [makeAgent({ awaitingTerminalPermission: true, terminalPermission: prompt, liveInjectable: true })] })
+    expect(external.permission?.attachable).toBe(false)
+  })
+})

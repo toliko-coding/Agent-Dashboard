@@ -73,6 +73,16 @@ export function agentTerminalAttachable(agent: Agent): boolean {
     && (!!agent.dashboardOwned || !!agent.pipelineTaskId)
 }
 
+/**
+ * A request to open an agent's terminal from a surface that does not host it
+ * (Needs you): the agent workspace opens the terminal for this pid once the
+ * workspace is showing that agent and it is attachable.
+ */
+export const terminalRequest = ref<number | null>(null)
+export function requestTerminal(pid: number): void {
+  terminalRequest.value = pid
+}
+
 export const EXTERNAL_SESSION_NOTE = 'External session — stop it from the terminal or application that started it.'
 export const PIPELINE_AGENT_NOTE = 'Managed by its pipeline task — stop or cancel the task instead.'
 

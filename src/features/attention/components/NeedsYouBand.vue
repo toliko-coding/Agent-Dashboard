@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { AttentionItem, AttentionLevel, AttentionQueue } from '../queue'
 import { computed, ref, watch } from 'vue'
+import AppButton from '@/components/ui/AppButton.vue'
 import { useNow } from '@/composables/useNow'
+import { useTerminalPermissionDecision } from '@/composables/useTerminalPermission'
 import { workspaceDisplay } from '@/utils/agentGroup'
 import { formatRelativeActivity, secondsSince } from '@/utils/format'
 
@@ -14,11 +16,25 @@ import { formatRelativeActivity, secondsSince } from '@/utils/format'
  * report either, so the quiet line says only that nothing is waiting.
  *
  * Every row answers who, why, where and for how long, as far as the data can.
- * It never shows a path, a command, a question's text or any transcript: the
- * row identifies the problem and opens the surface where it is dealt with.
+ * It never shows a question's text or any transcript: the row identifies the
+ * problem and opens the surface where it is dealt with.
+ *
+ * One exception, on its own action row (Phase 4): a permission prompt open in
+ * an agent's terminal shows the tool and the command or path it is about, and —
+ * for a session Agent Dashboard started, when the prompt is recognised — Approve
+ * once and Deny. Approving blind would be worse than showing the command.
  */
 const props = defineProps<{ queue: AttentionQueue }>()
-const emit = defineEmits<{ select: [item: AttentionItem] }>()
+const emit = defineEmits<{ select: [item: AttentionItem], openTerminal: [item: AttentionItem] }>()
+
+const { decide, decisionFor } = useTerminalPermissionDecision()
+function canDecide(item: AttentionItem): boolean {
+  return !!item.permission?.decidable && !!item.permission.attachable && item.agentPid != null
+}
+function onDecide(item: AttentionItem, decision: 'approve_once' | 'deny'): void {
+  if (item.permission && item.agentPid != null)
+    void decide(item.agentPid, item.permission.id, decision)
+}
 
 // The shared 30s clock the roster already runs; one interval for every row.
 const { nowMs } = useNow()
@@ -177,6 +193,51 @@ watch(
             </span>
             <span class="text-ui-sm text-fg-mute whitespace-nowrap tabular-nums" data-testid="needs-you-when">{{ when(item) }}</span>
           </button>
+          <div
+            v-if="item.permission"
+            class="mt-1.5 ml-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-control border border-line bg-card px-3 py-2"
+            data-testid="needs-you-permission"
+            :data-decidable="canDecide(item) ? 'true' : 'false'"
+          >
+            <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span class="text-ui-sm font-semibold text-fg" data-testid="needs-you-permission-tool">{{ item.permission.tool || 'Permission' }}</span>
+              <code v-if="item.permission.detail" class="block max-w-full truncate font-mono text-ui-sm text-fg-soft" :title="item.permission.detail" data-testid="needs-you-permission-detail">{{ item.permission.detail }}</code>
+            </span>
+            <span class="flex shrink-0 flex-wrap items-center gap-2">
+              <template v-if="canDecide(item)">
+                <AppButton
+                  variant="outline"
+                  size="sm"
+                  :disabled="!!decisionFor(item.permission.id)"
+                  :aria-label="`Deny — ${item.permission.tool} for ${item.title}`"
+                  data-testid="needs-you-permission-deny"
+                  @click="onDecide(item, 'deny')"
+                >
+                  Deny
+                </AppButton>
+                <AppButton
+                  variant="primary"
+                  size="sm"
+                  :disabled="!!decisionFor(item.permission.id)"
+                  :aria-label="`Approve once — ${item.permission.tool} for ${item.title}`"
+                  data-testid="needs-you-permission-approve"
+                  @click="onDecide(item, 'approve_once')"
+                >
+                  Approve once
+                </AppButton>
+              </template>
+              <button
+                v-if="item.permission.attachable"
+                type="button"
+                class="cursor-pointer rounded border-none bg-transparent p-0 text-ui-sm text-accent hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+                data-testid="needs-you-permission-terminal"
+                @click="emit('openTerminal', item)"
+              >
+                {{ canDecide(item) ? 'Open terminal →' : 'Respond in terminal →' }}
+              </button>
+              <span v-else class="text-ui-sm text-fg-mute" data-testid="needs-you-permission-elsewhere">Answer it in the terminal that started it</span>
+            </span>
+          </div>
         </li>
       </ul>
     </template>

@@ -3,6 +3,7 @@ import type { ActiveView } from '@/composables/useViewState'
 import type { AttentionItem, AttentionQueue } from '@/features/attention'
 import type { Agent } from '@/types'
 import { computed } from 'vue'
+import { requestTerminal } from '@/composables/useAgentLifecycle'
 import { openFolderTrust } from '@/composables/useSpawnWatch'
 import { useViewState } from '@/composables/useViewState'
 import { useAgents } from '@/features/agents'
@@ -97,6 +98,18 @@ function openAttention(item: AttentionItem): void {
   }
 }
 
+// Needs you's "Open terminal": the agent workspace, with its terminal open.
+function openAttentionTerminal(item: AttentionItem): void {
+  const subject = item.subject
+  if (subject.type !== 'agent')
+    return
+  const agent = agents.value.find(a => a.sessionId === subject.sessionId)
+  if (!agent)
+    return
+  requestTerminal(agent.pid)
+  selectAgent(agent)
+}
+
 function openAgent(agent: Agent): void {
   selectAgent(agent)
 }
@@ -120,7 +133,7 @@ function openAgent(agent: Agent): void {
       :live="live"
     />
 
-    <NeedsYouBand :queue="attention" @select="openAttention" />
+    <NeedsYouBand :queue="attention" @select="openAttention" @open-terminal="openAttentionTerminal" />
 
     <div class="grid grid-cols-1 gap-4 min-w-0 xl:grid-cols-[minmax(0,1fr)_minmax(19rem,23rem)] xl:items-start" data-testid="command-main">
       <div class="flex flex-col gap-4 min-w-0" data-testid="command-primary">

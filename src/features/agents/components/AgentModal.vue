@@ -12,9 +12,10 @@ import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import WorkspaceBadge from '@/components/ui/WorkspaceBadge.vue'
-import { agentIsDashboardOwned, agentIsRunning, agentTerminalAttachable, editorLabel, getAgentControl, lifecyclePresentation, openInEditor, useAgentLifecycle, useAgentProfileEditor } from '@/composables/useAgentLifecycle'
+import { agentIsDashboardOwned, agentIsRunning, agentTerminalAttachable, editorLabel, getAgentControl, lifecyclePresentation, openInEditor, terminalRequest, useAgentLifecycle, useAgentProfileEditor } from '@/composables/useAgentLifecycle'
 import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
+import { useTerminalPermissionDecision } from '@/composables/useTerminalPermission'
 import { toast } from '@/composables/useToast'
 import { useMetricsDisclosure } from '@/features/agents/composables/useMetricsDisclosure'
 import { PluginSlot } from '@/features/plugins'
@@ -55,9 +56,31 @@ const presentation = computed(() => props.agent ? lifecyclePresentation(props.ag
 // prompt can be answered, offered only for a session the dashboard launched.
 const canAttachTerminal = computed(() => !!props.agent && agentTerminalAttachable(props.agent))
 const terminalOpen = ref(false)
-watch(() => props.agent?.pid, () => {
-  terminalOpen.value = false
-})
+/*
+ * Switching agents closes the terminal, and Needs you can ask for one by pid.
+ * Both rules live in one watcher because they write the same flag: as two, the
+ * request arriving before the agent was selected (Needs you sets the pid, then
+ * opens the workspace) let the reset run last and close the terminal it had
+ * just opened.
+ */
+watch([() => props.agent?.pid, terminalRequest, canAttachTerminal], ([pid, requested, attachable], prev) => {
+  if (prev && pid !== prev[0])
+    terminalOpen.value = false
+  if (pid && requested === pid && attachable) {
+    terminalOpen.value = true
+    terminalRequest.value = null
+  }
+}, { immediate: true })
+
+// Approve once / Deny on the recognised prompt (Phase 4); the terminal stays the fallback.
+const permissionPrompt = computed(() => props.agent?.terminalPermission ?? null)
+const canDecidePermission = computed(() => !!permissionPrompt.value?.decidable && canAttachTerminal.value)
+const { decide: decideTerminalPermission, decisionFor } = useTerminalPermissionDecision()
+const permissionDecided = computed(() => !!decisionFor(permissionPrompt.value?.id))
+function decidePermission(decision: 'approve_once' | 'deny'): void {
+  if (props.agent && permissionPrompt.value)
+    void decideTerminalPermission(props.agent.pid, permissionPrompt.value.id, decision)
+}
 // What sending a message does when there is no live input path.
 const composerNote = computed(() => {
   if (!props.agent)
@@ -324,9 +347,30 @@ watch(() => props.agent?.sessionId, (sessionId) => {
           data-testid="agent-modal-terminal-permission"
         >
           <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="font-medium text-fg">Claude is asking for permission in its terminal</span>
-            <span class="text-fg-soft">Nothing runs until you choose an answer there. Agent Dashboard does not answer it for you.</span>
+            <span class="font-medium text-fg" data-testid="agent-modal-permission-title">{{ permissionPrompt?.tool ? `Claude wants permission to use ${permissionPrompt.tool}` : 'Claude is asking for permission in its terminal' }}</span>
+            <code v-if="permissionPrompt?.detail" class="block max-w-full truncate font-mono text-fg-soft" :title="permissionPrompt.detail" data-testid="agent-modal-permission-detail">{{ permissionPrompt.detail }}</code>
+            <span class="text-fg-soft">{{ canDecidePermission ? 'Approve once allows only this request; nothing else changes.' : 'Nothing runs until you choose an answer there. Agent Dashboard does not answer it for you.' }}</span>
           </span>
+          <template v-if="canDecidePermission">
+            <button
+              type="button"
+              class="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-line px-3 text-ui-sm text-fg-soft hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent disabled:cursor-default disabled:opacity-60"
+              :disabled="permissionDecided"
+              data-testid="agent-modal-permission-deny"
+              @click="decidePermission('deny')"
+            >
+              Deny
+            </button>
+            <button
+              type="button"
+              class="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-accent bg-accent px-3 text-ui-sm font-medium text-accent-contrast hover:brightness-110 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent disabled:cursor-default disabled:opacity-60"
+              :disabled="permissionDecided"
+              data-testid="agent-modal-permission-approve"
+              @click="decidePermission('approve_once')"
+            >
+              Approve once
+            </button>
+          </template>
           <button
             v-if="canAttachTerminal"
             type="button"
@@ -334,7 +378,7 @@ watch(() => props.agent?.sessionId, (sessionId) => {
             data-testid="agent-modal-respond-terminal"
             @click="terminalOpen = true"
           >
-            Respond in terminal
+            {{ canDecidePermission ? 'Open terminal' : 'Respond in terminal' }}
           </button>
           <span v-else class="text-fg-mute" data-testid="agent-modal-terminal-elsewhere">Answer it in the terminal or app that started this session.</span>
         </div>

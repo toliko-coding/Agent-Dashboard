@@ -1,7 +1,7 @@
 import type { AttentionItem, AttentionQueue } from '../queue'
 import type { Agent } from '@/types'
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { axe } from '@/utils/testA11y'
 import { buildAttentionQueue } from '../queue'
@@ -218,5 +218,68 @@ describe('needsYouBand — accessibility', () => {
   it('has no axe violations when quiet or loading', async () => {
     expect(await axe(render(ready([])).element as Element)).toHaveNoViolations()
     expect(await axe(render({ status: 'loading', stale: false, items: [] }).element as Element)).toHaveNoViolations()
+  })
+})
+
+vi.mock('@/composables/useToast', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }))
+
+describe('needsYouBand — terminal permission decisions (Phase 4)', () => {
+  const perm = (id: string, o: Partial<NonNullable<AttentionItem['permission']>> = {}) => item({
+    id,
+    level: 'blocking',
+    kind: 'terminal-permission',
+    reason: 'Wants permission',
+    since: null,
+    agentPid: 4242,
+    permission: { id: `prompt-${id}`, tool: 'Bash', detail: 'shasum -a 256 notes/sample.txt', question: 'Do you want to proceed?', decidable: true, attachable: true, ...o },
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('shows what is asked and decides it once, for an agent Agent Dashboard started', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }))
+    vi.stubGlobal('fetch', fetchMock)
+    const w = render(ready([perm('a')]))
+    const row = w.get('[data-testid="needs-you-permission"]')
+    expect(row.attributes('data-decidable')).toBe('true')
+    expect(row.get('[data-testid="needs-you-permission-tool"]').text()).toBe('Bash')
+    expect(row.get('[data-testid="needs-you-permission-detail"]').text()).toBe('shasum -a 256 notes/sample.txt')
+    expect(row.get('[data-testid="needs-you-permission-terminal"]').text()).toBe('Open terminal →')
+    await row.get('[data-testid="needs-you-permission-approve"]').trigger('click')
+    await nextTick()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/agents/4242/terminal-permission')
+    expect(JSON.parse(String(init.body))).toEqual({ promptId: 'prompt-a', decision: 'approve_once' })
+    expect(row.get('[data-testid="needs-you-permission-approve"]').attributes('disabled')).toBeDefined()
+    expect(row.get('[data-testid="needs-you-permission-deny"]').attributes('disabled')).toBeDefined()
+    await row.get('[data-testid="needs-you-permission-deny"]').trigger('click')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers only the terminal for a prompt it cannot decide', () => {
+    const row = render(ready([perm('b', { decidable: false })])).get('[data-testid="needs-you-permission"]')
+    expect(row.find('[data-testid="needs-you-permission-approve"]').exists()).toBe(false)
+    expect(row.get('[data-testid="needs-you-permission-terminal"]').text()).toBe('Respond in terminal →')
+  })
+
+  it('offers no action for a session Agent Dashboard did not start', () => {
+    const row = render(ready([perm('c', { attachable: false })])).get('[data-testid="needs-you-permission"]')
+    expect(row.find('[data-testid="needs-you-permission-approve"]').exists()).toBe(false)
+    expect(row.find('[data-testid="needs-you-permission-terminal"]').exists()).toBe(false)
+    expect(row.get('[data-testid="needs-you-permission-elsewhere"]').text()).toContain('terminal that started it')
+  })
+
+  it('asks for the terminal without selecting the row', async () => {
+    const w = render(ready([perm('d')]))
+    await w.get('[data-testid="needs-you-permission-terminal"]').trigger('click')
+    expect(w.emitted('openTerminal')).toHaveLength(1)
+    expect(w.emitted('select')).toBeUndefined()
+  })
+
+  it('has no axe violations with a decision row', async () => {
+    const w = render(ready([perm('e'), BLOCKING]))
+    expect(await axe(w.element as Element)).toHaveNoViolations()
   })
 })
