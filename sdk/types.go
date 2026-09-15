@@ -412,6 +412,26 @@ type PendingScreen struct {
 // Only the question and how many options it offers are kept: an option label
 // can repeat the command or file the prompt is about, which the transcript
 // already names, and none of it is needed to say that the session is waiting.
+// TerminalPermissionPrompt is the Claude Code tool permission prompt currently
+// open in a session terminal, as the dashboard presents it.
+type TerminalPermissionPrompt struct {
+	// ID identifies this exact prompt: session, process, open tool call and the
+	// prompt question and options. A decision must quote it, and is refused once
+	// the prompt on screen no longer matches.
+	ID string `json:"id"`
+	// Tool is the tool the open tool call uses (Bash, Write, Edit, ...).
+	Tool string `json:"tool"`
+	// Detail is what the call is about (a command or file path), as the pending
+	// tool call already reports it: display-safe and capped.
+	Detail   string `json:"detail"`
+	Question string `json:"question"`
+	// Decidable is true when the dashboard can answer this prompt with Approve
+	// once or Deny; otherwise it is answered in the terminal.
+	Decidable bool `json:"decidable"`
+}
+
+// DetectedPermission is a tool permission prompt read from a session's screen
+// by the pty broker.
 type DetectedPermission struct {
 	Question    string `json:"question"`
 	OptionCount int    `json:"optionCount"`
@@ -619,6 +639,10 @@ type Agent struct {
 	// lapsed before anyone decided, or the session is not armed. Set from the
 	// Notification hook's typed notification_type, never from its prose.
 	AwaitingTerminalPermission bool `json:"awaitingTerminalPermission,omitempty"`
+	// TerminalPermission is the permission prompt open in the session terminal,
+	// read by the server from that screen: what it asks about and whether it can
+	// be answered from the dashboard. Nil when none is open.
+	TerminalPermission *TerminalPermissionPrompt `json:"terminalPermission,omitempty"`
 	// TerminalPermissionToolUseID names the tool call that terminal prompt is
 	// about, when the bridge held that call and the hold lapsed. Empty for a
 	// session the bridge never held, because the Notification payload carries no

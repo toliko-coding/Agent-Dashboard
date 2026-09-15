@@ -395,51 +395,11 @@ const (
 // AskUserQuestion meta-row is on screen; and nothing but the "Esc to …" footer
 // follows the options, so an answered prompt still in scrollback does not count.
 func DetectToolPermission(rows []string) *sdk.DetectedPermission {
-	contentLines := parseRows(rows)
-	numbered := numberedEntries(contentLines)
-	if len(numbered) < 2 {
+	p := ParsePermissionPrompt(rows)
+	if p == nil {
 		return nil
 	}
-	for _, e := range numbered {
-		if metaLabelMatches(e.row.label, typeSomethingLabel) || metaLabelMatches(e.row.label, chatAboutLabel) {
-			return nil
-		}
-	}
-
-	end := len(numbered) - 1
-	start := end
-	for start > 0 {
-		prev, cur := numbered[start-1], numbered[start]
-		if prev.row.num != cur.row.num-1 || cur.idx-prev.idx > permissionOptionMaxGap {
-			break
-		}
-		start--
-	}
-	first, last := numbered[start], numbered[end]
-	if first.row.num != 1 || end-start < 1 {
-		return nil
-	}
-	if !strings.HasPrefix(normalizeLabel(first.row.label), "yes") || !strings.HasPrefix(normalizeLabel(last.row.label), "no") {
-		return nil
-	}
-
-	for _, l := range contentLines[last.idx+1:] {
-		if !strings.HasPrefix(strings.ToLower(l.text), permissionFooterPrefix) {
-			return nil
-		}
-	}
-
-	question := ""
-	for i := first.idx - 1; i >= 0 && i >= first.idx-4; i-- {
-		if strings.HasPrefix(strings.ToLower(contentLines[i].text), permissionQuestionPrefix) {
-			question = contentLines[i].text
-			break
-		}
-	}
-	if question == "" {
-		return nil
-	}
-	return &sdk.DetectedPermission{Question: question, OptionCount: end - start + 1}
+	return &sdk.DetectedPermission{Question: p.Question, OptionCount: len(p.Options)}
 }
 
 // DetectedFolderTrust is aliased like the modal types above.

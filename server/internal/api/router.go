@@ -658,6 +658,10 @@ func NewRouter(deps RouterDeps) http.Handler {
 		// stream.
 		terminalHandler := agents.NewTerminalHandler(getAgents, spawnMgr.TerminalTarget)
 		r.Get("/api/agents/{pid}/terminal", terminalHandler.Terminal)
+		// Approve once / Deny on a terminal permission prompt, re-verified
+		// against the session's live screen on every call.
+		permissionHandler := agents.NewTerminalPermissionHandler(getAgents, merger.ReadSessionScreen, spawnMgr.SendAnswerKeys, merger.ForgetPermissionPrompt)
+		r.Post("/api/agents/{pid}/terminal-permission", permissionHandler.Decide)
 		answerQuestionHandler := agents.NewAnswerQuestionHandler(spawnMgr)
 		r.Post("/api/agents/{pid}/answer-question", answerQuestionHandler.AnswerQuestion)
 		if deps.PermissionPresetRepo != nil {

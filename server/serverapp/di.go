@@ -280,6 +280,7 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 			return scanner.ScanProcessesWithDetector(ctx, providerRegistry)
 		}),
 		merger.WithScreenProbe(merger.RealScreenProbe),
+		merger.WithPermissionPrompt(merger.RealPermissionPrompt),
 	)
 
 	taskBase := sse.NewBroadcaster()

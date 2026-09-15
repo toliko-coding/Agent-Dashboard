@@ -3,12 +3,15 @@ package merger
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/lx-wnk/agent-dashboard/server/internal/channel"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/lx-wnk/agent-dashboard/sdk"
@@ -144,4 +147,93 @@ func probeTmuxScreen(home string, pid int) *sdk.PendingScreen {
 		return nil
 	}
 	return askq.DetectScreen(rows)
+}
+
+// errNoScreen reports a session with neither a tmux pane nor a pty broker.
+var errNoScreen = errors.New("session has no readable screen")
+
+// ReadSessionScreen returns the visible rows of pid's terminal: a tmux pane
+// capture, or the pty broker's replay rendered on the server. It never writes
+// to the session.
+func ReadSessionScreen(ctx context.Context, pid int) ([]string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	if data, rerr := os.ReadFile(channelconfig.DiscoveryFile(home, pid)); rerr == nil {
+		var disc struct {
+			TmuxPane   string `json:"tmuxPane"`
+			TmuxSocket string `json:"tmuxSocket"`
+		}
+		if json.Unmarshal(data, &disc) == nil && disc.TmuxPane != "" {
+			return captureTmuxPane(disc.TmuxSocket, disc.TmuxPane)
+		}
+	}
+	data, err := os.ReadFile(channelconfig.DiscoveryPtyFile(home, pid))
+	if err != nil {
+		return nil, errNoScreen
+	}
+	var disc struct {
+		Port  int    `json:"port"`
+		Token string `json:"token"`
+	}
+	if json.Unmarshal(data, &disc) != nil || disc.Port == 0 {
+		return nil, errNoScreen
+	}
+	return channel.ReadBrokerScreen(ctx, disc.Port, disc.Token)
+}
+
+// permissionPromptCacheTTL keeps a session from being re-read on every scan
+// tick; a decision drops the entry (ForgetPermissionPrompt) so it shows at once.
+const permissionPromptCacheTTL = 3 * time.Second
+
+type permissionPromptEntry struct {
+	at     time.Time
+	prompt *sdk.TerminalPermissionPrompt
+}
+
+var permissionPromptCache = struct {
+	sync.Mutex
+	m map[string]permissionPromptEntry
+}{m: map[string]permissionPromptEntry{}}
+
+// RealPermissionPrompt is the production PermissionPromptFn: it reads pid's
+// screen and describes the tool permission prompt open on it, or nil.
+func RealPermissionPrompt(ctx context.Context, pid int, sessionID string, pending *sdk.PendingToolUse) *sdk.TerminalPermissionPrompt {
+	key := fmt.Sprintf("%d|%s", pid, sessionID)
+	now := time.Now()
+	permissionPromptCache.Lock()
+	if e, ok := permissionPromptCache.m[key]; ok && now.Sub(e.at) < permissionPromptCacheTTL {
+		permissionPromptCache.Unlock()
+		return e.prompt
+	}
+	permissionPromptCache.Unlock()
+
+	var prompt *sdk.TerminalPermissionPrompt
+	if rows, err := ReadSessionScreen(ctx, pid); err == nil {
+		prompt = askq.BuildTerminalPermission(sessionID, pid, pending, askq.ParsePermissionPrompt(rows))
+	}
+
+	permissionPromptCache.Lock()
+	for k, e := range permissionPromptCache.m {
+		if now.Sub(e.at) > time.Minute {
+			delete(permissionPromptCache.m, k)
+		}
+	}
+	permissionPromptCache.m[key] = permissionPromptEntry{at: now, prompt: prompt}
+	permissionPromptCache.Unlock()
+	return prompt
+}
+
+// ForgetPermissionPrompt drops pid's cached prompt after a decision, so the
+// next scan reads the screen again instead of showing the answered prompt.
+func ForgetPermissionPrompt(pid int) {
+	prefix := fmt.Sprintf("%d|", pid)
+	permissionPromptCache.Lock()
+	defer permissionPromptCache.Unlock()
+	for k := range permissionPromptCache.m {
+		if strings.HasPrefix(k, prefix) {
+			delete(permissionPromptCache.m, k)
+		}
+	}
 }

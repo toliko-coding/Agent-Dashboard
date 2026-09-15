@@ -125,6 +125,7 @@ POST /api/agents/{pid}/answer-question
 POST /api/agents/{pid}/message
 POST /api/agents/{pid}/resume-under-dashboard
 POST /api/agents/{pid}/stop
+POST /api/agents/{pid}/terminal-permission
 POST /api/agents/{pid}/upload-image
 POST /api/analytics/patterns/refresh
 POST /api/auth/logout

@@ -275,6 +275,9 @@ type Merger struct {
 	tracker     *staleTracker
 	registry    *provider.Registry
 	screenProbe ScreenProbeFn
+	// permissionPrompt reads a terminal permission prompt server-side, for
+	// sessions whose broker cannot report one itself.
+	permissionPrompt PermissionPromptFn
 	// workspaces resolves an agent's cwd to the checkout it runs in. Cached,
 	// because this rebuilds every agent on every SSE tick; see the resolver.
 	workspaces *identity.Resolver
@@ -341,6 +344,17 @@ func (m *Merger) applyProfiles(agents []sdk.Agent) {
 			agents[i].Category = p.Category
 		}
 	}
+}
+
+// PermissionPromptFn reads the tool permission prompt open on pid's screen, or
+// nil (RealPermissionPrompt in production). pending is the transcript's open
+// tool call, nil when it has not been written yet.
+type PermissionPromptFn func(ctx context.Context, pid int, sessionID string, pending *sdk.PendingToolUse) *sdk.TerminalPermissionPrompt
+
+// WithPermissionPrompt injects the reader that attaches an open terminal
+// permission prompt to an agent.
+func WithPermissionPrompt(fn PermissionPromptFn) Option {
+	return func(m *Merger) { m.permissionPrompt = fn }
 }
 
 // ScreenProbeFn resolves whichever AskUserQuestion screen is currently open on
@@ -632,6 +646,17 @@ func (m *Merger) buildAgent(ctx context.Context, proc scanner.ProcessInfo, sessi
 			terminalPermission = screen.Permission != nil
 		}
 	}
+	// Read on the server, with current detection, whenever a session's turn is
+	// open (or its broker already reports a prompt). Not gated on a pending tool
+	// call — Claude Code can show the prompt before the call reaches the
+	// transcript — nor on quiet output, since it keeps redrawing while it waits.
+	// This also covers brokers that predate permission detection.
+	// RealPermissionPrompt caches per session.
+	var terminalPrompt *sdk.TerminalPermissionPrompt
+	if discovery.liveInjectable && m.permissionPrompt != nil && (session.TurnOpen || terminalPermission) {
+		terminalPrompt = m.permissionPrompt(ctx, proc.PID, session.SessionID, session.PendingToolUse)
+		terminalPermission = terminalPermission || terminalPrompt != nil
+	}
 	health := ComputeHealthScore(session, c.Total, c.Unknown, baselineCost)
 
 	return sdk.Agent{
@@ -648,6 +673,7 @@ func (m *Merger) buildAgent(ctx context.Context, proc scanner.ProcessInfo, sessi
 		Status:                     CalculateStatus(session.LastActivity),
 		Working:                    (session.TurnOpen || discovery.recentOutput) && !terminalPermission,
 		AwaitingTerminalPermission: terminalPermission,
+		TerminalPermission:         terminalPrompt,
 		ChannelAvailable:           discovery.channelAvailable,
 		LiveInjectable:             discovery.liveInjectable,
 		InternalProcess:            proc.InternalProcess,
