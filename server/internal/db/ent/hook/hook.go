@@ -345,6 +345,42 @@ func (f ResourceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, er
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ResourceMutation", m)
 }
 
+// The RoadmapItemFunc type is an adapter to allow the use of ordinary
+// function as RoadmapItem mutator.
+type RoadmapItemFunc func(context.Context, *ent.RoadmapItemMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f RoadmapItemFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.RoadmapItemMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RoadmapItemMutation", m)
+}
+
+// The RoadmapPhaseFunc type is an adapter to allow the use of ordinary
+// function as RoadmapPhase mutator.
+type RoadmapPhaseFunc func(context.Context, *ent.RoadmapPhaseMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f RoadmapPhaseFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.RoadmapPhaseMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RoadmapPhaseMutation", m)
+}
+
+// The RoadmapProposalFunc type is an adapter to allow the use of ordinary
+// function as RoadmapProposal mutator.
+type RoadmapProposalFunc func(context.Context, *ent.RoadmapProposalMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f RoadmapProposalFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.RoadmapProposalMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RoadmapProposalMutation", m)
+}
+
 // The ScratchpadFunc type is an adapter to allow the use of ordinary
 // function as Scratchpad mutator.
 type ScratchpadFunc func(context.Context, *ent.ScratchpadMutation) (ent.Value, error)

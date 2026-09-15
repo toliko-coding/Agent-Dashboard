@@ -26,12 +26,18 @@ const (
 	FieldDefaultSpawnerID = "default_spawner_id"
 	// FieldSetupCommand holds the string denoting the setup_command field in the database.
 	FieldSetupCommand = "setup_command"
+	// FieldObjective holds the string denoting the objective field in the database.
+	FieldObjective = "objective"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
 	// EdgeFolders holds the string denoting the folders edge name in mutations.
 	EdgeFolders = "folders"
+	// EdgeRoadmapPhases holds the string denoting the roadmap_phases edge name in mutations.
+	EdgeRoadmapPhases = "roadmap_phases"
+	// EdgeRoadmapProposals holds the string denoting the roadmap_proposals edge name in mutations.
+	EdgeRoadmapProposals = "roadmap_proposals"
 	// Table holds the table name of the project in the database.
 	Table = "projects"
 	// FoldersTable is the table that holds the folders relation/edge.
@@ -41,6 +47,20 @@ const (
 	FoldersInverseTable = "project_folders"
 	// FoldersColumn is the table column denoting the folders relation/edge.
 	FoldersColumn = "project_folders"
+	// RoadmapPhasesTable is the table that holds the roadmap_phases relation/edge.
+	RoadmapPhasesTable = "roadmap_phases"
+	// RoadmapPhasesInverseTable is the table name for the RoadmapPhase entity.
+	// It exists in this package in order to avoid circular dependency with the "roadmapphase" package.
+	RoadmapPhasesInverseTable = "roadmap_phases"
+	// RoadmapPhasesColumn is the table column denoting the roadmap_phases relation/edge.
+	RoadmapPhasesColumn = "project_roadmap_phases"
+	// RoadmapProposalsTable is the table that holds the roadmap_proposals relation/edge.
+	RoadmapProposalsTable = "roadmap_proposals"
+	// RoadmapProposalsInverseTable is the table name for the RoadmapProposal entity.
+	// It exists in this package in order to avoid circular dependency with the "roadmapproposal" package.
+	RoadmapProposalsInverseTable = "roadmap_proposals"
+	// RoadmapProposalsColumn is the table column denoting the roadmap_proposals relation/edge.
+	RoadmapProposalsColumn = "project_roadmap_proposals"
 )
 
 // Columns holds all SQL columns for project fields.
@@ -52,6 +72,7 @@ var Columns = []string{
 	FieldColor,
 	FieldDefaultSpawnerID,
 	FieldSetupCommand,
+	FieldObjective,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -67,6 +88,8 @@ func ValidColumn(column string) bool {
 }
 
 var (
+	// ObjectiveValidator is a validator for the "objective" field. It is called by the builders before save.
+	ObjectiveValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -113,6 +136,11 @@ func BySetupCommand(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSetupCommand, opts...).ToFunc()
 }
 
+// ByObjective orders the results by the objective field.
+func ByObjective(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldObjective, opts...).ToFunc()
+}
+
 // ByCreatedAt orders the results by the created_at field.
 func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreatedAt, opts...).ToFunc()
@@ -136,10 +164,52 @@ func ByFolders(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newFoldersStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByRoadmapPhasesCount orders the results by roadmap_phases count.
+func ByRoadmapPhasesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newRoadmapPhasesStep(), opts...)
+	}
+}
+
+// ByRoadmapPhases orders the results by roadmap_phases terms.
+func ByRoadmapPhases(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newRoadmapPhasesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByRoadmapProposalsCount orders the results by roadmap_proposals count.
+func ByRoadmapProposalsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newRoadmapProposalsStep(), opts...)
+	}
+}
+
+// ByRoadmapProposals orders the results by roadmap_proposals terms.
+func ByRoadmapProposals(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newRoadmapProposalsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newFoldersStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(FoldersInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, FoldersTable, FoldersColumn),
+	)
+}
+func newRoadmapPhasesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(RoadmapPhasesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, RoadmapPhasesTable, RoadmapPhasesColumn),
+	)
+}
+func newRoadmapProposalsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(RoadmapProposalsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, RoadmapProposalsTable, RoadmapProposalsColumn),
 	)
 }

@@ -45,6 +45,7 @@ import (
 	refineapi "github.com/lx-wnk/agent-dashboard/server/internal/api/refine"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/remotes"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/resources"
+	roadmapapi "github.com/lx-wnk/agent-dashboard/server/internal/api/roadmap"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/schedules"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/search"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/sessions"
@@ -63,7 +64,9 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/managedagent"
 	mcp "github.com/lx-wnk/agent-dashboard/server/internal/mcp"
 	"github.com/lx-wnk/agent-dashboard/server/internal/merger"
+	"github.com/lx-wnk/agent-dashboard/server/internal/pipeline"
 	"github.com/lx-wnk/agent-dashboard/server/internal/plugin"
+	"github.com/lx-wnk/agent-dashboard/server/internal/roadmap"
 	"github.com/lx-wnk/agent-dashboard/server/internal/serverask"
 	"github.com/lx-wnk/agent-dashboard/server/internal/services"
 	"github.com/lx-wnk/agent-dashboard/server/internal/settings"
@@ -172,7 +175,9 @@ type RouterDeps struct {
 	AgentProfiles *agentprofile.Store
 	// ManagedAgents records the agents this server launched (lifecycle ownership).
 	ManagedAgents *managedagent.Store
-	SpawnerRepo   repo.SpawnerRepo
+	// Roadmap is Project Intelligence's roadmap service (Phase 4B).
+	Roadmap     *roadmap.Service
+	SpawnerRepo repo.SpawnerRepo
 	// SpawnerBroadcaster fans out spawner CRUD events to SSE subscribers.
 	// May be nil; Stream is only mounted in DI where a broadcaster is always provided.
 	SpawnerBroadcaster *sse.SpawnerBroadcaster
@@ -627,6 +632,21 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Put("/api/agents/projectless", spawnHandler.SetProjectlessRoot)
 		r.Post("/api/agents/projectless/preview", spawnHandler.PreviewProjectlessWorkspace)
 		r.Delete("/api/agents/{pid}/profile", spawnHandler.RemoveAgentProfile)
+
+		// Project Intelligence roadmaps (Phase 4B). Proposals come only from an
+		// agent the dashboard launched in the project's folders; analysis agents
+		// are started through the same spawn policy as any other.
+		if deps.Roadmap != nil && deps.ProjectFolderRepo != nil {
+			roadmapHandler := roadmapapi.NewHandler(deps.Roadmap, deps.ProjectFolderRepo)
+			if deps.Merger != nil {
+				roadmapHandler.SetAgents(deps.Merger, agents.NewOwnership(deps.ManagedAgents, spawnMgr), func(cwd, sessionID string) (map[string]any, error) {
+					out, err := pipeline.ReadLastStageJsonOutput(cwd, sessionID)
+					return out.Output, err
+				})
+			}
+			roadmapHandler.SetSpawn(spawnHandler.SpawnFromServer)
+			roadmapHandler.Mount(r)
+		}
 		r.Put("/api/agents/{pid}/profile", spawnHandler.UpdateAgentProfile)
 		r.Get("/api/agents/{pid}/control", spawnHandler.GetAgentControl)
 		r.Post("/api/agents/{pid}/resume-under-dashboard", spawnHandler.ResumeUnderDashboard)

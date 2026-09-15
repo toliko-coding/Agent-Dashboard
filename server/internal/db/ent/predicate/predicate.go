@@ -90,6 +90,15 @@ type RemoteRegistration func(*sql.Selector)
 // Resource is the predicate function for resource builders.
 type Resource func(*sql.Selector)
 
+// RoadmapItem is the predicate function for roadmapitem builders.
+type RoadmapItem func(*sql.Selector)
+
+// RoadmapPhase is the predicate function for roadmapphase builders.
+type RoadmapPhase func(*sql.Selector)
+
+// RoadmapProposal is the predicate function for roadmapproposal builders.
+type RoadmapProposal func(*sql.Selector)
+
 // Scratchpad is the predicate function for scratchpad builders.
 type Scratchpad func(*sql.Selector)
 

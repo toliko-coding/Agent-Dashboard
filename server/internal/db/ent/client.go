@@ -43,6 +43,9 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/refinementturn"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/remoteregistration"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/resource"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapitem"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapphase"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapproposal"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/scratchpad"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/skill"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/spawner"
@@ -116,6 +119,12 @@ type Client struct {
 	RemoteRegistration *RemoteRegistrationClient
 	// Resource is the client for interacting with the Resource builders.
 	Resource *ResourceClient
+	// RoadmapItem is the client for interacting with the RoadmapItem builders.
+	RoadmapItem *RoadmapItemClient
+	// RoadmapPhase is the client for interacting with the RoadmapPhase builders.
+	RoadmapPhase *RoadmapPhaseClient
+	// RoadmapProposal is the client for interacting with the RoadmapProposal builders.
+	RoadmapProposal *RoadmapProposalClient
 	// Scratchpad is the client for interacting with the Scratchpad builders.
 	Scratchpad *ScratchpadClient
 	// Skill is the client for interacting with the Skill builders.
@@ -175,6 +184,9 @@ func (c *Client) init() {
 	c.RefinementTurn = NewRefinementTurnClient(c.config)
 	c.RemoteRegistration = NewRemoteRegistrationClient(c.config)
 	c.Resource = NewResourceClient(c.config)
+	c.RoadmapItem = NewRoadmapItemClient(c.config)
+	c.RoadmapPhase = NewRoadmapPhaseClient(c.config)
+	c.RoadmapProposal = NewRoadmapProposalClient(c.config)
 	c.Scratchpad = NewScratchpadClient(c.config)
 	c.Skill = NewSkillClient(c.config)
 	c.Spawner = NewSpawnerClient(c.config)
@@ -305,6 +317,9 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		RefinementTurn:     NewRefinementTurnClient(cfg),
 		RemoteRegistration: NewRemoteRegistrationClient(cfg),
 		Resource:           NewResourceClient(cfg),
+		RoadmapItem:        NewRoadmapItemClient(cfg),
+		RoadmapPhase:       NewRoadmapPhaseClient(cfg),
+		RoadmapProposal:    NewRoadmapProposalClient(cfg),
 		Scratchpad:         NewScratchpadClient(cfg),
 		Skill:              NewSkillClient(cfg),
 		Spawner:            NewSpawnerClient(cfg),
@@ -362,6 +377,9 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		RefinementTurn:     NewRefinementTurnClient(cfg),
 		RemoteRegistration: NewRemoteRegistrationClient(cfg),
 		Resource:           NewResourceClient(cfg),
+		RoadmapItem:        NewRoadmapItemClient(cfg),
+		RoadmapPhase:       NewRoadmapPhaseClient(cfg),
+		RoadmapProposal:    NewRoadmapProposalClient(cfg),
 		Scratchpad:         NewScratchpadClient(cfg),
 		Skill:              NewSkillClient(cfg),
 		Spawner:            NewSpawnerClient(cfg),
@@ -407,8 +425,9 @@ func (c *Client) Use(hooks ...Hook) {
 		c.MemoryInjection, c.PermissionPreset, c.PermissionRequest, c.PipelineConfig,
 		c.Plugin, c.PluginSetting, c.Project, c.ProjectFolder, c.PromptTemplate,
 		c.ProviderSetting, c.RefinementTurn, c.RemoteRegistration, c.Resource,
-		c.Scratchpad, c.Skill, c.Spawner, c.StageRun, c.SystemPrompt, c.Task,
-		c.TaskDependency, c.TaskPermission, c.TaskSchedule, c.User,
+		c.RoadmapItem, c.RoadmapPhase, c.RoadmapProposal, c.Scratchpad, c.Skill,
+		c.Spawner, c.StageRun, c.SystemPrompt, c.Task, c.TaskDependency,
+		c.TaskPermission, c.TaskSchedule, c.User,
 	} {
 		n.Use(hooks...)
 	}
@@ -424,8 +443,9 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.MemoryInjection, c.PermissionPreset, c.PermissionRequest, c.PipelineConfig,
 		c.Plugin, c.PluginSetting, c.Project, c.ProjectFolder, c.PromptTemplate,
 		c.ProviderSetting, c.RefinementTurn, c.RemoteRegistration, c.Resource,
-		c.Scratchpad, c.Skill, c.Spawner, c.StageRun, c.SystemPrompt, c.Task,
-		c.TaskDependency, c.TaskPermission, c.TaskSchedule, c.User,
+		c.RoadmapItem, c.RoadmapPhase, c.RoadmapProposal, c.Scratchpad, c.Skill,
+		c.Spawner, c.StageRun, c.SystemPrompt, c.Task, c.TaskDependency,
+		c.TaskPermission, c.TaskSchedule, c.User,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -490,6 +510,12 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.RemoteRegistration.mutate(ctx, m)
 	case *ResourceMutation:
 		return c.Resource.mutate(ctx, m)
+	case *RoadmapItemMutation:
+		return c.RoadmapItem.mutate(ctx, m)
+	case *RoadmapPhaseMutation:
+		return c.RoadmapPhase.mutate(ctx, m)
+	case *RoadmapProposalMutation:
+		return c.RoadmapProposal.mutate(ctx, m)
 	case *ScratchpadMutation:
 		return c.Scratchpad.mutate(ctx, m)
 	case *SkillMutation:
@@ -3448,6 +3474,38 @@ func (c *ProjectClient) QueryFolders(_m *Project) *ProjectFolderQuery {
 	return query
 }
 
+// QueryRoadmapPhases queries the roadmap_phases edge of a Project.
+func (c *ProjectClient) QueryRoadmapPhases(_m *Project) *RoadmapPhaseQuery {
+	query := (&RoadmapPhaseClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(project.Table, project.FieldID, id),
+			sqlgraph.To(roadmapphase.Table, roadmapphase.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, project.RoadmapPhasesTable, project.RoadmapPhasesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryRoadmapProposals queries the roadmap_proposals edge of a Project.
+func (c *ProjectClient) QueryRoadmapProposals(_m *Project) *RoadmapProposalQuery {
+	query := (&RoadmapProposalClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(project.Table, project.FieldID, id),
+			sqlgraph.To(roadmapproposal.Table, roadmapproposal.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, project.RoadmapProposalsTable, project.RoadmapProposalsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *ProjectClient) Hooks() []Hook {
 	return c.hooks.Project
@@ -4284,6 +4342,469 @@ func (c *ResourceClient) mutate(ctx context.Context, m *ResourceMutation) (Value
 		return (&ResourceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Resource mutation op: %q", m.Op())
+	}
+}
+
+// RoadmapItemClient is a client for the RoadmapItem schema.
+type RoadmapItemClient struct {
+	config
+}
+
+// NewRoadmapItemClient returns a client for the RoadmapItem from the given config.
+func NewRoadmapItemClient(c config) *RoadmapItemClient {
+	return &RoadmapItemClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `roadmapitem.Hooks(f(g(h())))`.
+func (c *RoadmapItemClient) Use(hooks ...Hook) {
+	c.hooks.RoadmapItem = append(c.hooks.RoadmapItem, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `roadmapitem.Intercept(f(g(h())))`.
+func (c *RoadmapItemClient) Intercept(interceptors ...Interceptor) {
+	c.inters.RoadmapItem = append(c.inters.RoadmapItem, interceptors...)
+}
+
+// Create returns a builder for creating a RoadmapItem entity.
+func (c *RoadmapItemClient) Create() *RoadmapItemCreate {
+	mutation := newRoadmapItemMutation(c.config, OpCreate)
+	return &RoadmapItemCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of RoadmapItem entities.
+func (c *RoadmapItemClient) CreateBulk(builders ...*RoadmapItemCreate) *RoadmapItemCreateBulk {
+	return &RoadmapItemCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *RoadmapItemClient) MapCreateBulk(slice any, setFunc func(*RoadmapItemCreate, int)) *RoadmapItemCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &RoadmapItemCreateBulk{err: fmt.Errorf("calling to RoadmapItemClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*RoadmapItemCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &RoadmapItemCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for RoadmapItem.
+func (c *RoadmapItemClient) Update() *RoadmapItemUpdate {
+	mutation := newRoadmapItemMutation(c.config, OpUpdate)
+	return &RoadmapItemUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *RoadmapItemClient) UpdateOne(_m *RoadmapItem) *RoadmapItemUpdateOne {
+	mutation := newRoadmapItemMutation(c.config, OpUpdateOne, withRoadmapItem(_m))
+	return &RoadmapItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *RoadmapItemClient) UpdateOneID(id string) *RoadmapItemUpdateOne {
+	mutation := newRoadmapItemMutation(c.config, OpUpdateOne, withRoadmapItemID(id))
+	return &RoadmapItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for RoadmapItem.
+func (c *RoadmapItemClient) Delete() *RoadmapItemDelete {
+	mutation := newRoadmapItemMutation(c.config, OpDelete)
+	return &RoadmapItemDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *RoadmapItemClient) DeleteOne(_m *RoadmapItem) *RoadmapItemDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *RoadmapItemClient) DeleteOneID(id string) *RoadmapItemDeleteOne {
+	builder := c.Delete().Where(roadmapitem.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &RoadmapItemDeleteOne{builder}
+}
+
+// Query returns a query builder for RoadmapItem.
+func (c *RoadmapItemClient) Query() *RoadmapItemQuery {
+	return &RoadmapItemQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeRoadmapItem},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a RoadmapItem entity by its id.
+func (c *RoadmapItemClient) Get(ctx context.Context, id string) (*RoadmapItem, error) {
+	return c.Query().Where(roadmapitem.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *RoadmapItemClient) GetX(ctx context.Context, id string) *RoadmapItem {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryPhase queries the phase edge of a RoadmapItem.
+func (c *RoadmapItemClient) QueryPhase(_m *RoadmapItem) *RoadmapPhaseQuery {
+	query := (&RoadmapPhaseClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(roadmapitem.Table, roadmapitem.FieldID, id),
+			sqlgraph.To(roadmapphase.Table, roadmapphase.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, roadmapitem.PhaseTable, roadmapitem.PhaseColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *RoadmapItemClient) Hooks() []Hook {
+	return c.hooks.RoadmapItem
+}
+
+// Interceptors returns the client interceptors.
+func (c *RoadmapItemClient) Interceptors() []Interceptor {
+	return c.inters.RoadmapItem
+}
+
+func (c *RoadmapItemClient) mutate(ctx context.Context, m *RoadmapItemMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&RoadmapItemCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&RoadmapItemUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&RoadmapItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&RoadmapItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown RoadmapItem mutation op: %q", m.Op())
+	}
+}
+
+// RoadmapPhaseClient is a client for the RoadmapPhase schema.
+type RoadmapPhaseClient struct {
+	config
+}
+
+// NewRoadmapPhaseClient returns a client for the RoadmapPhase from the given config.
+func NewRoadmapPhaseClient(c config) *RoadmapPhaseClient {
+	return &RoadmapPhaseClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `roadmapphase.Hooks(f(g(h())))`.
+func (c *RoadmapPhaseClient) Use(hooks ...Hook) {
+	c.hooks.RoadmapPhase = append(c.hooks.RoadmapPhase, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `roadmapphase.Intercept(f(g(h())))`.
+func (c *RoadmapPhaseClient) Intercept(interceptors ...Interceptor) {
+	c.inters.RoadmapPhase = append(c.inters.RoadmapPhase, interceptors...)
+}
+
+// Create returns a builder for creating a RoadmapPhase entity.
+func (c *RoadmapPhaseClient) Create() *RoadmapPhaseCreate {
+	mutation := newRoadmapPhaseMutation(c.config, OpCreate)
+	return &RoadmapPhaseCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of RoadmapPhase entities.
+func (c *RoadmapPhaseClient) CreateBulk(builders ...*RoadmapPhaseCreate) *RoadmapPhaseCreateBulk {
+	return &RoadmapPhaseCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *RoadmapPhaseClient) MapCreateBulk(slice any, setFunc func(*RoadmapPhaseCreate, int)) *RoadmapPhaseCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &RoadmapPhaseCreateBulk{err: fmt.Errorf("calling to RoadmapPhaseClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*RoadmapPhaseCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &RoadmapPhaseCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for RoadmapPhase.
+func (c *RoadmapPhaseClient) Update() *RoadmapPhaseUpdate {
+	mutation := newRoadmapPhaseMutation(c.config, OpUpdate)
+	return &RoadmapPhaseUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *RoadmapPhaseClient) UpdateOne(_m *RoadmapPhase) *RoadmapPhaseUpdateOne {
+	mutation := newRoadmapPhaseMutation(c.config, OpUpdateOne, withRoadmapPhase(_m))
+	return &RoadmapPhaseUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *RoadmapPhaseClient) UpdateOneID(id string) *RoadmapPhaseUpdateOne {
+	mutation := newRoadmapPhaseMutation(c.config, OpUpdateOne, withRoadmapPhaseID(id))
+	return &RoadmapPhaseUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for RoadmapPhase.
+func (c *RoadmapPhaseClient) Delete() *RoadmapPhaseDelete {
+	mutation := newRoadmapPhaseMutation(c.config, OpDelete)
+	return &RoadmapPhaseDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *RoadmapPhaseClient) DeleteOne(_m *RoadmapPhase) *RoadmapPhaseDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *RoadmapPhaseClient) DeleteOneID(id string) *RoadmapPhaseDeleteOne {
+	builder := c.Delete().Where(roadmapphase.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &RoadmapPhaseDeleteOne{builder}
+}
+
+// Query returns a query builder for RoadmapPhase.
+func (c *RoadmapPhaseClient) Query() *RoadmapPhaseQuery {
+	return &RoadmapPhaseQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeRoadmapPhase},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a RoadmapPhase entity by its id.
+func (c *RoadmapPhaseClient) Get(ctx context.Context, id string) (*RoadmapPhase, error) {
+	return c.Query().Where(roadmapphase.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *RoadmapPhaseClient) GetX(ctx context.Context, id string) *RoadmapPhase {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryProject queries the project edge of a RoadmapPhase.
+func (c *RoadmapPhaseClient) QueryProject(_m *RoadmapPhase) *ProjectQuery {
+	query := (&ProjectClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(roadmapphase.Table, roadmapphase.FieldID, id),
+			sqlgraph.To(project.Table, project.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, roadmapphase.ProjectTable, roadmapphase.ProjectColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryItems queries the items edge of a RoadmapPhase.
+func (c *RoadmapPhaseClient) QueryItems(_m *RoadmapPhase) *RoadmapItemQuery {
+	query := (&RoadmapItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(roadmapphase.Table, roadmapphase.FieldID, id),
+			sqlgraph.To(roadmapitem.Table, roadmapitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, roadmapphase.ItemsTable, roadmapphase.ItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *RoadmapPhaseClient) Hooks() []Hook {
+	return c.hooks.RoadmapPhase
+}
+
+// Interceptors returns the client interceptors.
+func (c *RoadmapPhaseClient) Interceptors() []Interceptor {
+	return c.inters.RoadmapPhase
+}
+
+func (c *RoadmapPhaseClient) mutate(ctx context.Context, m *RoadmapPhaseMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&RoadmapPhaseCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&RoadmapPhaseUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&RoadmapPhaseUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&RoadmapPhaseDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown RoadmapPhase mutation op: %q", m.Op())
+	}
+}
+
+// RoadmapProposalClient is a client for the RoadmapProposal schema.
+type RoadmapProposalClient struct {
+	config
+}
+
+// NewRoadmapProposalClient returns a client for the RoadmapProposal from the given config.
+func NewRoadmapProposalClient(c config) *RoadmapProposalClient {
+	return &RoadmapProposalClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `roadmapproposal.Hooks(f(g(h())))`.
+func (c *RoadmapProposalClient) Use(hooks ...Hook) {
+	c.hooks.RoadmapProposal = append(c.hooks.RoadmapProposal, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `roadmapproposal.Intercept(f(g(h())))`.
+func (c *RoadmapProposalClient) Intercept(interceptors ...Interceptor) {
+	c.inters.RoadmapProposal = append(c.inters.RoadmapProposal, interceptors...)
+}
+
+// Create returns a builder for creating a RoadmapProposal entity.
+func (c *RoadmapProposalClient) Create() *RoadmapProposalCreate {
+	mutation := newRoadmapProposalMutation(c.config, OpCreate)
+	return &RoadmapProposalCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of RoadmapProposal entities.
+func (c *RoadmapProposalClient) CreateBulk(builders ...*RoadmapProposalCreate) *RoadmapProposalCreateBulk {
+	return &RoadmapProposalCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *RoadmapProposalClient) MapCreateBulk(slice any, setFunc func(*RoadmapProposalCreate, int)) *RoadmapProposalCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &RoadmapProposalCreateBulk{err: fmt.Errorf("calling to RoadmapProposalClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*RoadmapProposalCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &RoadmapProposalCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for RoadmapProposal.
+func (c *RoadmapProposalClient) Update() *RoadmapProposalUpdate {
+	mutation := newRoadmapProposalMutation(c.config, OpUpdate)
+	return &RoadmapProposalUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *RoadmapProposalClient) UpdateOne(_m *RoadmapProposal) *RoadmapProposalUpdateOne {
+	mutation := newRoadmapProposalMutation(c.config, OpUpdateOne, withRoadmapProposal(_m))
+	return &RoadmapProposalUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *RoadmapProposalClient) UpdateOneID(id string) *RoadmapProposalUpdateOne {
+	mutation := newRoadmapProposalMutation(c.config, OpUpdateOne, withRoadmapProposalID(id))
+	return &RoadmapProposalUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for RoadmapProposal.
+func (c *RoadmapProposalClient) Delete() *RoadmapProposalDelete {
+	mutation := newRoadmapProposalMutation(c.config, OpDelete)
+	return &RoadmapProposalDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *RoadmapProposalClient) DeleteOne(_m *RoadmapProposal) *RoadmapProposalDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *RoadmapProposalClient) DeleteOneID(id string) *RoadmapProposalDeleteOne {
+	builder := c.Delete().Where(roadmapproposal.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &RoadmapProposalDeleteOne{builder}
+}
+
+// Query returns a query builder for RoadmapProposal.
+func (c *RoadmapProposalClient) Query() *RoadmapProposalQuery {
+	return &RoadmapProposalQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeRoadmapProposal},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a RoadmapProposal entity by its id.
+func (c *RoadmapProposalClient) Get(ctx context.Context, id string) (*RoadmapProposal, error) {
+	return c.Query().Where(roadmapproposal.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *RoadmapProposalClient) GetX(ctx context.Context, id string) *RoadmapProposal {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryProject queries the project edge of a RoadmapProposal.
+func (c *RoadmapProposalClient) QueryProject(_m *RoadmapProposal) *ProjectQuery {
+	query := (&ProjectClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(roadmapproposal.Table, roadmapproposal.FieldID, id),
+			sqlgraph.To(project.Table, project.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, roadmapproposal.ProjectTable, roadmapproposal.ProjectColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *RoadmapProposalClient) Hooks() []Hook {
+	return c.hooks.RoadmapProposal
+}
+
+// Interceptors returns the client interceptors.
+func (c *RoadmapProposalClient) Interceptors() []Interceptor {
+	return c.inters.RoadmapProposal
+}
+
+func (c *RoadmapProposalClient) mutate(ctx context.Context, m *RoadmapProposalMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&RoadmapProposalCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&RoadmapProposalUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&RoadmapProposalUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&RoadmapProposalDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown RoadmapProposal mutation op: %q", m.Op())
 	}
 }
 
@@ -5769,9 +6290,9 @@ type (
 		ManagedAgent, Materialization, MemoryEntry, MemoryInjection, PermissionPreset,
 		PermissionRequest, PipelineConfig, Plugin, PluginSetting, Project,
 		ProjectFolder, PromptTemplate, ProviderSetting, RefinementTurn,
-		RemoteRegistration, Resource, Scratchpad, Skill, Spawner, StageRun,
-		SystemPrompt, Task, TaskDependency, TaskPermission, TaskSchedule,
-		User []ent.Hook
+		RemoteRegistration, Resource, RoadmapItem, RoadmapPhase, RoadmapProposal,
+		Scratchpad, Skill, Spawner, StageRun, SystemPrompt, Task, TaskDependency,
+		TaskPermission, TaskSchedule, User []ent.Hook
 	}
 	inters struct {
 		AgentCostTrend, AgentProfile, ApiKey, AppSetting, AuditEvent, Capability,
@@ -5779,8 +6300,8 @@ type (
 		ManagedAgent, Materialization, MemoryEntry, MemoryInjection, PermissionPreset,
 		PermissionRequest, PipelineConfig, Plugin, PluginSetting, Project,
 		ProjectFolder, PromptTemplate, ProviderSetting, RefinementTurn,
-		RemoteRegistration, Resource, Scratchpad, Skill, Spawner, StageRun,
-		SystemPrompt, Task, TaskDependency, TaskPermission, TaskSchedule,
-		User []ent.Interceptor
+		RemoteRegistration, Resource, RoadmapItem, RoadmapPhase, RoadmapProposal,
+		Scratchpad, Skill, Spawner, StageRun, SystemPrompt, Task, TaskDependency,
+		TaskPermission, TaskSchedule, User []ent.Interceptor
 	}
 )

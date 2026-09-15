@@ -40,6 +40,9 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/refinementturn"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/remoteregistration"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/resource"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapitem"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapphase"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapproposal"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/scratchpad"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/skill"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/spawner"
@@ -138,6 +141,9 @@ func checkColumn(t, c string) error {
 			refinementturn.Table:     refinementturn.ValidColumn,
 			remoteregistration.Table: remoteregistration.ValidColumn,
 			resource.Table:           resource.ValidColumn,
+			roadmapitem.Table:        roadmapitem.ValidColumn,
+			roadmapphase.Table:       roadmapphase.ValidColumn,
+			roadmapproposal.Table:    roadmapproposal.ValidColumn,
 			scratchpad.Table:         scratchpad.ValidColumn,
 			skill.Table:              skill.ValidColumn,
 			spawner.Table:            spawner.ValidColumn,

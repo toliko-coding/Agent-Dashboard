@@ -40,6 +40,9 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/refinementturn"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/remoteregistration"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/resource"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapitem"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapphase"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapproposal"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/scratchpad"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/skill"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/spawner"
@@ -89,6 +92,9 @@ const (
 	TypeRefinementTurn     = "RefinementTurn"
 	TypeRemoteRegistration = "RemoteRegistration"
 	TypeResource           = "Resource"
+	TypeRoadmapItem        = "RoadmapItem"
+	TypeRoadmapPhase       = "RoadmapPhase"
+	TypeRoadmapProposal    = "RoadmapProposal"
 	TypeScratchpad         = "Scratchpad"
 	TypeSkill              = "Skill"
 	TypeSpawner            = "Spawner"
@@ -15909,24 +15915,31 @@ func (m *PluginSettingMutation) ResetEdge(name string) error {
 // ProjectMutation represents an operation that mutates the Project nodes in the graph.
 type ProjectMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *string
-	slug               *string
-	name               *string
-	description        *string
-	color              *string
-	default_spawner_id *string
-	setup_command      *string
-	created_at         *time.Time
-	updated_at         *time.Time
-	clearedFields      map[string]struct{}
-	folders            map[string]struct{}
-	removedfolders     map[string]struct{}
-	clearedfolders     bool
-	done               bool
-	oldValue           func(context.Context) (*Project, error)
-	predicates         []predicate.Project
+	op                       Op
+	typ                      string
+	id                       *string
+	slug                     *string
+	name                     *string
+	description              *string
+	color                    *string
+	default_spawner_id       *string
+	setup_command            *string
+	objective                *string
+	created_at               *time.Time
+	updated_at               *time.Time
+	clearedFields            map[string]struct{}
+	folders                  map[string]struct{}
+	removedfolders           map[string]struct{}
+	clearedfolders           bool
+	roadmap_phases           map[string]struct{}
+	removedroadmap_phases    map[string]struct{}
+	clearedroadmap_phases    bool
+	roadmap_proposals        map[string]struct{}
+	removedroadmap_proposals map[string]struct{}
+	clearedroadmap_proposals bool
+	done                     bool
+	oldValue                 func(context.Context) (*Project, error)
+	predicates               []predicate.Project
 }
 
 var _ ent.Mutation = (*ProjectMutation)(nil)
@@ -16301,6 +16314,55 @@ func (m *ProjectMutation) ResetSetupCommand() {
 	delete(m.clearedFields, project.FieldSetupCommand)
 }
 
+// SetObjective sets the "objective" field.
+func (m *ProjectMutation) SetObjective(s string) {
+	m.objective = &s
+}
+
+// Objective returns the value of the "objective" field in the mutation.
+func (m *ProjectMutation) Objective() (r string, exists bool) {
+	v := m.objective
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldObjective returns the old "objective" field's value of the Project entity.
+// If the Project object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProjectMutation) OldObjective(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldObjective is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldObjective requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldObjective: %w", err)
+	}
+	return oldValue.Objective, nil
+}
+
+// ClearObjective clears the value of the "objective" field.
+func (m *ProjectMutation) ClearObjective() {
+	m.objective = nil
+	m.clearedFields[project.FieldObjective] = struct{}{}
+}
+
+// ObjectiveCleared returns if the "objective" field was cleared in this mutation.
+func (m *ProjectMutation) ObjectiveCleared() bool {
+	_, ok := m.clearedFields[project.FieldObjective]
+	return ok
+}
+
+// ResetObjective resets all changes to the "objective" field.
+func (m *ProjectMutation) ResetObjective() {
+	m.objective = nil
+	delete(m.clearedFields, project.FieldObjective)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *ProjectMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -16427,6 +16489,114 @@ func (m *ProjectMutation) ResetFolders() {
 	m.removedfolders = nil
 }
 
+// AddRoadmapPhaseIDs adds the "roadmap_phases" edge to the RoadmapPhase entity by ids.
+func (m *ProjectMutation) AddRoadmapPhaseIDs(ids ...string) {
+	if m.roadmap_phases == nil {
+		m.roadmap_phases = make(map[string]struct{})
+	}
+	for i := range ids {
+		m.roadmap_phases[ids[i]] = struct{}{}
+	}
+}
+
+// ClearRoadmapPhases clears the "roadmap_phases" edge to the RoadmapPhase entity.
+func (m *ProjectMutation) ClearRoadmapPhases() {
+	m.clearedroadmap_phases = true
+}
+
+// RoadmapPhasesCleared reports if the "roadmap_phases" edge to the RoadmapPhase entity was cleared.
+func (m *ProjectMutation) RoadmapPhasesCleared() bool {
+	return m.clearedroadmap_phases
+}
+
+// RemoveRoadmapPhaseIDs removes the "roadmap_phases" edge to the RoadmapPhase entity by IDs.
+func (m *ProjectMutation) RemoveRoadmapPhaseIDs(ids ...string) {
+	if m.removedroadmap_phases == nil {
+		m.removedroadmap_phases = make(map[string]struct{})
+	}
+	for i := range ids {
+		delete(m.roadmap_phases, ids[i])
+		m.removedroadmap_phases[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedRoadmapPhases returns the removed IDs of the "roadmap_phases" edge to the RoadmapPhase entity.
+func (m *ProjectMutation) RemovedRoadmapPhasesIDs() (ids []string) {
+	for id := range m.removedroadmap_phases {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// RoadmapPhasesIDs returns the "roadmap_phases" edge IDs in the mutation.
+func (m *ProjectMutation) RoadmapPhasesIDs() (ids []string) {
+	for id := range m.roadmap_phases {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetRoadmapPhases resets all changes to the "roadmap_phases" edge.
+func (m *ProjectMutation) ResetRoadmapPhases() {
+	m.roadmap_phases = nil
+	m.clearedroadmap_phases = false
+	m.removedroadmap_phases = nil
+}
+
+// AddRoadmapProposalIDs adds the "roadmap_proposals" edge to the RoadmapProposal entity by ids.
+func (m *ProjectMutation) AddRoadmapProposalIDs(ids ...string) {
+	if m.roadmap_proposals == nil {
+		m.roadmap_proposals = make(map[string]struct{})
+	}
+	for i := range ids {
+		m.roadmap_proposals[ids[i]] = struct{}{}
+	}
+}
+
+// ClearRoadmapProposals clears the "roadmap_proposals" edge to the RoadmapProposal entity.
+func (m *ProjectMutation) ClearRoadmapProposals() {
+	m.clearedroadmap_proposals = true
+}
+
+// RoadmapProposalsCleared reports if the "roadmap_proposals" edge to the RoadmapProposal entity was cleared.
+func (m *ProjectMutation) RoadmapProposalsCleared() bool {
+	return m.clearedroadmap_proposals
+}
+
+// RemoveRoadmapProposalIDs removes the "roadmap_proposals" edge to the RoadmapProposal entity by IDs.
+func (m *ProjectMutation) RemoveRoadmapProposalIDs(ids ...string) {
+	if m.removedroadmap_proposals == nil {
+		m.removedroadmap_proposals = make(map[string]struct{})
+	}
+	for i := range ids {
+		delete(m.roadmap_proposals, ids[i])
+		m.removedroadmap_proposals[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedRoadmapProposals returns the removed IDs of the "roadmap_proposals" edge to the RoadmapProposal entity.
+func (m *ProjectMutation) RemovedRoadmapProposalsIDs() (ids []string) {
+	for id := range m.removedroadmap_proposals {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// RoadmapProposalsIDs returns the "roadmap_proposals" edge IDs in the mutation.
+func (m *ProjectMutation) RoadmapProposalsIDs() (ids []string) {
+	for id := range m.roadmap_proposals {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetRoadmapProposals resets all changes to the "roadmap_proposals" edge.
+func (m *ProjectMutation) ResetRoadmapProposals() {
+	m.roadmap_proposals = nil
+	m.clearedroadmap_proposals = false
+	m.removedroadmap_proposals = nil
+}
+
 // Where appends a list predicates to the ProjectMutation builder.
 func (m *ProjectMutation) Where(ps ...predicate.Project) {
 	m.predicates = append(m.predicates, ps...)
@@ -16461,7 +16631,7 @@ func (m *ProjectMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProjectMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 9)
 	if m.slug != nil {
 		fields = append(fields, project.FieldSlug)
 	}
@@ -16479,6 +16649,9 @@ func (m *ProjectMutation) Fields() []string {
 	}
 	if m.setup_command != nil {
 		fields = append(fields, project.FieldSetupCommand)
+	}
+	if m.objective != nil {
+		fields = append(fields, project.FieldObjective)
 	}
 	if m.created_at != nil {
 		fields = append(fields, project.FieldCreatedAt)
@@ -16506,6 +16679,8 @@ func (m *ProjectMutation) Field(name string) (ent.Value, bool) {
 		return m.DefaultSpawnerID()
 	case project.FieldSetupCommand:
 		return m.SetupCommand()
+	case project.FieldObjective:
+		return m.Objective()
 	case project.FieldCreatedAt:
 		return m.CreatedAt()
 	case project.FieldUpdatedAt:
@@ -16531,6 +16706,8 @@ func (m *ProjectMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldDefaultSpawnerID(ctx)
 	case project.FieldSetupCommand:
 		return m.OldSetupCommand(ctx)
+	case project.FieldObjective:
+		return m.OldObjective(ctx)
 	case project.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case project.FieldUpdatedAt:
@@ -16585,6 +16762,13 @@ func (m *ProjectMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSetupCommand(v)
+		return nil
+	case project.FieldObjective:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetObjective(v)
 		return nil
 	case project.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -16642,6 +16826,9 @@ func (m *ProjectMutation) ClearedFields() []string {
 	if m.FieldCleared(project.FieldSetupCommand) {
 		fields = append(fields, project.FieldSetupCommand)
 	}
+	if m.FieldCleared(project.FieldObjective) {
+		fields = append(fields, project.FieldObjective)
+	}
 	return fields
 }
 
@@ -16667,6 +16854,9 @@ func (m *ProjectMutation) ClearField(name string) error {
 		return nil
 	case project.FieldSetupCommand:
 		m.ClearSetupCommand()
+		return nil
+	case project.FieldObjective:
+		m.ClearObjective()
 		return nil
 	}
 	return fmt.Errorf("unknown Project nullable field %s", name)
@@ -16694,6 +16884,9 @@ func (m *ProjectMutation) ResetField(name string) error {
 	case project.FieldSetupCommand:
 		m.ResetSetupCommand()
 		return nil
+	case project.FieldObjective:
+		m.ResetObjective()
+		return nil
 	case project.FieldCreatedAt:
 		m.ResetCreatedAt()
 		return nil
@@ -16706,9 +16899,15 @@ func (m *ProjectMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ProjectMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	if m.folders != nil {
 		edges = append(edges, project.EdgeFolders)
+	}
+	if m.roadmap_phases != nil {
+		edges = append(edges, project.EdgeRoadmapPhases)
+	}
+	if m.roadmap_proposals != nil {
+		edges = append(edges, project.EdgeRoadmapProposals)
 	}
 	return edges
 }
@@ -16723,15 +16922,33 @@ func (m *ProjectMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case project.EdgeRoadmapPhases:
+		ids := make([]ent.Value, 0, len(m.roadmap_phases))
+		for id := range m.roadmap_phases {
+			ids = append(ids, id)
+		}
+		return ids
+	case project.EdgeRoadmapProposals:
+		ids := make([]ent.Value, 0, len(m.roadmap_proposals))
+		for id := range m.roadmap_proposals {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ProjectMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	if m.removedfolders != nil {
 		edges = append(edges, project.EdgeFolders)
+	}
+	if m.removedroadmap_phases != nil {
+		edges = append(edges, project.EdgeRoadmapPhases)
+	}
+	if m.removedroadmap_proposals != nil {
+		edges = append(edges, project.EdgeRoadmapProposals)
 	}
 	return edges
 }
@@ -16746,15 +16963,33 @@ func (m *ProjectMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case project.EdgeRoadmapPhases:
+		ids := make([]ent.Value, 0, len(m.removedroadmap_phases))
+		for id := range m.removedroadmap_phases {
+			ids = append(ids, id)
+		}
+		return ids
+	case project.EdgeRoadmapProposals:
+		ids := make([]ent.Value, 0, len(m.removedroadmap_proposals))
+		for id := range m.removedroadmap_proposals {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ProjectMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	if m.clearedfolders {
 		edges = append(edges, project.EdgeFolders)
+	}
+	if m.clearedroadmap_phases {
+		edges = append(edges, project.EdgeRoadmapPhases)
+	}
+	if m.clearedroadmap_proposals {
+		edges = append(edges, project.EdgeRoadmapProposals)
 	}
 	return edges
 }
@@ -16765,6 +17000,10 @@ func (m *ProjectMutation) EdgeCleared(name string) bool {
 	switch name {
 	case project.EdgeFolders:
 		return m.clearedfolders
+	case project.EdgeRoadmapPhases:
+		return m.clearedroadmap_phases
+	case project.EdgeRoadmapProposals:
+		return m.clearedroadmap_proposals
 	}
 	return false
 }
@@ -16783,6 +17022,12 @@ func (m *ProjectMutation) ResetEdge(name string) error {
 	switch name {
 	case project.EdgeFolders:
 		m.ResetFolders()
+		return nil
+	case project.EdgeRoadmapPhases:
+		m.ResetRoadmapPhases()
+		return nil
+	case project.EdgeRoadmapProposals:
+		m.ResetRoadmapProposals()
 		return nil
 	}
 	return fmt.Errorf("unknown Project edge %s", name)
@@ -20478,6 +20723,2704 @@ func (m *ResourceMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *ResourceMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown Resource edge %s", name)
+}
+
+// RoadmapItemMutation represents an operation that mutates the RoadmapItem nodes in the graph.
+type RoadmapItemMutation struct {
+	config
+	op             Op
+	typ            string
+	id             *string
+	title          *string
+	status         *string
+	position       *int
+	addposition    *int
+	provenance     *string
+	blocked_reason *string
+	task_id        *string
+	created_at     *time.Time
+	updated_at     *time.Time
+	clearedFields  map[string]struct{}
+	phase          *string
+	clearedphase   bool
+	done           bool
+	oldValue       func(context.Context) (*RoadmapItem, error)
+	predicates     []predicate.RoadmapItem
+}
+
+var _ ent.Mutation = (*RoadmapItemMutation)(nil)
+
+// roadmapitemOption allows management of the mutation configuration using functional options.
+type roadmapitemOption func(*RoadmapItemMutation)
+
+// newRoadmapItemMutation creates new mutation for the RoadmapItem entity.
+func newRoadmapItemMutation(c config, op Op, opts ...roadmapitemOption) *RoadmapItemMutation {
+	m := &RoadmapItemMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeRoadmapItem,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withRoadmapItemID sets the ID field of the mutation.
+func withRoadmapItemID(id string) roadmapitemOption {
+	return func(m *RoadmapItemMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *RoadmapItem
+		)
+		m.oldValue = func(ctx context.Context) (*RoadmapItem, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().RoadmapItem.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withRoadmapItem sets the old RoadmapItem of the mutation.
+func withRoadmapItem(node *RoadmapItem) roadmapitemOption {
+	return func(m *RoadmapItemMutation) {
+		m.oldValue = func(context.Context) (*RoadmapItem, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m RoadmapItemMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m RoadmapItemMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of RoadmapItem entities.
+func (m *RoadmapItemMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *RoadmapItemMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *RoadmapItemMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().RoadmapItem.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetTitle sets the "title" field.
+func (m *RoadmapItemMutation) SetTitle(s string) {
+	m.title = &s
+}
+
+// Title returns the value of the "title" field in the mutation.
+func (m *RoadmapItemMutation) Title() (r string, exists bool) {
+	v := m.title
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTitle returns the old "title" field's value of the RoadmapItem entity.
+// If the RoadmapItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapItemMutation) OldTitle(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTitle is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTitle requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTitle: %w", err)
+	}
+	return oldValue.Title, nil
+}
+
+// ResetTitle resets all changes to the "title" field.
+func (m *RoadmapItemMutation) ResetTitle() {
+	m.title = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *RoadmapItemMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *RoadmapItemMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the RoadmapItem entity.
+// If the RoadmapItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapItemMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *RoadmapItemMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetPosition sets the "position" field.
+func (m *RoadmapItemMutation) SetPosition(i int) {
+	m.position = &i
+	m.addposition = nil
+}
+
+// Position returns the value of the "position" field in the mutation.
+func (m *RoadmapItemMutation) Position() (r int, exists bool) {
+	v := m.position
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPosition returns the old "position" field's value of the RoadmapItem entity.
+// If the RoadmapItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapItemMutation) OldPosition(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPosition is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPosition requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPosition: %w", err)
+	}
+	return oldValue.Position, nil
+}
+
+// AddPosition adds i to the "position" field.
+func (m *RoadmapItemMutation) AddPosition(i int) {
+	if m.addposition != nil {
+		*m.addposition += i
+	} else {
+		m.addposition = &i
+	}
+}
+
+// AddedPosition returns the value that was added to the "position" field in this mutation.
+func (m *RoadmapItemMutation) AddedPosition() (r int, exists bool) {
+	v := m.addposition
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPosition resets all changes to the "position" field.
+func (m *RoadmapItemMutation) ResetPosition() {
+	m.position = nil
+	m.addposition = nil
+}
+
+// SetProvenance sets the "provenance" field.
+func (m *RoadmapItemMutation) SetProvenance(s string) {
+	m.provenance = &s
+}
+
+// Provenance returns the value of the "provenance" field in the mutation.
+func (m *RoadmapItemMutation) Provenance() (r string, exists bool) {
+	v := m.provenance
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProvenance returns the old "provenance" field's value of the RoadmapItem entity.
+// If the RoadmapItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapItemMutation) OldProvenance(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProvenance is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProvenance requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProvenance: %w", err)
+	}
+	return oldValue.Provenance, nil
+}
+
+// ResetProvenance resets all changes to the "provenance" field.
+func (m *RoadmapItemMutation) ResetProvenance() {
+	m.provenance = nil
+}
+
+// SetBlockedReason sets the "blocked_reason" field.
+func (m *RoadmapItemMutation) SetBlockedReason(s string) {
+	m.blocked_reason = &s
+}
+
+// BlockedReason returns the value of the "blocked_reason" field in the mutation.
+func (m *RoadmapItemMutation) BlockedReason() (r string, exists bool) {
+	v := m.blocked_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBlockedReason returns the old "blocked_reason" field's value of the RoadmapItem entity.
+// If the RoadmapItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapItemMutation) OldBlockedReason(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBlockedReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBlockedReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBlockedReason: %w", err)
+	}
+	return oldValue.BlockedReason, nil
+}
+
+// ResetBlockedReason resets all changes to the "blocked_reason" field.
+func (m *RoadmapItemMutation) ResetBlockedReason() {
+	m.blocked_reason = nil
+}
+
+// SetTaskID sets the "task_id" field.
+func (m *RoadmapItemMutation) SetTaskID(s string) {
+	m.task_id = &s
+}
+
+// TaskID returns the value of the "task_id" field in the mutation.
+func (m *RoadmapItemMutation) TaskID() (r string, exists bool) {
+	v := m.task_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTaskID returns the old "task_id" field's value of the RoadmapItem entity.
+// If the RoadmapItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapItemMutation) OldTaskID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTaskID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTaskID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTaskID: %w", err)
+	}
+	return oldValue.TaskID, nil
+}
+
+// ClearTaskID clears the value of the "task_id" field.
+func (m *RoadmapItemMutation) ClearTaskID() {
+	m.task_id = nil
+	m.clearedFields[roadmapitem.FieldTaskID] = struct{}{}
+}
+
+// TaskIDCleared returns if the "task_id" field was cleared in this mutation.
+func (m *RoadmapItemMutation) TaskIDCleared() bool {
+	_, ok := m.clearedFields[roadmapitem.FieldTaskID]
+	return ok
+}
+
+// ResetTaskID resets all changes to the "task_id" field.
+func (m *RoadmapItemMutation) ResetTaskID() {
+	m.task_id = nil
+	delete(m.clearedFields, roadmapitem.FieldTaskID)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *RoadmapItemMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *RoadmapItemMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the RoadmapItem entity.
+// If the RoadmapItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapItemMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *RoadmapItemMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *RoadmapItemMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *RoadmapItemMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the RoadmapItem entity.
+// If the RoadmapItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapItemMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *RoadmapItemMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetPhaseID sets the "phase" edge to the RoadmapPhase entity by id.
+func (m *RoadmapItemMutation) SetPhaseID(id string) {
+	m.phase = &id
+}
+
+// ClearPhase clears the "phase" edge to the RoadmapPhase entity.
+func (m *RoadmapItemMutation) ClearPhase() {
+	m.clearedphase = true
+}
+
+// PhaseCleared reports if the "phase" edge to the RoadmapPhase entity was cleared.
+func (m *RoadmapItemMutation) PhaseCleared() bool {
+	return m.clearedphase
+}
+
+// PhaseID returns the "phase" edge ID in the mutation.
+func (m *RoadmapItemMutation) PhaseID() (id string, exists bool) {
+	if m.phase != nil {
+		return *m.phase, true
+	}
+	return
+}
+
+// PhaseIDs returns the "phase" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PhaseID instead. It exists only for internal usage by the builders.
+func (m *RoadmapItemMutation) PhaseIDs() (ids []string) {
+	if id := m.phase; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPhase resets all changes to the "phase" edge.
+func (m *RoadmapItemMutation) ResetPhase() {
+	m.phase = nil
+	m.clearedphase = false
+}
+
+// Where appends a list predicates to the RoadmapItemMutation builder.
+func (m *RoadmapItemMutation) Where(ps ...predicate.RoadmapItem) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the RoadmapItemMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *RoadmapItemMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.RoadmapItem, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *RoadmapItemMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *RoadmapItemMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (RoadmapItem).
+func (m *RoadmapItemMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *RoadmapItemMutation) Fields() []string {
+	fields := make([]string, 0, 8)
+	if m.title != nil {
+		fields = append(fields, roadmapitem.FieldTitle)
+	}
+	if m.status != nil {
+		fields = append(fields, roadmapitem.FieldStatus)
+	}
+	if m.position != nil {
+		fields = append(fields, roadmapitem.FieldPosition)
+	}
+	if m.provenance != nil {
+		fields = append(fields, roadmapitem.FieldProvenance)
+	}
+	if m.blocked_reason != nil {
+		fields = append(fields, roadmapitem.FieldBlockedReason)
+	}
+	if m.task_id != nil {
+		fields = append(fields, roadmapitem.FieldTaskID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, roadmapitem.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, roadmapitem.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *RoadmapItemMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case roadmapitem.FieldTitle:
+		return m.Title()
+	case roadmapitem.FieldStatus:
+		return m.Status()
+	case roadmapitem.FieldPosition:
+		return m.Position()
+	case roadmapitem.FieldProvenance:
+		return m.Provenance()
+	case roadmapitem.FieldBlockedReason:
+		return m.BlockedReason()
+	case roadmapitem.FieldTaskID:
+		return m.TaskID()
+	case roadmapitem.FieldCreatedAt:
+		return m.CreatedAt()
+	case roadmapitem.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *RoadmapItemMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case roadmapitem.FieldTitle:
+		return m.OldTitle(ctx)
+	case roadmapitem.FieldStatus:
+		return m.OldStatus(ctx)
+	case roadmapitem.FieldPosition:
+		return m.OldPosition(ctx)
+	case roadmapitem.FieldProvenance:
+		return m.OldProvenance(ctx)
+	case roadmapitem.FieldBlockedReason:
+		return m.OldBlockedReason(ctx)
+	case roadmapitem.FieldTaskID:
+		return m.OldTaskID(ctx)
+	case roadmapitem.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case roadmapitem.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown RoadmapItem field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *RoadmapItemMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case roadmapitem.FieldTitle:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTitle(v)
+		return nil
+	case roadmapitem.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case roadmapitem.FieldPosition:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPosition(v)
+		return nil
+	case roadmapitem.FieldProvenance:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProvenance(v)
+		return nil
+	case roadmapitem.FieldBlockedReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBlockedReason(v)
+		return nil
+	case roadmapitem.FieldTaskID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTaskID(v)
+		return nil
+	case roadmapitem.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case roadmapitem.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapItem field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *RoadmapItemMutation) AddedFields() []string {
+	var fields []string
+	if m.addposition != nil {
+		fields = append(fields, roadmapitem.FieldPosition)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *RoadmapItemMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case roadmapitem.FieldPosition:
+		return m.AddedPosition()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *RoadmapItemMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case roadmapitem.FieldPosition:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPosition(v)
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapItem numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *RoadmapItemMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(roadmapitem.FieldTaskID) {
+		fields = append(fields, roadmapitem.FieldTaskID)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *RoadmapItemMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *RoadmapItemMutation) ClearField(name string) error {
+	switch name {
+	case roadmapitem.FieldTaskID:
+		m.ClearTaskID()
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapItem nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *RoadmapItemMutation) ResetField(name string) error {
+	switch name {
+	case roadmapitem.FieldTitle:
+		m.ResetTitle()
+		return nil
+	case roadmapitem.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case roadmapitem.FieldPosition:
+		m.ResetPosition()
+		return nil
+	case roadmapitem.FieldProvenance:
+		m.ResetProvenance()
+		return nil
+	case roadmapitem.FieldBlockedReason:
+		m.ResetBlockedReason()
+		return nil
+	case roadmapitem.FieldTaskID:
+		m.ResetTaskID()
+		return nil
+	case roadmapitem.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case roadmapitem.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapItem field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *RoadmapItemMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.phase != nil {
+		edges = append(edges, roadmapitem.EdgePhase)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *RoadmapItemMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case roadmapitem.EdgePhase:
+		if id := m.phase; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *RoadmapItemMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *RoadmapItemMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *RoadmapItemMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedphase {
+		edges = append(edges, roadmapitem.EdgePhase)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *RoadmapItemMutation) EdgeCleared(name string) bool {
+	switch name {
+	case roadmapitem.EdgePhase:
+		return m.clearedphase
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *RoadmapItemMutation) ClearEdge(name string) error {
+	switch name {
+	case roadmapitem.EdgePhase:
+		m.ClearPhase()
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapItem unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *RoadmapItemMutation) ResetEdge(name string) error {
+	switch name {
+	case roadmapitem.EdgePhase:
+		m.ResetPhase()
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapItem edge %s", name)
+}
+
+// RoadmapPhaseMutation represents an operation that mutates the RoadmapPhase nodes in the graph.
+type RoadmapPhaseMutation struct {
+	config
+	op               Op
+	typ              string
+	id               *string
+	title            *string
+	description      *string
+	status           *string
+	position         *int
+	addposition      *int
+	is_current       *bool
+	provenance       *string
+	blocked_reason   *string
+	decisions        *string
+	depends_on       *[]string
+	appenddepends_on []string
+	created_at       *time.Time
+	updated_at       *time.Time
+	clearedFields    map[string]struct{}
+	project          *string
+	clearedproject   bool
+	items            map[string]struct{}
+	removeditems     map[string]struct{}
+	cleareditems     bool
+	done             bool
+	oldValue         func(context.Context) (*RoadmapPhase, error)
+	predicates       []predicate.RoadmapPhase
+}
+
+var _ ent.Mutation = (*RoadmapPhaseMutation)(nil)
+
+// roadmapphaseOption allows management of the mutation configuration using functional options.
+type roadmapphaseOption func(*RoadmapPhaseMutation)
+
+// newRoadmapPhaseMutation creates new mutation for the RoadmapPhase entity.
+func newRoadmapPhaseMutation(c config, op Op, opts ...roadmapphaseOption) *RoadmapPhaseMutation {
+	m := &RoadmapPhaseMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeRoadmapPhase,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withRoadmapPhaseID sets the ID field of the mutation.
+func withRoadmapPhaseID(id string) roadmapphaseOption {
+	return func(m *RoadmapPhaseMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *RoadmapPhase
+		)
+		m.oldValue = func(ctx context.Context) (*RoadmapPhase, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().RoadmapPhase.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withRoadmapPhase sets the old RoadmapPhase of the mutation.
+func withRoadmapPhase(node *RoadmapPhase) roadmapphaseOption {
+	return func(m *RoadmapPhaseMutation) {
+		m.oldValue = func(context.Context) (*RoadmapPhase, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m RoadmapPhaseMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m RoadmapPhaseMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of RoadmapPhase entities.
+func (m *RoadmapPhaseMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *RoadmapPhaseMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *RoadmapPhaseMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().RoadmapPhase.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetTitle sets the "title" field.
+func (m *RoadmapPhaseMutation) SetTitle(s string) {
+	m.title = &s
+}
+
+// Title returns the value of the "title" field in the mutation.
+func (m *RoadmapPhaseMutation) Title() (r string, exists bool) {
+	v := m.title
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTitle returns the old "title" field's value of the RoadmapPhase entity.
+// If the RoadmapPhase object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapPhaseMutation) OldTitle(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTitle is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTitle requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTitle: %w", err)
+	}
+	return oldValue.Title, nil
+}
+
+// ResetTitle resets all changes to the "title" field.
+func (m *RoadmapPhaseMutation) ResetTitle() {
+	m.title = nil
+}
+
+// SetDescription sets the "description" field.
+func (m *RoadmapPhaseMutation) SetDescription(s string) {
+	m.description = &s
+}
+
+// Description returns the value of the "description" field in the mutation.
+func (m *RoadmapPhaseMutation) Description() (r string, exists bool) {
+	v := m.description
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDescription returns the old "description" field's value of the RoadmapPhase entity.
+// If the RoadmapPhase object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapPhaseMutation) OldDescription(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDescription is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDescription requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDescription: %w", err)
+	}
+	return oldValue.Description, nil
+}
+
+// ResetDescription resets all changes to the "description" field.
+func (m *RoadmapPhaseMutation) ResetDescription() {
+	m.description = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *RoadmapPhaseMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *RoadmapPhaseMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the RoadmapPhase entity.
+// If the RoadmapPhase object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapPhaseMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *RoadmapPhaseMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetPosition sets the "position" field.
+func (m *RoadmapPhaseMutation) SetPosition(i int) {
+	m.position = &i
+	m.addposition = nil
+}
+
+// Position returns the value of the "position" field in the mutation.
+func (m *RoadmapPhaseMutation) Position() (r int, exists bool) {
+	v := m.position
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPosition returns the old "position" field's value of the RoadmapPhase entity.
+// If the RoadmapPhase object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapPhaseMutation) OldPosition(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPosition is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPosition requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPosition: %w", err)
+	}
+	return oldValue.Position, nil
+}
+
+// AddPosition adds i to the "position" field.
+func (m *RoadmapPhaseMutation) AddPosition(i int) {
+	if m.addposition != nil {
+		*m.addposition += i
+	} else {
+		m.addposition = &i
+	}
+}
+
+// AddedPosition returns the value that was added to the "position" field in this mutation.
+func (m *RoadmapPhaseMutation) AddedPosition() (r int, exists bool) {
+	v := m.addposition
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPosition resets all changes to the "position" field.
+func (m *RoadmapPhaseMutation) ResetPosition() {
+	m.position = nil
+	m.addposition = nil
+}
+
+// SetIsCurrent sets the "is_current" field.
+func (m *RoadmapPhaseMutation) SetIsCurrent(b bool) {
+	m.is_current = &b
+}
+
+// IsCurrent returns the value of the "is_current" field in the mutation.
+func (m *RoadmapPhaseMutation) IsCurrent() (r bool, exists bool) {
+	v := m.is_current
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIsCurrent returns the old "is_current" field's value of the RoadmapPhase entity.
+// If the RoadmapPhase object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapPhaseMutation) OldIsCurrent(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIsCurrent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIsCurrent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIsCurrent: %w", err)
+	}
+	return oldValue.IsCurrent, nil
+}
+
+// ResetIsCurrent resets all changes to the "is_current" field.
+func (m *RoadmapPhaseMutation) ResetIsCurrent() {
+	m.is_current = nil
+}
+
+// SetProvenance sets the "provenance" field.
+func (m *RoadmapPhaseMutation) SetProvenance(s string) {
+	m.provenance = &s
+}
+
+// Provenance returns the value of the "provenance" field in the mutation.
+func (m *RoadmapPhaseMutation) Provenance() (r string, exists bool) {
+	v := m.provenance
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProvenance returns the old "provenance" field's value of the RoadmapPhase entity.
+// If the RoadmapPhase object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapPhaseMutation) OldProvenance(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProvenance is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProvenance requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProvenance: %w", err)
+	}
+	return oldValue.Provenance, nil
+}
+
+// ResetProvenance resets all changes to the "provenance" field.
+func (m *RoadmapPhaseMutation) ResetProvenance() {
+	m.provenance = nil
+}
+
+// SetBlockedReason sets the "blocked_reason" field.
+func (m *RoadmapPhaseMutation) SetBlockedReason(s string) {
+	m.blocked_reason = &s
+}
+
+// BlockedReason returns the value of the "blocked_reason" field in the mutation.
+func (m *RoadmapPhaseMutation) BlockedReason() (r string, exists bool) {
+	v := m.blocked_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBlockedReason returns the old "blocked_reason" field's value of the RoadmapPhase entity.
+// If the RoadmapPhase object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapPhaseMutation) OldBlockedReason(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBlockedReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBlockedReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBlockedReason: %w", err)
+	}
+	return oldValue.BlockedReason, nil
+}
+
+// ResetBlockedReason resets all changes to the "blocked_reason" field.
+func (m *RoadmapPhaseMutation) ResetBlockedReason() {
+	m.blocked_reason = nil
+}
+
+// SetDecisions sets the "decisions" field.
+func (m *RoadmapPhaseMutation) SetDecisions(s string) {
+	m.decisions = &s
+}
+
+// Decisions returns the value of the "decisions" field in the mutation.
+func (m *RoadmapPhaseMutation) Decisions() (r string, exists bool) {
+	v := m.decisions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDecisions returns the old "decisions" field's value of the RoadmapPhase entity.
+// If the RoadmapPhase object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapPhaseMutation) OldDecisions(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDecisions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDecisions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDecisions: %w", err)
+	}
+	return oldValue.Decisions, nil
+}
+
+// ResetDecisions resets all changes to the "decisions" field.
+func (m *RoadmapPhaseMutation) ResetDecisions() {
+	m.decisions = nil
+}
+
+// SetDependsOn sets the "depends_on" field.
+func (m *RoadmapPhaseMutation) SetDependsOn(s []string) {
+	m.depends_on = &s
+	m.appenddepends_on = nil
+}
+
+// DependsOn returns the value of the "depends_on" field in the mutation.
+func (m *RoadmapPhaseMutation) DependsOn() (r []string, exists bool) {
+	v := m.depends_on
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDependsOn returns the old "depends_on" field's value of the RoadmapPhase entity.
+// If the RoadmapPhase object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapPhaseMutation) OldDependsOn(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDependsOn is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDependsOn requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDependsOn: %w", err)
+	}
+	return oldValue.DependsOn, nil
+}
+
+// AppendDependsOn adds s to the "depends_on" field.
+func (m *RoadmapPhaseMutation) AppendDependsOn(s []string) {
+	m.appenddepends_on = append(m.appenddepends_on, s...)
+}
+
+// AppendedDependsOn returns the list of values that were appended to the "depends_on" field in this mutation.
+func (m *RoadmapPhaseMutation) AppendedDependsOn() ([]string, bool) {
+	if len(m.appenddepends_on) == 0 {
+		return nil, false
+	}
+	return m.appenddepends_on, true
+}
+
+// ClearDependsOn clears the value of the "depends_on" field.
+func (m *RoadmapPhaseMutation) ClearDependsOn() {
+	m.depends_on = nil
+	m.appenddepends_on = nil
+	m.clearedFields[roadmapphase.FieldDependsOn] = struct{}{}
+}
+
+// DependsOnCleared returns if the "depends_on" field was cleared in this mutation.
+func (m *RoadmapPhaseMutation) DependsOnCleared() bool {
+	_, ok := m.clearedFields[roadmapphase.FieldDependsOn]
+	return ok
+}
+
+// ResetDependsOn resets all changes to the "depends_on" field.
+func (m *RoadmapPhaseMutation) ResetDependsOn() {
+	m.depends_on = nil
+	m.appenddepends_on = nil
+	delete(m.clearedFields, roadmapphase.FieldDependsOn)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *RoadmapPhaseMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *RoadmapPhaseMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the RoadmapPhase entity.
+// If the RoadmapPhase object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapPhaseMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *RoadmapPhaseMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *RoadmapPhaseMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *RoadmapPhaseMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the RoadmapPhase entity.
+// If the RoadmapPhase object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapPhaseMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *RoadmapPhaseMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetProjectID sets the "project" edge to the Project entity by id.
+func (m *RoadmapPhaseMutation) SetProjectID(id string) {
+	m.project = &id
+}
+
+// ClearProject clears the "project" edge to the Project entity.
+func (m *RoadmapPhaseMutation) ClearProject() {
+	m.clearedproject = true
+}
+
+// ProjectCleared reports if the "project" edge to the Project entity was cleared.
+func (m *RoadmapPhaseMutation) ProjectCleared() bool {
+	return m.clearedproject
+}
+
+// ProjectID returns the "project" edge ID in the mutation.
+func (m *RoadmapPhaseMutation) ProjectID() (id string, exists bool) {
+	if m.project != nil {
+		return *m.project, true
+	}
+	return
+}
+
+// ProjectIDs returns the "project" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ProjectID instead. It exists only for internal usage by the builders.
+func (m *RoadmapPhaseMutation) ProjectIDs() (ids []string) {
+	if id := m.project; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetProject resets all changes to the "project" edge.
+func (m *RoadmapPhaseMutation) ResetProject() {
+	m.project = nil
+	m.clearedproject = false
+}
+
+// AddItemIDs adds the "items" edge to the RoadmapItem entity by ids.
+func (m *RoadmapPhaseMutation) AddItemIDs(ids ...string) {
+	if m.items == nil {
+		m.items = make(map[string]struct{})
+	}
+	for i := range ids {
+		m.items[ids[i]] = struct{}{}
+	}
+}
+
+// ClearItems clears the "items" edge to the RoadmapItem entity.
+func (m *RoadmapPhaseMutation) ClearItems() {
+	m.cleareditems = true
+}
+
+// ItemsCleared reports if the "items" edge to the RoadmapItem entity was cleared.
+func (m *RoadmapPhaseMutation) ItemsCleared() bool {
+	return m.cleareditems
+}
+
+// RemoveItemIDs removes the "items" edge to the RoadmapItem entity by IDs.
+func (m *RoadmapPhaseMutation) RemoveItemIDs(ids ...string) {
+	if m.removeditems == nil {
+		m.removeditems = make(map[string]struct{})
+	}
+	for i := range ids {
+		delete(m.items, ids[i])
+		m.removeditems[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedItems returns the removed IDs of the "items" edge to the RoadmapItem entity.
+func (m *RoadmapPhaseMutation) RemovedItemsIDs() (ids []string) {
+	for id := range m.removeditems {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ItemsIDs returns the "items" edge IDs in the mutation.
+func (m *RoadmapPhaseMutation) ItemsIDs() (ids []string) {
+	for id := range m.items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetItems resets all changes to the "items" edge.
+func (m *RoadmapPhaseMutation) ResetItems() {
+	m.items = nil
+	m.cleareditems = false
+	m.removeditems = nil
+}
+
+// Where appends a list predicates to the RoadmapPhaseMutation builder.
+func (m *RoadmapPhaseMutation) Where(ps ...predicate.RoadmapPhase) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the RoadmapPhaseMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *RoadmapPhaseMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.RoadmapPhase, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *RoadmapPhaseMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *RoadmapPhaseMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (RoadmapPhase).
+func (m *RoadmapPhaseMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *RoadmapPhaseMutation) Fields() []string {
+	fields := make([]string, 0, 11)
+	if m.title != nil {
+		fields = append(fields, roadmapphase.FieldTitle)
+	}
+	if m.description != nil {
+		fields = append(fields, roadmapphase.FieldDescription)
+	}
+	if m.status != nil {
+		fields = append(fields, roadmapphase.FieldStatus)
+	}
+	if m.position != nil {
+		fields = append(fields, roadmapphase.FieldPosition)
+	}
+	if m.is_current != nil {
+		fields = append(fields, roadmapphase.FieldIsCurrent)
+	}
+	if m.provenance != nil {
+		fields = append(fields, roadmapphase.FieldProvenance)
+	}
+	if m.blocked_reason != nil {
+		fields = append(fields, roadmapphase.FieldBlockedReason)
+	}
+	if m.decisions != nil {
+		fields = append(fields, roadmapphase.FieldDecisions)
+	}
+	if m.depends_on != nil {
+		fields = append(fields, roadmapphase.FieldDependsOn)
+	}
+	if m.created_at != nil {
+		fields = append(fields, roadmapphase.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, roadmapphase.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *RoadmapPhaseMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case roadmapphase.FieldTitle:
+		return m.Title()
+	case roadmapphase.FieldDescription:
+		return m.Description()
+	case roadmapphase.FieldStatus:
+		return m.Status()
+	case roadmapphase.FieldPosition:
+		return m.Position()
+	case roadmapphase.FieldIsCurrent:
+		return m.IsCurrent()
+	case roadmapphase.FieldProvenance:
+		return m.Provenance()
+	case roadmapphase.FieldBlockedReason:
+		return m.BlockedReason()
+	case roadmapphase.FieldDecisions:
+		return m.Decisions()
+	case roadmapphase.FieldDependsOn:
+		return m.DependsOn()
+	case roadmapphase.FieldCreatedAt:
+		return m.CreatedAt()
+	case roadmapphase.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *RoadmapPhaseMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case roadmapphase.FieldTitle:
+		return m.OldTitle(ctx)
+	case roadmapphase.FieldDescription:
+		return m.OldDescription(ctx)
+	case roadmapphase.FieldStatus:
+		return m.OldStatus(ctx)
+	case roadmapphase.FieldPosition:
+		return m.OldPosition(ctx)
+	case roadmapphase.FieldIsCurrent:
+		return m.OldIsCurrent(ctx)
+	case roadmapphase.FieldProvenance:
+		return m.OldProvenance(ctx)
+	case roadmapphase.FieldBlockedReason:
+		return m.OldBlockedReason(ctx)
+	case roadmapphase.FieldDecisions:
+		return m.OldDecisions(ctx)
+	case roadmapphase.FieldDependsOn:
+		return m.OldDependsOn(ctx)
+	case roadmapphase.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case roadmapphase.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown RoadmapPhase field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *RoadmapPhaseMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case roadmapphase.FieldTitle:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTitle(v)
+		return nil
+	case roadmapphase.FieldDescription:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDescription(v)
+		return nil
+	case roadmapphase.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case roadmapphase.FieldPosition:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPosition(v)
+		return nil
+	case roadmapphase.FieldIsCurrent:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIsCurrent(v)
+		return nil
+	case roadmapphase.FieldProvenance:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProvenance(v)
+		return nil
+	case roadmapphase.FieldBlockedReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBlockedReason(v)
+		return nil
+	case roadmapphase.FieldDecisions:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDecisions(v)
+		return nil
+	case roadmapphase.FieldDependsOn:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDependsOn(v)
+		return nil
+	case roadmapphase.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case roadmapphase.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapPhase field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *RoadmapPhaseMutation) AddedFields() []string {
+	var fields []string
+	if m.addposition != nil {
+		fields = append(fields, roadmapphase.FieldPosition)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *RoadmapPhaseMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case roadmapphase.FieldPosition:
+		return m.AddedPosition()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *RoadmapPhaseMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case roadmapphase.FieldPosition:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPosition(v)
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapPhase numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *RoadmapPhaseMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(roadmapphase.FieldDependsOn) {
+		fields = append(fields, roadmapphase.FieldDependsOn)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *RoadmapPhaseMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *RoadmapPhaseMutation) ClearField(name string) error {
+	switch name {
+	case roadmapphase.FieldDependsOn:
+		m.ClearDependsOn()
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapPhase nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *RoadmapPhaseMutation) ResetField(name string) error {
+	switch name {
+	case roadmapphase.FieldTitle:
+		m.ResetTitle()
+		return nil
+	case roadmapphase.FieldDescription:
+		m.ResetDescription()
+		return nil
+	case roadmapphase.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case roadmapphase.FieldPosition:
+		m.ResetPosition()
+		return nil
+	case roadmapphase.FieldIsCurrent:
+		m.ResetIsCurrent()
+		return nil
+	case roadmapphase.FieldProvenance:
+		m.ResetProvenance()
+		return nil
+	case roadmapphase.FieldBlockedReason:
+		m.ResetBlockedReason()
+		return nil
+	case roadmapphase.FieldDecisions:
+		m.ResetDecisions()
+		return nil
+	case roadmapphase.FieldDependsOn:
+		m.ResetDependsOn()
+		return nil
+	case roadmapphase.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case roadmapphase.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapPhase field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *RoadmapPhaseMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.project != nil {
+		edges = append(edges, roadmapphase.EdgeProject)
+	}
+	if m.items != nil {
+		edges = append(edges, roadmapphase.EdgeItems)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *RoadmapPhaseMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case roadmapphase.EdgeProject:
+		if id := m.project; id != nil {
+			return []ent.Value{*id}
+		}
+	case roadmapphase.EdgeItems:
+		ids := make([]ent.Value, 0, len(m.items))
+		for id := range m.items {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *RoadmapPhaseMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.removeditems != nil {
+		edges = append(edges, roadmapphase.EdgeItems)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *RoadmapPhaseMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case roadmapphase.EdgeItems:
+		ids := make([]ent.Value, 0, len(m.removeditems))
+		for id := range m.removeditems {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *RoadmapPhaseMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedproject {
+		edges = append(edges, roadmapphase.EdgeProject)
+	}
+	if m.cleareditems {
+		edges = append(edges, roadmapphase.EdgeItems)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *RoadmapPhaseMutation) EdgeCleared(name string) bool {
+	switch name {
+	case roadmapphase.EdgeProject:
+		return m.clearedproject
+	case roadmapphase.EdgeItems:
+		return m.cleareditems
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *RoadmapPhaseMutation) ClearEdge(name string) error {
+	switch name {
+	case roadmapphase.EdgeProject:
+		m.ClearProject()
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapPhase unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *RoadmapPhaseMutation) ResetEdge(name string) error {
+	switch name {
+	case roadmapphase.EdgeProject:
+		m.ResetProject()
+		return nil
+	case roadmapphase.EdgeItems:
+		m.ResetItems()
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapPhase edge %s", name)
+}
+
+// RoadmapProposalMutation represents an operation that mutates the RoadmapProposal nodes in the graph.
+type RoadmapProposalMutation struct {
+	config
+	op               Op
+	typ              string
+	id               *string
+	status           *string
+	source           *string
+	agent_session_id *string
+	summary          *string
+	payload          *map[string]interface{}
+	created_at       *time.Time
+	decided_at       *time.Time
+	clearedFields    map[string]struct{}
+	project          *string
+	clearedproject   bool
+	done             bool
+	oldValue         func(context.Context) (*RoadmapProposal, error)
+	predicates       []predicate.RoadmapProposal
+}
+
+var _ ent.Mutation = (*RoadmapProposalMutation)(nil)
+
+// roadmapproposalOption allows management of the mutation configuration using functional options.
+type roadmapproposalOption func(*RoadmapProposalMutation)
+
+// newRoadmapProposalMutation creates new mutation for the RoadmapProposal entity.
+func newRoadmapProposalMutation(c config, op Op, opts ...roadmapproposalOption) *RoadmapProposalMutation {
+	m := &RoadmapProposalMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeRoadmapProposal,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withRoadmapProposalID sets the ID field of the mutation.
+func withRoadmapProposalID(id string) roadmapproposalOption {
+	return func(m *RoadmapProposalMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *RoadmapProposal
+		)
+		m.oldValue = func(ctx context.Context) (*RoadmapProposal, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().RoadmapProposal.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withRoadmapProposal sets the old RoadmapProposal of the mutation.
+func withRoadmapProposal(node *RoadmapProposal) roadmapproposalOption {
+	return func(m *RoadmapProposalMutation) {
+		m.oldValue = func(context.Context) (*RoadmapProposal, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m RoadmapProposalMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m RoadmapProposalMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of RoadmapProposal entities.
+func (m *RoadmapProposalMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *RoadmapProposalMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *RoadmapProposalMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().RoadmapProposal.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetStatus sets the "status" field.
+func (m *RoadmapProposalMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *RoadmapProposalMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the RoadmapProposal entity.
+// If the RoadmapProposal object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapProposalMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *RoadmapProposalMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetSource sets the "source" field.
+func (m *RoadmapProposalMutation) SetSource(s string) {
+	m.source = &s
+}
+
+// Source returns the value of the "source" field in the mutation.
+func (m *RoadmapProposalMutation) Source() (r string, exists bool) {
+	v := m.source
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSource returns the old "source" field's value of the RoadmapProposal entity.
+// If the RoadmapProposal object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapProposalMutation) OldSource(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSource is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSource requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSource: %w", err)
+	}
+	return oldValue.Source, nil
+}
+
+// ResetSource resets all changes to the "source" field.
+func (m *RoadmapProposalMutation) ResetSource() {
+	m.source = nil
+}
+
+// SetAgentSessionID sets the "agent_session_id" field.
+func (m *RoadmapProposalMutation) SetAgentSessionID(s string) {
+	m.agent_session_id = &s
+}
+
+// AgentSessionID returns the value of the "agent_session_id" field in the mutation.
+func (m *RoadmapProposalMutation) AgentSessionID() (r string, exists bool) {
+	v := m.agent_session_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAgentSessionID returns the old "agent_session_id" field's value of the RoadmapProposal entity.
+// If the RoadmapProposal object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapProposalMutation) OldAgentSessionID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAgentSessionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAgentSessionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAgentSessionID: %w", err)
+	}
+	return oldValue.AgentSessionID, nil
+}
+
+// ClearAgentSessionID clears the value of the "agent_session_id" field.
+func (m *RoadmapProposalMutation) ClearAgentSessionID() {
+	m.agent_session_id = nil
+	m.clearedFields[roadmapproposal.FieldAgentSessionID] = struct{}{}
+}
+
+// AgentSessionIDCleared returns if the "agent_session_id" field was cleared in this mutation.
+func (m *RoadmapProposalMutation) AgentSessionIDCleared() bool {
+	_, ok := m.clearedFields[roadmapproposal.FieldAgentSessionID]
+	return ok
+}
+
+// ResetAgentSessionID resets all changes to the "agent_session_id" field.
+func (m *RoadmapProposalMutation) ResetAgentSessionID() {
+	m.agent_session_id = nil
+	delete(m.clearedFields, roadmapproposal.FieldAgentSessionID)
+}
+
+// SetSummary sets the "summary" field.
+func (m *RoadmapProposalMutation) SetSummary(s string) {
+	m.summary = &s
+}
+
+// Summary returns the value of the "summary" field in the mutation.
+func (m *RoadmapProposalMutation) Summary() (r string, exists bool) {
+	v := m.summary
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSummary returns the old "summary" field's value of the RoadmapProposal entity.
+// If the RoadmapProposal object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapProposalMutation) OldSummary(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSummary is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSummary requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSummary: %w", err)
+	}
+	return oldValue.Summary, nil
+}
+
+// ResetSummary resets all changes to the "summary" field.
+func (m *RoadmapProposalMutation) ResetSummary() {
+	m.summary = nil
+}
+
+// SetPayload sets the "payload" field.
+func (m *RoadmapProposalMutation) SetPayload(value map[string]interface{}) {
+	m.payload = &value
+}
+
+// Payload returns the value of the "payload" field in the mutation.
+func (m *RoadmapProposalMutation) Payload() (r map[string]interface{}, exists bool) {
+	v := m.payload
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPayload returns the old "payload" field's value of the RoadmapProposal entity.
+// If the RoadmapProposal object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapProposalMutation) OldPayload(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPayload is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPayload requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPayload: %w", err)
+	}
+	return oldValue.Payload, nil
+}
+
+// ResetPayload resets all changes to the "payload" field.
+func (m *RoadmapProposalMutation) ResetPayload() {
+	m.payload = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *RoadmapProposalMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *RoadmapProposalMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the RoadmapProposal entity.
+// If the RoadmapProposal object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapProposalMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *RoadmapProposalMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetDecidedAt sets the "decided_at" field.
+func (m *RoadmapProposalMutation) SetDecidedAt(t time.Time) {
+	m.decided_at = &t
+}
+
+// DecidedAt returns the value of the "decided_at" field in the mutation.
+func (m *RoadmapProposalMutation) DecidedAt() (r time.Time, exists bool) {
+	v := m.decided_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDecidedAt returns the old "decided_at" field's value of the RoadmapProposal entity.
+// If the RoadmapProposal object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoadmapProposalMutation) OldDecidedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDecidedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDecidedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDecidedAt: %w", err)
+	}
+	return oldValue.DecidedAt, nil
+}
+
+// ClearDecidedAt clears the value of the "decided_at" field.
+func (m *RoadmapProposalMutation) ClearDecidedAt() {
+	m.decided_at = nil
+	m.clearedFields[roadmapproposal.FieldDecidedAt] = struct{}{}
+}
+
+// DecidedAtCleared returns if the "decided_at" field was cleared in this mutation.
+func (m *RoadmapProposalMutation) DecidedAtCleared() bool {
+	_, ok := m.clearedFields[roadmapproposal.FieldDecidedAt]
+	return ok
+}
+
+// ResetDecidedAt resets all changes to the "decided_at" field.
+func (m *RoadmapProposalMutation) ResetDecidedAt() {
+	m.decided_at = nil
+	delete(m.clearedFields, roadmapproposal.FieldDecidedAt)
+}
+
+// SetProjectID sets the "project" edge to the Project entity by id.
+func (m *RoadmapProposalMutation) SetProjectID(id string) {
+	m.project = &id
+}
+
+// ClearProject clears the "project" edge to the Project entity.
+func (m *RoadmapProposalMutation) ClearProject() {
+	m.clearedproject = true
+}
+
+// ProjectCleared reports if the "project" edge to the Project entity was cleared.
+func (m *RoadmapProposalMutation) ProjectCleared() bool {
+	return m.clearedproject
+}
+
+// ProjectID returns the "project" edge ID in the mutation.
+func (m *RoadmapProposalMutation) ProjectID() (id string, exists bool) {
+	if m.project != nil {
+		return *m.project, true
+	}
+	return
+}
+
+// ProjectIDs returns the "project" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ProjectID instead. It exists only for internal usage by the builders.
+func (m *RoadmapProposalMutation) ProjectIDs() (ids []string) {
+	if id := m.project; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetProject resets all changes to the "project" edge.
+func (m *RoadmapProposalMutation) ResetProject() {
+	m.project = nil
+	m.clearedproject = false
+}
+
+// Where appends a list predicates to the RoadmapProposalMutation builder.
+func (m *RoadmapProposalMutation) Where(ps ...predicate.RoadmapProposal) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the RoadmapProposalMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *RoadmapProposalMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.RoadmapProposal, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *RoadmapProposalMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *RoadmapProposalMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (RoadmapProposal).
+func (m *RoadmapProposalMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *RoadmapProposalMutation) Fields() []string {
+	fields := make([]string, 0, 7)
+	if m.status != nil {
+		fields = append(fields, roadmapproposal.FieldStatus)
+	}
+	if m.source != nil {
+		fields = append(fields, roadmapproposal.FieldSource)
+	}
+	if m.agent_session_id != nil {
+		fields = append(fields, roadmapproposal.FieldAgentSessionID)
+	}
+	if m.summary != nil {
+		fields = append(fields, roadmapproposal.FieldSummary)
+	}
+	if m.payload != nil {
+		fields = append(fields, roadmapproposal.FieldPayload)
+	}
+	if m.created_at != nil {
+		fields = append(fields, roadmapproposal.FieldCreatedAt)
+	}
+	if m.decided_at != nil {
+		fields = append(fields, roadmapproposal.FieldDecidedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *RoadmapProposalMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case roadmapproposal.FieldStatus:
+		return m.Status()
+	case roadmapproposal.FieldSource:
+		return m.Source()
+	case roadmapproposal.FieldAgentSessionID:
+		return m.AgentSessionID()
+	case roadmapproposal.FieldSummary:
+		return m.Summary()
+	case roadmapproposal.FieldPayload:
+		return m.Payload()
+	case roadmapproposal.FieldCreatedAt:
+		return m.CreatedAt()
+	case roadmapproposal.FieldDecidedAt:
+		return m.DecidedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *RoadmapProposalMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case roadmapproposal.FieldStatus:
+		return m.OldStatus(ctx)
+	case roadmapproposal.FieldSource:
+		return m.OldSource(ctx)
+	case roadmapproposal.FieldAgentSessionID:
+		return m.OldAgentSessionID(ctx)
+	case roadmapproposal.FieldSummary:
+		return m.OldSummary(ctx)
+	case roadmapproposal.FieldPayload:
+		return m.OldPayload(ctx)
+	case roadmapproposal.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case roadmapproposal.FieldDecidedAt:
+		return m.OldDecidedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown RoadmapProposal field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *RoadmapProposalMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case roadmapproposal.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case roadmapproposal.FieldSource:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSource(v)
+		return nil
+	case roadmapproposal.FieldAgentSessionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAgentSessionID(v)
+		return nil
+	case roadmapproposal.FieldSummary:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSummary(v)
+		return nil
+	case roadmapproposal.FieldPayload:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPayload(v)
+		return nil
+	case roadmapproposal.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case roadmapproposal.FieldDecidedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDecidedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapProposal field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *RoadmapProposalMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *RoadmapProposalMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *RoadmapProposalMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown RoadmapProposal numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *RoadmapProposalMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(roadmapproposal.FieldAgentSessionID) {
+		fields = append(fields, roadmapproposal.FieldAgentSessionID)
+	}
+	if m.FieldCleared(roadmapproposal.FieldDecidedAt) {
+		fields = append(fields, roadmapproposal.FieldDecidedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *RoadmapProposalMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *RoadmapProposalMutation) ClearField(name string) error {
+	switch name {
+	case roadmapproposal.FieldAgentSessionID:
+		m.ClearAgentSessionID()
+		return nil
+	case roadmapproposal.FieldDecidedAt:
+		m.ClearDecidedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapProposal nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *RoadmapProposalMutation) ResetField(name string) error {
+	switch name {
+	case roadmapproposal.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case roadmapproposal.FieldSource:
+		m.ResetSource()
+		return nil
+	case roadmapproposal.FieldAgentSessionID:
+		m.ResetAgentSessionID()
+		return nil
+	case roadmapproposal.FieldSummary:
+		m.ResetSummary()
+		return nil
+	case roadmapproposal.FieldPayload:
+		m.ResetPayload()
+		return nil
+	case roadmapproposal.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case roadmapproposal.FieldDecidedAt:
+		m.ResetDecidedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapProposal field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *RoadmapProposalMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.project != nil {
+		edges = append(edges, roadmapproposal.EdgeProject)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *RoadmapProposalMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case roadmapproposal.EdgeProject:
+		if id := m.project; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *RoadmapProposalMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *RoadmapProposalMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *RoadmapProposalMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedproject {
+		edges = append(edges, roadmapproposal.EdgeProject)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *RoadmapProposalMutation) EdgeCleared(name string) bool {
+	switch name {
+	case roadmapproposal.EdgeProject:
+		return m.clearedproject
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *RoadmapProposalMutation) ClearEdge(name string) error {
+	switch name {
+	case roadmapproposal.EdgeProject:
+		m.ClearProject()
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapProposal unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *RoadmapProposalMutation) ResetEdge(name string) error {
+	switch name {
+	case roadmapproposal.EdgeProject:
+		m.ResetProject()
+		return nil
+	}
+	return fmt.Errorf("unknown RoadmapProposal edge %s", name)
 }
 
 // ScratchpadMutation represents an operation that mutates the Scratchpad nodes in the graph.

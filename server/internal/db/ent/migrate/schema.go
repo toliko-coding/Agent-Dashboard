@@ -592,6 +592,7 @@ var (
 		{Name: "color", Type: field.TypeString, Nullable: true},
 		{Name: "default_spawner_id", Type: field.TypeString, Nullable: true},
 		{Name: "setup_command", Type: field.TypeString, Nullable: true},
+		{Name: "objective", Type: field.TypeString, Nullable: true, Size: 1000},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 	}
@@ -748,6 +749,89 @@ var (
 				Name:    "resource_kind_state",
 				Unique:  false,
 				Columns: []*schema.Column{ResourcesColumns[3], ResourcesColumns[9]},
+			},
+		},
+	}
+	// RoadmapItemsColumns holds the columns for the "roadmap_items" table.
+	RoadmapItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "title", Type: field.TypeString, Size: 200},
+		{Name: "status", Type: field.TypeString, Default: "planned"},
+		{Name: "position", Type: field.TypeInt, Default: 0},
+		{Name: "provenance", Type: field.TypeString, Default: "user"},
+		{Name: "blocked_reason", Type: field.TypeString, Size: 500, Default: ""},
+		{Name: "task_id", Type: field.TypeString, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "roadmap_phase_items", Type: field.TypeString},
+	}
+	// RoadmapItemsTable holds the schema information for the "roadmap_items" table.
+	RoadmapItemsTable = &schema.Table{
+		Name:       "roadmap_items",
+		Columns:    RoadmapItemsColumns,
+		PrimaryKey: []*schema.Column{RoadmapItemsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "roadmap_items_roadmap_phases_items",
+				Columns:    []*schema.Column{RoadmapItemsColumns[9]},
+				RefColumns: []*schema.Column{RoadmapPhasesColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+	}
+	// RoadmapPhasesColumns holds the columns for the "roadmap_phases" table.
+	RoadmapPhasesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "title", Type: field.TypeString, Size: 120},
+		{Name: "description", Type: field.TypeString, Size: 2000, Default: ""},
+		{Name: "status", Type: field.TypeString, Default: "planned"},
+		{Name: "position", Type: field.TypeInt, Default: 0},
+		{Name: "is_current", Type: field.TypeBool, Default: false},
+		{Name: "provenance", Type: field.TypeString, Default: "user"},
+		{Name: "blocked_reason", Type: field.TypeString, Size: 500, Default: ""},
+		{Name: "decisions", Type: field.TypeString, Size: 4000, Default: ""},
+		{Name: "depends_on", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "project_roadmap_phases", Type: field.TypeString},
+	}
+	// RoadmapPhasesTable holds the schema information for the "roadmap_phases" table.
+	RoadmapPhasesTable = &schema.Table{
+		Name:       "roadmap_phases",
+		Columns:    RoadmapPhasesColumns,
+		PrimaryKey: []*schema.Column{RoadmapPhasesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "roadmap_phases_projects_roadmap_phases",
+				Columns:    []*schema.Column{RoadmapPhasesColumns[12]},
+				RefColumns: []*schema.Column{ProjectsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+	}
+	// RoadmapProposalsColumns holds the columns for the "roadmap_proposals" table.
+	RoadmapProposalsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "status", Type: field.TypeString, Default: "pending"},
+		{Name: "source", Type: field.TypeString, Default: "agent"},
+		{Name: "agent_session_id", Type: field.TypeString, Nullable: true},
+		{Name: "summary", Type: field.TypeString, Size: 2000, Default: ""},
+		{Name: "payload", Type: field.TypeJSON},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "decided_at", Type: field.TypeTime, Nullable: true},
+		{Name: "project_roadmap_proposals", Type: field.TypeString},
+	}
+	// RoadmapProposalsTable holds the schema information for the "roadmap_proposals" table.
+	RoadmapProposalsTable = &schema.Table{
+		Name:       "roadmap_proposals",
+		Columns:    RoadmapProposalsColumns,
+		PrimaryKey: []*schema.Column{RoadmapProposalsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "roadmap_proposals_projects_roadmap_proposals",
+				Columns:    []*schema.Column{RoadmapProposalsColumns[8]},
+				RefColumns: []*schema.Column{ProjectsColumns[0]},
+				OnDelete:   schema.Cascade,
 			},
 		},
 	}
@@ -1153,6 +1237,9 @@ var (
 		RefinementTurnsTable,
 		RemoteRegistrationsTable,
 		ResourcesTable,
+		RoadmapItemsTable,
+		RoadmapPhasesTable,
+		RoadmapProposalsTable,
 		ScratchpadsTable,
 		SkillsTable,
 		SpawnersTable,
@@ -1169,6 +1256,9 @@ var (
 func init() {
 	PermissionRequestsTable.ForeignKeys[0].RefTable = StageRunsTable
 	ProjectFoldersTable.ForeignKeys[0].RefTable = ProjectsTable
+	RoadmapItemsTable.ForeignKeys[0].RefTable = RoadmapPhasesTable
+	RoadmapPhasesTable.ForeignKeys[0].RefTable = ProjectsTable
+	RoadmapProposalsTable.ForeignKeys[0].RefTable = ProjectsTable
 	StageRunsTable.ForeignKeys[0].RefTable = TasksTable
 	TaskDependenciesTable.ForeignKeys[0].RefTable = TasksTable
 	TaskDependenciesTable.ForeignKeys[1].RefTable = TasksTable

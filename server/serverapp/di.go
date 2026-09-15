@@ -82,6 +82,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/providersettings"
 	"github.com/lx-wnk/agent-dashboard/server/internal/refine"
 	"github.com/lx-wnk/agent-dashboard/server/internal/restart"
+	"github.com/lx-wnk/agent-dashboard/server/internal/roadmap"
 	"github.com/lx-wnk/agent-dashboard/server/internal/scanner"
 	"github.com/lx-wnk/agent-dashboard/server/internal/scheduler"
 	"github.com/lx-wnk/agent-dashboard/server/internal/secretbox"
@@ -529,12 +530,15 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 	var projectFolderRepo repo.ProjectFolderRepo
 	var agentProfiles *agentprofile.Store
 	var managedAgents *managedagent.Store
+	var roadmapSvc *roadmap.Service
 	var spawnerRepo repo.SpawnerRepo
 	var spawnerResolver services.SpawnerResolver
 	if entClient != nil {
 		taskRepoForResolver = repo.NewTaskRepo(entClient)
 		projectRepo = repo.NewProjectRepo(entClient)
 		projectFolderRepo = repo.NewProjectFolderRepo(entClient)
+		// Project Intelligence roadmaps and agent proposals (Phase 4B).
+		roadmapSvc = roadmap.New(entClient)
 		// Display names and icon categories given at spawn, by session id (3N.1).
 		agentProfiles = agentprofile.New(repo.NewAgentProfileRepo(entClient))
 		if err := agentProfiles.Load(ctx); err != nil {
@@ -989,6 +993,7 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 		ProjectFolderRepo:      projectFolderRepo,
 		AgentProfiles:          agentProfiles,
 		ManagedAgents:          managedAgents,
+		Roadmap:                roadmapSvc,
 		SpawnerRepo:            spawnerRepo,
 		SpawnerBroadcaster:     spawnerBroadcaster,
 		ProjectBroadcaster:     projectBroadcaster,

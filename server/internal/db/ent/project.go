@@ -29,6 +29,8 @@ type Project struct {
 	DefaultSpawnerID *string `json:"default_spawner_id,omitempty"`
 	// SetupCommand holds the value of the "setup_command" field.
 	SetupCommand *string `json:"setup_command,omitempty"`
+	// Objective holds the value of the "objective" field.
+	Objective *string `json:"objective,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -43,9 +45,13 @@ type Project struct {
 type ProjectEdges struct {
 	// Folders holds the value of the folders edge.
 	Folders []*ProjectFolder `json:"folders,omitempty"`
+	// RoadmapPhases holds the value of the roadmap_phases edge.
+	RoadmapPhases []*RoadmapPhase `json:"roadmap_phases,omitempty"`
+	// RoadmapProposals holds the value of the roadmap_proposals edge.
+	RoadmapProposals []*RoadmapProposal `json:"roadmap_proposals,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [3]bool
 }
 
 // FoldersOrErr returns the Folders value or an error if the edge
@@ -57,12 +63,30 @@ func (e ProjectEdges) FoldersOrErr() ([]*ProjectFolder, error) {
 	return nil, &NotLoadedError{edge: "folders"}
 }
 
+// RoadmapPhasesOrErr returns the RoadmapPhases value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProjectEdges) RoadmapPhasesOrErr() ([]*RoadmapPhase, error) {
+	if e.loadedTypes[1] {
+		return e.RoadmapPhases, nil
+	}
+	return nil, &NotLoadedError{edge: "roadmap_phases"}
+}
+
+// RoadmapProposalsOrErr returns the RoadmapProposals value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProjectEdges) RoadmapProposalsOrErr() ([]*RoadmapProposal, error) {
+	if e.loadedTypes[2] {
+		return e.RoadmapProposals, nil
+	}
+	return nil, &NotLoadedError{edge: "roadmap_proposals"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*Project) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case project.FieldID, project.FieldSlug, project.FieldName, project.FieldDescription, project.FieldColor, project.FieldDefaultSpawnerID, project.FieldSetupCommand:
+		case project.FieldID, project.FieldSlug, project.FieldName, project.FieldDescription, project.FieldColor, project.FieldDefaultSpawnerID, project.FieldSetupCommand, project.FieldObjective:
 			values[i] = new(sql.NullString)
 		case project.FieldCreatedAt, project.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -127,6 +151,13 @@ func (_m *Project) assignValues(columns []string, values []any) error {
 				_m.SetupCommand = new(string)
 				*_m.SetupCommand = value.String
 			}
+		case project.FieldObjective:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field objective", values[i])
+			} else if value.Valid {
+				_m.Objective = new(string)
+				*_m.Objective = value.String
+			}
 		case project.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -155,6 +186,16 @@ func (_m *Project) Value(name string) (ent.Value, error) {
 // QueryFolders queries the "folders" edge of the Project entity.
 func (_m *Project) QueryFolders() *ProjectFolderQuery {
 	return NewProjectClient(_m.config).QueryFolders(_m)
+}
+
+// QueryRoadmapPhases queries the "roadmap_phases" edge of the Project entity.
+func (_m *Project) QueryRoadmapPhases() *RoadmapPhaseQuery {
+	return NewProjectClient(_m.config).QueryRoadmapPhases(_m)
+}
+
+// QueryRoadmapProposals queries the "roadmap_proposals" edge of the Project entity.
+func (_m *Project) QueryRoadmapProposals() *RoadmapProposalQuery {
+	return NewProjectClient(_m.config).QueryRoadmapProposals(_m)
 }
 
 // Update returns a builder for updating this Project.
@@ -203,6 +244,11 @@ func (_m *Project) String() string {
 	builder.WriteString(", ")
 	if v := _m.SetupCommand; v != nil {
 		builder.WriteString("setup_command=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.Objective; v != nil {
+		builder.WriteString("objective=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

@@ -95,6 +95,11 @@ func SetupCommand(v string) predicate.Project {
 	return predicate.Project(sql.FieldEQ(FieldSetupCommand, v))
 }
 
+// Objective applies equality check predicate on the "objective" field. It's identical to ObjectiveEQ.
+func Objective(v string) predicate.Project {
+	return predicate.Project(sql.FieldEQ(FieldObjective, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.Project {
 	return predicate.Project(sql.FieldEQ(FieldCreatedAt, v))
@@ -535,6 +540,81 @@ func SetupCommandContainsFold(v string) predicate.Project {
 	return predicate.Project(sql.FieldContainsFold(FieldSetupCommand, v))
 }
 
+// ObjectiveEQ applies the EQ predicate on the "objective" field.
+func ObjectiveEQ(v string) predicate.Project {
+	return predicate.Project(sql.FieldEQ(FieldObjective, v))
+}
+
+// ObjectiveNEQ applies the NEQ predicate on the "objective" field.
+func ObjectiveNEQ(v string) predicate.Project {
+	return predicate.Project(sql.FieldNEQ(FieldObjective, v))
+}
+
+// ObjectiveIn applies the In predicate on the "objective" field.
+func ObjectiveIn(vs ...string) predicate.Project {
+	return predicate.Project(sql.FieldIn(FieldObjective, vs...))
+}
+
+// ObjectiveNotIn applies the NotIn predicate on the "objective" field.
+func ObjectiveNotIn(vs ...string) predicate.Project {
+	return predicate.Project(sql.FieldNotIn(FieldObjective, vs...))
+}
+
+// ObjectiveGT applies the GT predicate on the "objective" field.
+func ObjectiveGT(v string) predicate.Project {
+	return predicate.Project(sql.FieldGT(FieldObjective, v))
+}
+
+// ObjectiveGTE applies the GTE predicate on the "objective" field.
+func ObjectiveGTE(v string) predicate.Project {
+	return predicate.Project(sql.FieldGTE(FieldObjective, v))
+}
+
+// ObjectiveLT applies the LT predicate on the "objective" field.
+func ObjectiveLT(v string) predicate.Project {
+	return predicate.Project(sql.FieldLT(FieldObjective, v))
+}
+
+// ObjectiveLTE applies the LTE predicate on the "objective" field.
+func ObjectiveLTE(v string) predicate.Project {
+	return predicate.Project(sql.FieldLTE(FieldObjective, v))
+}
+
+// ObjectiveContains applies the Contains predicate on the "objective" field.
+func ObjectiveContains(v string) predicate.Project {
+	return predicate.Project(sql.FieldContains(FieldObjective, v))
+}
+
+// ObjectiveHasPrefix applies the HasPrefix predicate on the "objective" field.
+func ObjectiveHasPrefix(v string) predicate.Project {
+	return predicate.Project(sql.FieldHasPrefix(FieldObjective, v))
+}
+
+// ObjectiveHasSuffix applies the HasSuffix predicate on the "objective" field.
+func ObjectiveHasSuffix(v string) predicate.Project {
+	return predicate.Project(sql.FieldHasSuffix(FieldObjective, v))
+}
+
+// ObjectiveIsNil applies the IsNil predicate on the "objective" field.
+func ObjectiveIsNil() predicate.Project {
+	return predicate.Project(sql.FieldIsNull(FieldObjective))
+}
+
+// ObjectiveNotNil applies the NotNil predicate on the "objective" field.
+func ObjectiveNotNil() predicate.Project {
+	return predicate.Project(sql.FieldNotNull(FieldObjective))
+}
+
+// ObjectiveEqualFold applies the EqualFold predicate on the "objective" field.
+func ObjectiveEqualFold(v string) predicate.Project {
+	return predicate.Project(sql.FieldEqualFold(FieldObjective, v))
+}
+
+// ObjectiveContainsFold applies the ContainsFold predicate on the "objective" field.
+func ObjectiveContainsFold(v string) predicate.Project {
+	return predicate.Project(sql.FieldContainsFold(FieldObjective, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.Project {
 	return predicate.Project(sql.FieldEQ(FieldCreatedAt, v))
@@ -630,6 +710,52 @@ func HasFolders() predicate.Project {
 func HasFoldersWith(preds ...predicate.ProjectFolder) predicate.Project {
 	return predicate.Project(func(s *sql.Selector) {
 		step := newFoldersStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasRoadmapPhases applies the HasEdge predicate on the "roadmap_phases" edge.
+func HasRoadmapPhases() predicate.Project {
+	return predicate.Project(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, RoadmapPhasesTable, RoadmapPhasesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasRoadmapPhasesWith applies the HasEdge predicate on the "roadmap_phases" edge with a given conditions (other predicates).
+func HasRoadmapPhasesWith(preds ...predicate.RoadmapPhase) predicate.Project {
+	return predicate.Project(func(s *sql.Selector) {
+		step := newRoadmapPhasesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasRoadmapProposals applies the HasEdge predicate on the "roadmap_proposals" edge.
+func HasRoadmapProposals() predicate.Project {
+	return predicate.Project(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, RoadmapProposalsTable, RoadmapProposalsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasRoadmapProposalsWith applies the HasEdge predicate on the "roadmap_proposals" edge with a given conditions (other predicates).
+func HasRoadmapProposalsWith(preds ...predicate.RoadmapProposal) predicate.Project {
+	return predicate.Project(func(s *sql.Selector) {
+		step := newRoadmapProposalsStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

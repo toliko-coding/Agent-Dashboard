@@ -1295,3 +1295,18 @@ func spawnerArgsControlPermissionMode(args []string) bool {
 	}
 	return false
 }
+
+// SpawnFromServer starts an agent for a server feature (Project Intelligence
+// analysis) with the same rate limit, spawn policy and ownership record as
+// POST /api/agents/spawn. The body is the server's, never the client's.
+func (h *SpawnHandler) SpawnFromServer(r *http.Request, body map[string]any) (int, error) {
+	sub := requestSub(r)
+	if !h.manager.IsSpawnAllowed(sub) {
+		return 0, errors.New("too many spawn requests; try again shortly")
+	}
+	out, err := h.manager.SpawnWithOutcome(sub, body)
+	if err != nil {
+		return 0, err
+	}
+	return out.PID, nil
+}

@@ -15,16 +15,20 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/predicate"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/project"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/projectfolder"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapphase"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapproposal"
 )
 
 // ProjectQuery is the builder for querying Project entities.
 type ProjectQuery struct {
 	config
-	ctx         *QueryContext
-	order       []project.OrderOption
-	inters      []Interceptor
-	predicates  []predicate.Project
-	withFolders *ProjectFolderQuery
+	ctx                  *QueryContext
+	order                []project.OrderOption
+	inters               []Interceptor
+	predicates           []predicate.Project
+	withFolders          *ProjectFolderQuery
+	withRoadmapPhases    *RoadmapPhaseQuery
+	withRoadmapProposals *RoadmapProposalQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -76,6 +80,50 @@ func (_q *ProjectQuery) QueryFolders() *ProjectFolderQuery {
 			sqlgraph.From(project.Table, project.FieldID, selector),
 			sqlgraph.To(projectfolder.Table, projectfolder.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, project.FoldersTable, project.FoldersColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryRoadmapPhases chains the current query on the "roadmap_phases" edge.
+func (_q *ProjectQuery) QueryRoadmapPhases() *RoadmapPhaseQuery {
+	query := (&RoadmapPhaseClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(project.Table, project.FieldID, selector),
+			sqlgraph.To(roadmapphase.Table, roadmapphase.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, project.RoadmapPhasesTable, project.RoadmapPhasesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryRoadmapProposals chains the current query on the "roadmap_proposals" edge.
+func (_q *ProjectQuery) QueryRoadmapProposals() *RoadmapProposalQuery {
+	query := (&RoadmapProposalClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(project.Table, project.FieldID, selector),
+			sqlgraph.To(roadmapproposal.Table, roadmapproposal.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, project.RoadmapProposalsTable, project.RoadmapProposalsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -270,12 +318,14 @@ func (_q *ProjectQuery) Clone() *ProjectQuery {
 		return nil
 	}
 	return &ProjectQuery{
-		config:      _q.config,
-		ctx:         _q.ctx.Clone(),
-		order:       append([]project.OrderOption{}, _q.order...),
-		inters:      append([]Interceptor{}, _q.inters...),
-		predicates:  append([]predicate.Project{}, _q.predicates...),
-		withFolders: _q.withFolders.Clone(),
+		config:               _q.config,
+		ctx:                  _q.ctx.Clone(),
+		order:                append([]project.OrderOption{}, _q.order...),
+		inters:               append([]Interceptor{}, _q.inters...),
+		predicates:           append([]predicate.Project{}, _q.predicates...),
+		withFolders:          _q.withFolders.Clone(),
+		withRoadmapPhases:    _q.withRoadmapPhases.Clone(),
+		withRoadmapProposals: _q.withRoadmapProposals.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -290,6 +340,28 @@ func (_q *ProjectQuery) WithFolders(opts ...func(*ProjectFolderQuery)) *ProjectQ
 		opt(query)
 	}
 	_q.withFolders = query
+	return _q
+}
+
+// WithRoadmapPhases tells the query-builder to eager-load the nodes that are connected to
+// the "roadmap_phases" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProjectQuery) WithRoadmapPhases(opts ...func(*RoadmapPhaseQuery)) *ProjectQuery {
+	query := (&RoadmapPhaseClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withRoadmapPhases = query
+	return _q
+}
+
+// WithRoadmapProposals tells the query-builder to eager-load the nodes that are connected to
+// the "roadmap_proposals" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProjectQuery) WithRoadmapProposals(opts ...func(*RoadmapProposalQuery)) *ProjectQuery {
+	query := (&RoadmapProposalClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withRoadmapProposals = query
 	return _q
 }
 
@@ -371,8 +443,10 @@ func (_q *ProjectQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Proj
 	var (
 		nodes       = []*Project{}
 		_spec       = _q.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [3]bool{
 			_q.withFolders != nil,
+			_q.withRoadmapPhases != nil,
+			_q.withRoadmapProposals != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -397,6 +471,20 @@ func (_q *ProjectQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Proj
 		if err := _q.loadFolders(ctx, query, nodes,
 			func(n *Project) { n.Edges.Folders = []*ProjectFolder{} },
 			func(n *Project, e *ProjectFolder) { n.Edges.Folders = append(n.Edges.Folders, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withRoadmapPhases; query != nil {
+		if err := _q.loadRoadmapPhases(ctx, query, nodes,
+			func(n *Project) { n.Edges.RoadmapPhases = []*RoadmapPhase{} },
+			func(n *Project, e *RoadmapPhase) { n.Edges.RoadmapPhases = append(n.Edges.RoadmapPhases, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withRoadmapProposals; query != nil {
+		if err := _q.loadRoadmapProposals(ctx, query, nodes,
+			func(n *Project) { n.Edges.RoadmapProposals = []*RoadmapProposal{} },
+			func(n *Project, e *RoadmapProposal) { n.Edges.RoadmapProposals = append(n.Edges.RoadmapProposals, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -429,6 +517,68 @@ func (_q *ProjectQuery) loadFolders(ctx context.Context, query *ProjectFolderQue
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "project_folders" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProjectQuery) loadRoadmapPhases(ctx context.Context, query *RoadmapPhaseQuery, nodes []*Project, init func(*Project), assign func(*Project, *RoadmapPhase)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[string]*Project)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.RoadmapPhase(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(project.RoadmapPhasesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.project_roadmap_phases
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "project_roadmap_phases" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "project_roadmap_phases" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProjectQuery) loadRoadmapProposals(ctx context.Context, query *RoadmapProposalQuery, nodes []*Project, init func(*Project), assign func(*Project, *RoadmapProposal)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[string]*Project)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.RoadmapProposal(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(project.RoadmapProposalsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.project_roadmap_proposals
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "project_roadmap_proposals" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "project_roadmap_proposals" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

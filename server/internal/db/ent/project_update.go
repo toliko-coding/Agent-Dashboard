@@ -14,6 +14,8 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/predicate"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/project"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/projectfolder"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapphase"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapproposal"
 )
 
 // ProjectUpdate is the builder for updating Project entities.
@@ -137,6 +139,26 @@ func (_u *ProjectUpdate) ClearSetupCommand() *ProjectUpdate {
 	return _u
 }
 
+// SetObjective sets the "objective" field.
+func (_u *ProjectUpdate) SetObjective(v string) *ProjectUpdate {
+	_u.mutation.SetObjective(v)
+	return _u
+}
+
+// SetNillableObjective sets the "objective" field if the given value is not nil.
+func (_u *ProjectUpdate) SetNillableObjective(v *string) *ProjectUpdate {
+	if v != nil {
+		_u.SetObjective(*v)
+	}
+	return _u
+}
+
+// ClearObjective clears the value of the "objective" field.
+func (_u *ProjectUpdate) ClearObjective() *ProjectUpdate {
+	_u.mutation.ClearObjective()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *ProjectUpdate) SetUpdatedAt(v time.Time) *ProjectUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -156,6 +178,36 @@ func (_u *ProjectUpdate) AddFolders(v ...*ProjectFolder) *ProjectUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.AddFolderIDs(ids...)
+}
+
+// AddRoadmapPhaseIDs adds the "roadmap_phases" edge to the RoadmapPhase entity by IDs.
+func (_u *ProjectUpdate) AddRoadmapPhaseIDs(ids ...string) *ProjectUpdate {
+	_u.mutation.AddRoadmapPhaseIDs(ids...)
+	return _u
+}
+
+// AddRoadmapPhases adds the "roadmap_phases" edges to the RoadmapPhase entity.
+func (_u *ProjectUpdate) AddRoadmapPhases(v ...*RoadmapPhase) *ProjectUpdate {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddRoadmapPhaseIDs(ids...)
+}
+
+// AddRoadmapProposalIDs adds the "roadmap_proposals" edge to the RoadmapProposal entity by IDs.
+func (_u *ProjectUpdate) AddRoadmapProposalIDs(ids ...string) *ProjectUpdate {
+	_u.mutation.AddRoadmapProposalIDs(ids...)
+	return _u
+}
+
+// AddRoadmapProposals adds the "roadmap_proposals" edges to the RoadmapProposal entity.
+func (_u *ProjectUpdate) AddRoadmapProposals(v ...*RoadmapProposal) *ProjectUpdate {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddRoadmapProposalIDs(ids...)
 }
 
 // Mutation returns the ProjectMutation object of the builder.
@@ -182,6 +234,48 @@ func (_u *ProjectUpdate) RemoveFolders(v ...*ProjectFolder) *ProjectUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveFolderIDs(ids...)
+}
+
+// ClearRoadmapPhases clears all "roadmap_phases" edges to the RoadmapPhase entity.
+func (_u *ProjectUpdate) ClearRoadmapPhases() *ProjectUpdate {
+	_u.mutation.ClearRoadmapPhases()
+	return _u
+}
+
+// RemoveRoadmapPhaseIDs removes the "roadmap_phases" edge to RoadmapPhase entities by IDs.
+func (_u *ProjectUpdate) RemoveRoadmapPhaseIDs(ids ...string) *ProjectUpdate {
+	_u.mutation.RemoveRoadmapPhaseIDs(ids...)
+	return _u
+}
+
+// RemoveRoadmapPhases removes "roadmap_phases" edges to RoadmapPhase entities.
+func (_u *ProjectUpdate) RemoveRoadmapPhases(v ...*RoadmapPhase) *ProjectUpdate {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveRoadmapPhaseIDs(ids...)
+}
+
+// ClearRoadmapProposals clears all "roadmap_proposals" edges to the RoadmapProposal entity.
+func (_u *ProjectUpdate) ClearRoadmapProposals() *ProjectUpdate {
+	_u.mutation.ClearRoadmapProposals()
+	return _u
+}
+
+// RemoveRoadmapProposalIDs removes the "roadmap_proposals" edge to RoadmapProposal entities by IDs.
+func (_u *ProjectUpdate) RemoveRoadmapProposalIDs(ids ...string) *ProjectUpdate {
+	_u.mutation.RemoveRoadmapProposalIDs(ids...)
+	return _u
+}
+
+// RemoveRoadmapProposals removes "roadmap_proposals" edges to RoadmapProposal entities.
+func (_u *ProjectUpdate) RemoveRoadmapProposals(v ...*RoadmapProposal) *ProjectUpdate {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveRoadmapProposalIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -220,7 +314,20 @@ func (_u *ProjectUpdate) defaults() {
 	}
 }
 
+// check runs all checks and user-defined validators on the builder.
+func (_u *ProjectUpdate) check() error {
+	if v, ok := _u.mutation.Objective(); ok {
+		if err := project.ObjectiveValidator(v); err != nil {
+			return &ValidationError{Name: "objective", err: fmt.Errorf(`ent: validator failed for field "Project.objective": %w`, err)}
+		}
+	}
+	return nil
+}
+
 func (_u *ProjectUpdate) sqlSave(ctx context.Context) (_node int, err error) {
+	if err := _u.check(); err != nil {
+		return _node, err
+	}
 	_spec := sqlgraph.NewUpdateSpec(project.Table, project.Columns, sqlgraph.NewFieldSpec(project.FieldID, field.TypeString))
 	if ps := _u.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
@@ -258,6 +365,12 @@ func (_u *ProjectUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.SetupCommandCleared() {
 		_spec.ClearField(project.FieldSetupCommand, field.TypeString)
+	}
+	if value, ok := _u.mutation.Objective(); ok {
+		_spec.SetField(project.FieldObjective, field.TypeString, value)
+	}
+	if _u.mutation.ObjectiveCleared() {
+		_spec.ClearField(project.FieldObjective, field.TypeString)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(project.FieldUpdatedAt, field.TypeTime, value)
@@ -300,6 +413,96 @@ func (_u *ProjectUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(projectfolder.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.RoadmapPhasesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapPhasesTable,
+			Columns: []string{project.RoadmapPhasesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapphase.FieldID, field.TypeString),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedRoadmapPhasesIDs(); len(nodes) > 0 && !_u.mutation.RoadmapPhasesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapPhasesTable,
+			Columns: []string{project.RoadmapPhasesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapphase.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RoadmapPhasesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapPhasesTable,
+			Columns: []string{project.RoadmapPhasesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapphase.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.RoadmapProposalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapProposalsTable,
+			Columns: []string{project.RoadmapProposalsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapproposal.FieldID, field.TypeString),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedRoadmapProposalsIDs(); len(nodes) > 0 && !_u.mutation.RoadmapProposalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapProposalsTable,
+			Columns: []string{project.RoadmapProposalsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapproposal.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RoadmapProposalsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapProposalsTable,
+			Columns: []string{project.RoadmapProposalsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapproposal.FieldID, field.TypeString),
 			},
 		}
 		for _, k := range nodes {
@@ -435,6 +638,26 @@ func (_u *ProjectUpdateOne) ClearSetupCommand() *ProjectUpdateOne {
 	return _u
 }
 
+// SetObjective sets the "objective" field.
+func (_u *ProjectUpdateOne) SetObjective(v string) *ProjectUpdateOne {
+	_u.mutation.SetObjective(v)
+	return _u
+}
+
+// SetNillableObjective sets the "objective" field if the given value is not nil.
+func (_u *ProjectUpdateOne) SetNillableObjective(v *string) *ProjectUpdateOne {
+	if v != nil {
+		_u.SetObjective(*v)
+	}
+	return _u
+}
+
+// ClearObjective clears the value of the "objective" field.
+func (_u *ProjectUpdateOne) ClearObjective() *ProjectUpdateOne {
+	_u.mutation.ClearObjective()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *ProjectUpdateOne) SetUpdatedAt(v time.Time) *ProjectUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
@@ -454,6 +677,36 @@ func (_u *ProjectUpdateOne) AddFolders(v ...*ProjectFolder) *ProjectUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.AddFolderIDs(ids...)
+}
+
+// AddRoadmapPhaseIDs adds the "roadmap_phases" edge to the RoadmapPhase entity by IDs.
+func (_u *ProjectUpdateOne) AddRoadmapPhaseIDs(ids ...string) *ProjectUpdateOne {
+	_u.mutation.AddRoadmapPhaseIDs(ids...)
+	return _u
+}
+
+// AddRoadmapPhases adds the "roadmap_phases" edges to the RoadmapPhase entity.
+func (_u *ProjectUpdateOne) AddRoadmapPhases(v ...*RoadmapPhase) *ProjectUpdateOne {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddRoadmapPhaseIDs(ids...)
+}
+
+// AddRoadmapProposalIDs adds the "roadmap_proposals" edge to the RoadmapProposal entity by IDs.
+func (_u *ProjectUpdateOne) AddRoadmapProposalIDs(ids ...string) *ProjectUpdateOne {
+	_u.mutation.AddRoadmapProposalIDs(ids...)
+	return _u
+}
+
+// AddRoadmapProposals adds the "roadmap_proposals" edges to the RoadmapProposal entity.
+func (_u *ProjectUpdateOne) AddRoadmapProposals(v ...*RoadmapProposal) *ProjectUpdateOne {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddRoadmapProposalIDs(ids...)
 }
 
 // Mutation returns the ProjectMutation object of the builder.
@@ -480,6 +733,48 @@ func (_u *ProjectUpdateOne) RemoveFolders(v ...*ProjectFolder) *ProjectUpdateOne
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveFolderIDs(ids...)
+}
+
+// ClearRoadmapPhases clears all "roadmap_phases" edges to the RoadmapPhase entity.
+func (_u *ProjectUpdateOne) ClearRoadmapPhases() *ProjectUpdateOne {
+	_u.mutation.ClearRoadmapPhases()
+	return _u
+}
+
+// RemoveRoadmapPhaseIDs removes the "roadmap_phases" edge to RoadmapPhase entities by IDs.
+func (_u *ProjectUpdateOne) RemoveRoadmapPhaseIDs(ids ...string) *ProjectUpdateOne {
+	_u.mutation.RemoveRoadmapPhaseIDs(ids...)
+	return _u
+}
+
+// RemoveRoadmapPhases removes "roadmap_phases" edges to RoadmapPhase entities.
+func (_u *ProjectUpdateOne) RemoveRoadmapPhases(v ...*RoadmapPhase) *ProjectUpdateOne {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveRoadmapPhaseIDs(ids...)
+}
+
+// ClearRoadmapProposals clears all "roadmap_proposals" edges to the RoadmapProposal entity.
+func (_u *ProjectUpdateOne) ClearRoadmapProposals() *ProjectUpdateOne {
+	_u.mutation.ClearRoadmapProposals()
+	return _u
+}
+
+// RemoveRoadmapProposalIDs removes the "roadmap_proposals" edge to RoadmapProposal entities by IDs.
+func (_u *ProjectUpdateOne) RemoveRoadmapProposalIDs(ids ...string) *ProjectUpdateOne {
+	_u.mutation.RemoveRoadmapProposalIDs(ids...)
+	return _u
+}
+
+// RemoveRoadmapProposals removes "roadmap_proposals" edges to RoadmapProposal entities.
+func (_u *ProjectUpdateOne) RemoveRoadmapProposals(v ...*RoadmapProposal) *ProjectUpdateOne {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveRoadmapProposalIDs(ids...)
 }
 
 // Where appends a list predicates to the ProjectUpdate builder.
@@ -531,7 +826,20 @@ func (_u *ProjectUpdateOne) defaults() {
 	}
 }
 
+// check runs all checks and user-defined validators on the builder.
+func (_u *ProjectUpdateOne) check() error {
+	if v, ok := _u.mutation.Objective(); ok {
+		if err := project.ObjectiveValidator(v); err != nil {
+			return &ValidationError{Name: "objective", err: fmt.Errorf(`ent: validator failed for field "Project.objective": %w`, err)}
+		}
+	}
+	return nil
+}
+
 func (_u *ProjectUpdateOne) sqlSave(ctx context.Context) (_node *Project, err error) {
+	if err := _u.check(); err != nil {
+		return _node, err
+	}
 	_spec := sqlgraph.NewUpdateSpec(project.Table, project.Columns, sqlgraph.NewFieldSpec(project.FieldID, field.TypeString))
 	id, ok := _u.mutation.ID()
 	if !ok {
@@ -587,6 +895,12 @@ func (_u *ProjectUpdateOne) sqlSave(ctx context.Context) (_node *Project, err er
 	if _u.mutation.SetupCommandCleared() {
 		_spec.ClearField(project.FieldSetupCommand, field.TypeString)
 	}
+	if value, ok := _u.mutation.Objective(); ok {
+		_spec.SetField(project.FieldObjective, field.TypeString, value)
+	}
+	if _u.mutation.ObjectiveCleared() {
+		_spec.ClearField(project.FieldObjective, field.TypeString)
+	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(project.FieldUpdatedAt, field.TypeTime, value)
 	}
@@ -628,6 +942,96 @@ func (_u *ProjectUpdateOne) sqlSave(ctx context.Context) (_node *Project, err er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(projectfolder.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.RoadmapPhasesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapPhasesTable,
+			Columns: []string{project.RoadmapPhasesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapphase.FieldID, field.TypeString),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedRoadmapPhasesIDs(); len(nodes) > 0 && !_u.mutation.RoadmapPhasesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapPhasesTable,
+			Columns: []string{project.RoadmapPhasesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapphase.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RoadmapPhasesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapPhasesTable,
+			Columns: []string{project.RoadmapPhasesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapphase.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.RoadmapProposalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapProposalsTable,
+			Columns: []string{project.RoadmapProposalsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapproposal.FieldID, field.TypeString),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedRoadmapProposalsIDs(); len(nodes) > 0 && !_u.mutation.RoadmapProposalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapProposalsTable,
+			Columns: []string{project.RoadmapProposalsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapproposal.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RoadmapProposalsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapProposalsTable,
+			Columns: []string{project.RoadmapProposalsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapproposal.FieldID, field.TypeString),
 			},
 		}
 		for _, k := range nodes {

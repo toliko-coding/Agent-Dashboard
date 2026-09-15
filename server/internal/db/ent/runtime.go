@@ -32,6 +32,9 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/refinementturn"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/remoteregistration"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/resource"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapitem"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapphase"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapproposal"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/schema"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/scratchpad"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/skill"
@@ -463,12 +466,16 @@ func init() {
 	pluginsetting.UpdateDefaultUpdatedAt = pluginsettingDescUpdatedAt.UpdateDefault.(func() time.Time)
 	projectFields := schema.Project{}.Fields()
 	_ = projectFields
+	// projectDescObjective is the schema descriptor for objective field.
+	projectDescObjective := projectFields[7].Descriptor()
+	// project.ObjectiveValidator is a validator for the "objective" field. It is called by the builders before save.
+	project.ObjectiveValidator = projectDescObjective.Validators[0].(func(string) error)
 	// projectDescCreatedAt is the schema descriptor for created_at field.
-	projectDescCreatedAt := projectFields[7].Descriptor()
+	projectDescCreatedAt := projectFields[8].Descriptor()
 	// project.DefaultCreatedAt holds the default value on creation for the created_at field.
 	project.DefaultCreatedAt = projectDescCreatedAt.Default.(func() time.Time)
 	// projectDescUpdatedAt is the schema descriptor for updated_at field.
-	projectDescUpdatedAt := projectFields[8].Descriptor()
+	projectDescUpdatedAt := projectFields[9].Descriptor()
 	// project.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	project.DefaultUpdatedAt = projectDescUpdatedAt.Default.(func() time.Time)
 	// project.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -568,6 +575,110 @@ func init() {
 	resourceDescOriginRef := resourceFields[9].Descriptor()
 	// resource.DefaultOriginRef holds the default value on creation for the origin_ref field.
 	resource.DefaultOriginRef = resourceDescOriginRef.Default.(string)
+	roadmapitemFields := schema.RoadmapItem{}.Fields()
+	_ = roadmapitemFields
+	// roadmapitemDescTitle is the schema descriptor for title field.
+	roadmapitemDescTitle := roadmapitemFields[1].Descriptor()
+	// roadmapitem.TitleValidator is a validator for the "title" field. It is called by the builders before save.
+	roadmapitem.TitleValidator = roadmapitemDescTitle.Validators[0].(func(string) error)
+	// roadmapitemDescStatus is the schema descriptor for status field.
+	roadmapitemDescStatus := roadmapitemFields[2].Descriptor()
+	// roadmapitem.DefaultStatus holds the default value on creation for the status field.
+	roadmapitem.DefaultStatus = roadmapitemDescStatus.Default.(string)
+	// roadmapitemDescPosition is the schema descriptor for position field.
+	roadmapitemDescPosition := roadmapitemFields[3].Descriptor()
+	// roadmapitem.DefaultPosition holds the default value on creation for the position field.
+	roadmapitem.DefaultPosition = roadmapitemDescPosition.Default.(int)
+	// roadmapitemDescProvenance is the schema descriptor for provenance field.
+	roadmapitemDescProvenance := roadmapitemFields[4].Descriptor()
+	// roadmapitem.DefaultProvenance holds the default value on creation for the provenance field.
+	roadmapitem.DefaultProvenance = roadmapitemDescProvenance.Default.(string)
+	// roadmapitemDescBlockedReason is the schema descriptor for blocked_reason field.
+	roadmapitemDescBlockedReason := roadmapitemFields[5].Descriptor()
+	// roadmapitem.DefaultBlockedReason holds the default value on creation for the blocked_reason field.
+	roadmapitem.DefaultBlockedReason = roadmapitemDescBlockedReason.Default.(string)
+	// roadmapitem.BlockedReasonValidator is a validator for the "blocked_reason" field. It is called by the builders before save.
+	roadmapitem.BlockedReasonValidator = roadmapitemDescBlockedReason.Validators[0].(func(string) error)
+	// roadmapitemDescCreatedAt is the schema descriptor for created_at field.
+	roadmapitemDescCreatedAt := roadmapitemFields[7].Descriptor()
+	// roadmapitem.DefaultCreatedAt holds the default value on creation for the created_at field.
+	roadmapitem.DefaultCreatedAt = roadmapitemDescCreatedAt.Default.(func() time.Time)
+	// roadmapitemDescUpdatedAt is the schema descriptor for updated_at field.
+	roadmapitemDescUpdatedAt := roadmapitemFields[8].Descriptor()
+	// roadmapitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	roadmapitem.DefaultUpdatedAt = roadmapitemDescUpdatedAt.Default.(func() time.Time)
+	// roadmapitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	roadmapitem.UpdateDefaultUpdatedAt = roadmapitemDescUpdatedAt.UpdateDefault.(func() time.Time)
+	roadmapphaseFields := schema.RoadmapPhase{}.Fields()
+	_ = roadmapphaseFields
+	// roadmapphaseDescTitle is the schema descriptor for title field.
+	roadmapphaseDescTitle := roadmapphaseFields[1].Descriptor()
+	// roadmapphase.TitleValidator is a validator for the "title" field. It is called by the builders before save.
+	roadmapphase.TitleValidator = roadmapphaseDescTitle.Validators[0].(func(string) error)
+	// roadmapphaseDescDescription is the schema descriptor for description field.
+	roadmapphaseDescDescription := roadmapphaseFields[2].Descriptor()
+	// roadmapphase.DefaultDescription holds the default value on creation for the description field.
+	roadmapphase.DefaultDescription = roadmapphaseDescDescription.Default.(string)
+	// roadmapphase.DescriptionValidator is a validator for the "description" field. It is called by the builders before save.
+	roadmapphase.DescriptionValidator = roadmapphaseDescDescription.Validators[0].(func(string) error)
+	// roadmapphaseDescStatus is the schema descriptor for status field.
+	roadmapphaseDescStatus := roadmapphaseFields[3].Descriptor()
+	// roadmapphase.DefaultStatus holds the default value on creation for the status field.
+	roadmapphase.DefaultStatus = roadmapphaseDescStatus.Default.(string)
+	// roadmapphaseDescPosition is the schema descriptor for position field.
+	roadmapphaseDescPosition := roadmapphaseFields[4].Descriptor()
+	// roadmapphase.DefaultPosition holds the default value on creation for the position field.
+	roadmapphase.DefaultPosition = roadmapphaseDescPosition.Default.(int)
+	// roadmapphaseDescIsCurrent is the schema descriptor for is_current field.
+	roadmapphaseDescIsCurrent := roadmapphaseFields[5].Descriptor()
+	// roadmapphase.DefaultIsCurrent holds the default value on creation for the is_current field.
+	roadmapphase.DefaultIsCurrent = roadmapphaseDescIsCurrent.Default.(bool)
+	// roadmapphaseDescProvenance is the schema descriptor for provenance field.
+	roadmapphaseDescProvenance := roadmapphaseFields[6].Descriptor()
+	// roadmapphase.DefaultProvenance holds the default value on creation for the provenance field.
+	roadmapphase.DefaultProvenance = roadmapphaseDescProvenance.Default.(string)
+	// roadmapphaseDescBlockedReason is the schema descriptor for blocked_reason field.
+	roadmapphaseDescBlockedReason := roadmapphaseFields[7].Descriptor()
+	// roadmapphase.DefaultBlockedReason holds the default value on creation for the blocked_reason field.
+	roadmapphase.DefaultBlockedReason = roadmapphaseDescBlockedReason.Default.(string)
+	// roadmapphase.BlockedReasonValidator is a validator for the "blocked_reason" field. It is called by the builders before save.
+	roadmapphase.BlockedReasonValidator = roadmapphaseDescBlockedReason.Validators[0].(func(string) error)
+	// roadmapphaseDescDecisions is the schema descriptor for decisions field.
+	roadmapphaseDescDecisions := roadmapphaseFields[8].Descriptor()
+	// roadmapphase.DefaultDecisions holds the default value on creation for the decisions field.
+	roadmapphase.DefaultDecisions = roadmapphaseDescDecisions.Default.(string)
+	// roadmapphase.DecisionsValidator is a validator for the "decisions" field. It is called by the builders before save.
+	roadmapphase.DecisionsValidator = roadmapphaseDescDecisions.Validators[0].(func(string) error)
+	// roadmapphaseDescCreatedAt is the schema descriptor for created_at field.
+	roadmapphaseDescCreatedAt := roadmapphaseFields[10].Descriptor()
+	// roadmapphase.DefaultCreatedAt holds the default value on creation for the created_at field.
+	roadmapphase.DefaultCreatedAt = roadmapphaseDescCreatedAt.Default.(func() time.Time)
+	// roadmapphaseDescUpdatedAt is the schema descriptor for updated_at field.
+	roadmapphaseDescUpdatedAt := roadmapphaseFields[11].Descriptor()
+	// roadmapphase.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	roadmapphase.DefaultUpdatedAt = roadmapphaseDescUpdatedAt.Default.(func() time.Time)
+	// roadmapphase.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	roadmapphase.UpdateDefaultUpdatedAt = roadmapphaseDescUpdatedAt.UpdateDefault.(func() time.Time)
+	roadmapproposalFields := schema.RoadmapProposal{}.Fields()
+	_ = roadmapproposalFields
+	// roadmapproposalDescStatus is the schema descriptor for status field.
+	roadmapproposalDescStatus := roadmapproposalFields[1].Descriptor()
+	// roadmapproposal.DefaultStatus holds the default value on creation for the status field.
+	roadmapproposal.DefaultStatus = roadmapproposalDescStatus.Default.(string)
+	// roadmapproposalDescSource is the schema descriptor for source field.
+	roadmapproposalDescSource := roadmapproposalFields[2].Descriptor()
+	// roadmapproposal.DefaultSource holds the default value on creation for the source field.
+	roadmapproposal.DefaultSource = roadmapproposalDescSource.Default.(string)
+	// roadmapproposalDescSummary is the schema descriptor for summary field.
+	roadmapproposalDescSummary := roadmapproposalFields[4].Descriptor()
+	// roadmapproposal.DefaultSummary holds the default value on creation for the summary field.
+	roadmapproposal.DefaultSummary = roadmapproposalDescSummary.Default.(string)
+	// roadmapproposal.SummaryValidator is a validator for the "summary" field. It is called by the builders before save.
+	roadmapproposal.SummaryValidator = roadmapproposalDescSummary.Validators[0].(func(string) error)
+	// roadmapproposalDescCreatedAt is the schema descriptor for created_at field.
+	roadmapproposalDescCreatedAt := roadmapproposalFields[6].Descriptor()
+	// roadmapproposal.DefaultCreatedAt holds the default value on creation for the created_at field.
+	roadmapproposal.DefaultCreatedAt = roadmapproposalDescCreatedAt.Default.(func() time.Time)
 	scratchpadFields := schema.Scratchpad{}.Fields()
 	_ = scratchpadFields
 	// scratchpadDescUpdatedAt is the schema descriptor for updated_at field.

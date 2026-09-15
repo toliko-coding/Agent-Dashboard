@@ -68,6 +68,12 @@ type Tx struct {
 	RemoteRegistration *RemoteRegistrationClient
 	// Resource is the client for interacting with the Resource builders.
 	Resource *ResourceClient
+	// RoadmapItem is the client for interacting with the RoadmapItem builders.
+	RoadmapItem *RoadmapItemClient
+	// RoadmapPhase is the client for interacting with the RoadmapPhase builders.
+	RoadmapPhase *RoadmapPhaseClient
+	// RoadmapProposal is the client for interacting with the RoadmapProposal builders.
+	RoadmapProposal *RoadmapProposalClient
 	// Scratchpad is the client for interacting with the Scratchpad builders.
 	Scratchpad *ScratchpadClient
 	// Skill is the client for interacting with the Skill builders.
@@ -247,6 +253,9 @@ func (tx *Tx) init() {
 	tx.RefinementTurn = NewRefinementTurnClient(tx.config)
 	tx.RemoteRegistration = NewRemoteRegistrationClient(tx.config)
 	tx.Resource = NewResourceClient(tx.config)
+	tx.RoadmapItem = NewRoadmapItemClient(tx.config)
+	tx.RoadmapPhase = NewRoadmapPhaseClient(tx.config)
+	tx.RoadmapProposal = NewRoadmapProposalClient(tx.config)
 	tx.Scratchpad = NewScratchpadClient(tx.config)
 	tx.Skill = NewSkillClient(tx.config)
 	tx.Spawner = NewSpawnerClient(tx.config)

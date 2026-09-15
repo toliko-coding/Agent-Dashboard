@@ -14,6 +14,8 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/project"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/projectfolder"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapphase"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/roadmapproposal"
 )
 
 // ProjectCreate is the builder for creating a Project entity.
@@ -92,6 +94,20 @@ func (_c *ProjectCreate) SetNillableSetupCommand(v *string) *ProjectCreate {
 	return _c
 }
 
+// SetObjective sets the "objective" field.
+func (_c *ProjectCreate) SetObjective(v string) *ProjectCreate {
+	_c.mutation.SetObjective(v)
+	return _c
+}
+
+// SetNillableObjective sets the "objective" field if the given value is not nil.
+func (_c *ProjectCreate) SetNillableObjective(v *string) *ProjectCreate {
+	if v != nil {
+		_c.SetObjective(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *ProjectCreate) SetCreatedAt(v time.Time) *ProjectCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -139,6 +155,36 @@ func (_c *ProjectCreate) AddFolders(v ...*ProjectFolder) *ProjectCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddFolderIDs(ids...)
+}
+
+// AddRoadmapPhaseIDs adds the "roadmap_phases" edge to the RoadmapPhase entity by IDs.
+func (_c *ProjectCreate) AddRoadmapPhaseIDs(ids ...string) *ProjectCreate {
+	_c.mutation.AddRoadmapPhaseIDs(ids...)
+	return _c
+}
+
+// AddRoadmapPhases adds the "roadmap_phases" edges to the RoadmapPhase entity.
+func (_c *ProjectCreate) AddRoadmapPhases(v ...*RoadmapPhase) *ProjectCreate {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddRoadmapPhaseIDs(ids...)
+}
+
+// AddRoadmapProposalIDs adds the "roadmap_proposals" edge to the RoadmapProposal entity by IDs.
+func (_c *ProjectCreate) AddRoadmapProposalIDs(ids ...string) *ProjectCreate {
+	_c.mutation.AddRoadmapProposalIDs(ids...)
+	return _c
+}
+
+// AddRoadmapProposals adds the "roadmap_proposals" edges to the RoadmapProposal entity.
+func (_c *ProjectCreate) AddRoadmapProposals(v ...*RoadmapProposal) *ProjectCreate {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddRoadmapProposalIDs(ids...)
 }
 
 // Mutation returns the ProjectMutation object of the builder.
@@ -193,6 +239,11 @@ func (_c *ProjectCreate) check() error {
 	}
 	if _, ok := _c.mutation.Name(); !ok {
 		return &ValidationError{Name: "name", err: errors.New(`ent: missing required field "Project.name"`)}
+	}
+	if v, ok := _c.mutation.Objective(); ok {
+		if err := project.ObjectiveValidator(v); err != nil {
+			return &ValidationError{Name: "objective", err: fmt.Errorf(`ent: validator failed for field "Project.objective": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Project.created_at"`)}
@@ -260,6 +311,10 @@ func (_c *ProjectCreate) createSpec() (*Project, *sqlgraph.CreateSpec) {
 		_spec.SetField(project.FieldSetupCommand, field.TypeString, value)
 		_node.SetupCommand = &value
 	}
+	if value, ok := _c.mutation.Objective(); ok {
+		_spec.SetField(project.FieldObjective, field.TypeString, value)
+		_node.Objective = &value
+	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(project.FieldCreatedAt, field.TypeTime, value)
 		_node.CreatedAt = value
@@ -277,6 +332,38 @@ func (_c *ProjectCreate) createSpec() (*Project, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(projectfolder.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.RoadmapPhasesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapPhasesTable,
+			Columns: []string{project.RoadmapPhasesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapphase.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.RoadmapProposalsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.RoadmapProposalsTable,
+			Columns: []string{project.RoadmapProposalsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roadmapproposal.FieldID, field.TypeString),
 			},
 		}
 		for _, k := range nodes {
@@ -429,6 +516,24 @@ func (u *ProjectUpsert) UpdateSetupCommand() *ProjectUpsert {
 // ClearSetupCommand clears the value of the "setup_command" field.
 func (u *ProjectUpsert) ClearSetupCommand() *ProjectUpsert {
 	u.SetNull(project.FieldSetupCommand)
+	return u
+}
+
+// SetObjective sets the "objective" field.
+func (u *ProjectUpsert) SetObjective(v string) *ProjectUpsert {
+	u.Set(project.FieldObjective, v)
+	return u
+}
+
+// UpdateObjective sets the "objective" field to the value that was provided on create.
+func (u *ProjectUpsert) UpdateObjective() *ProjectUpsert {
+	u.SetExcluded(project.FieldObjective)
+	return u
+}
+
+// ClearObjective clears the value of the "objective" field.
+func (u *ProjectUpsert) ClearObjective() *ProjectUpsert {
+	u.SetNull(project.FieldObjective)
 	return u
 }
 
@@ -604,6 +709,27 @@ func (u *ProjectUpsertOne) UpdateSetupCommand() *ProjectUpsertOne {
 func (u *ProjectUpsertOne) ClearSetupCommand() *ProjectUpsertOne {
 	return u.Update(func(s *ProjectUpsert) {
 		s.ClearSetupCommand()
+	})
+}
+
+// SetObjective sets the "objective" field.
+func (u *ProjectUpsertOne) SetObjective(v string) *ProjectUpsertOne {
+	return u.Update(func(s *ProjectUpsert) {
+		s.SetObjective(v)
+	})
+}
+
+// UpdateObjective sets the "objective" field to the value that was provided on create.
+func (u *ProjectUpsertOne) UpdateObjective() *ProjectUpsertOne {
+	return u.Update(func(s *ProjectUpsert) {
+		s.UpdateObjective()
+	})
+}
+
+// ClearObjective clears the value of the "objective" field.
+func (u *ProjectUpsertOne) ClearObjective() *ProjectUpsertOne {
+	return u.Update(func(s *ProjectUpsert) {
+		s.ClearObjective()
 	})
 }
 
@@ -948,6 +1074,27 @@ func (u *ProjectUpsertBulk) UpdateSetupCommand() *ProjectUpsertBulk {
 func (u *ProjectUpsertBulk) ClearSetupCommand() *ProjectUpsertBulk {
 	return u.Update(func(s *ProjectUpsert) {
 		s.ClearSetupCommand()
+	})
+}
+
+// SetObjective sets the "objective" field.
+func (u *ProjectUpsertBulk) SetObjective(v string) *ProjectUpsertBulk {
+	return u.Update(func(s *ProjectUpsert) {
+		s.SetObjective(v)
+	})
+}
+
+// UpdateObjective sets the "objective" field to the value that was provided on create.
+func (u *ProjectUpsertBulk) UpdateObjective() *ProjectUpsertBulk {
+	return u.Update(func(s *ProjectUpsert) {
+		s.UpdateObjective()
+	})
+}
+
+// ClearObjective clears the value of the "objective" field.
+func (u *ProjectUpsertBulk) ClearObjective() *ProjectUpsertBulk {
+	return u.Update(func(s *ProjectUpsert) {
+		s.ClearObjective()
 	})
 }
 

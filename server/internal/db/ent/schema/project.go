@@ -23,6 +23,8 @@ func (Project) Fields() []ent.Field {
 		field.String("color").Optional().Nillable(),
 		field.String("default_spawner_id").Optional().Nillable(),
 		field.String("setup_command").Optional().Nillable(),
+		// objective is what the project is for, in one or two sentences (Phase 4B roadmap).
+		field.String("objective").Optional().Nillable().MaxLen(1000),
 		field.Time("created_at").Default(time.Now).Immutable(),
 		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),
 	}
@@ -33,6 +35,8 @@ func (Project) Edges() []ent.Edge {
 	cascade := entsql.Annotation{OnDelete: entsql.Cascade}
 	return []ent.Edge{
 		edge.To("folders", ProjectFolder.Type).Annotations(cascade),
+		edge.To("roadmap_phases", RoadmapPhase.Type).Annotations(cascade),
+		edge.To("roadmap_proposals", RoadmapProposal.Type).Annotations(cascade),
 	}
 }
 
