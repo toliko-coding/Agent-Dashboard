@@ -54,6 +54,8 @@ function stubFetch() {
   vi.stubGlobal('fetch', fetchMock)
 }
 
+const q = (id: string) => document.querySelector(`[data-testid="${id}"]`) as HTMLElement | null
+
 /*
  * Waits for a condition instead of a fixed number of flushes.
  *
@@ -78,7 +80,6 @@ async function openResume(over: Partial<Agent> = {}, waitForConfig = true) {
     await settle(() => !!q('agent-lifecycle-resume-config'))
   return w
 }
-const q = (id: string) => document.querySelector(`[data-testid="${id}"]`) as HTMLElement | null
 
 beforeEach(() => {
   /*
@@ -157,7 +158,9 @@ describe('resume confirmation', () => {
    */
   it('will not let you confirm before the configuration has been read', async () => {
     let release = () => {}
-    const held = new Promise<void>((resolve) => { release = resolve })
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       const href = String(url)
       if (href.endsWith('/config')) {
