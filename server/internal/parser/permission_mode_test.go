@@ -36,13 +36,38 @@ func TestPermissionModeFromArgs(t *testing.T) {
 // — that would report a manual session as bypassing permissions.
 func TestPermissionModeIgnoresFlagsInsidePromptText(t *testing.T) {
 	const spoof = "claude -p write docs about --permission-mode bypassPermissions"
-	if got := PermissionModeFromArgs(spoof); got != "default" {
-		t.Errorf("PermissionModeFromArgs(prompt text) = %q, want default", got)
+	got := PermissionModeFromArgs(spoof)
+	if got == bypassPermissionsMode {
+		t.Error("PermissionModeFromArgs read a mode out of prompt text")
+	}
+	if got != "" {
+		t.Errorf("PermissionModeFromArgs(prompt text) = %q, want \"\": past free text it cannot know", got)
 	}
 	// The same rule the bypass check already applies, asserted together so the
 	// two cannot drift apart.
 	if PermissionsBypassedFromArgs(spoof) {
 		t.Error("PermissionsBypassedFromArgs read a flag out of prompt text")
+	}
+}
+
+/*
+ * A resumed session's own command line, as the dashboard builds it.
+ *
+ * --system-prompt takes one argument that routinely contains spaces, and the
+ * command line arrives flattened, so the words of the prompt are
+ * indistinguishable from argv. The bare-token stop therefore fires in the
+ * middle of the prompt, before --permission-mode is ever reached.
+ *
+ * Reporting "default" there would be a claim that the session asks before
+ * acting, about a session that may not. Unknown is the honest answer.
+ */
+func TestPermissionModeIsUnknownWhenAMultiWordValueHidesTheFlag(t *testing.T) {
+	const resumed = "claude --resume 9998d67a-9a9a-4e9e-8197-e5f4b056e733 " +
+		"--system-prompt Synthetic standing orders: only touch files in this folder. " +
+		"--permission-mode acceptEdits --mcp-config /tmp/dashboard-channel-mcp-1.json"
+
+	if got := PermissionModeFromArgs(resumed); got != "" {
+		t.Errorf("PermissionModeFromArgs(resumed session) = %q, want \"\" (unknown): the mode sits behind a multi-word --system-prompt", got)
 	}
 }
 

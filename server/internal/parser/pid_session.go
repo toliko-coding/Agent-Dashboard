@@ -113,15 +113,20 @@ const defaultPermissionMode = "default"
  * posture next to whatever is saved for it. A saved value can differ from a
  * running one, and the difference is the thing worth showing.
  *
- * "" means the mode is unknown because no command line was observed - kept
- * distinct from "default", which is a claim that argv was read and carried no
- * flag. Both dangerously-skip spellings report as bypassPermissions, because
- * that is what they do.
+ * "" means the mode could not be determined - either no command line was
+ * observed, or the scan reached text it cannot tell apart from argv. It is kept
+ * distinct from "default", which is a claim that the whole command line was read
+ * and carried no flag. Both dangerously-skip spellings report as
+ * bypassPermissions, because that is what they do.
  *
- * The bare-token stop is the same rule PermissionsBypassedFromArgs uses and
- * exists for the same reason: the command line arrives flattened, so a prompt
- * containing "--permission-mode bypassPermissions" would otherwise be read as
- * the agent's own posture.
+ * The bare-token stop is the same rule PermissionsBypassedFromArgs uses: the
+ * command line arrives flattened, so a prompt containing "--permission-mode
+ * bypassPermissions" would otherwise be read as the agent's own posture. Where
+ * that check can safely answer "not bypassed" - under-reporting is the harmless
+ * direction for it - this one cannot answer "default", which would assert that
+ * a session asks before acting. Anything the dashboard itself starts with a
+ * multi-word --system-prompt hides the flag behind exactly such text, so the
+ * honest answer there is that it does not know.
  */
 func PermissionModeFromArgs(command string) string {
 	if strings.TrimSpace(command) == "" {
@@ -130,7 +135,10 @@ func PermissionModeFromArgs(command string) string {
 	fields := strings.Fields(command)
 	for i, f := range fields {
 		if i > 0 && !strings.HasPrefix(f, "-") && !strings.HasPrefix(fields[i-1], "-") {
-			break
+			// Free text from here on: a flag found beyond it could be the
+			// agent's posture or could be someone's prompt, and there is no way
+			// to tell. Unknown, rather than a guess in either direction.
+			return ""
 		}
 		switch {
 		case f == "--dangerously-skip-permissions", f == "--allow-dangerously-skip-permissions":

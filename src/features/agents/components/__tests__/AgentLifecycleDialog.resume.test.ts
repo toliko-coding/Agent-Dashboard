@@ -54,17 +54,43 @@ function stubFetch() {
   vi.stubGlobal('fetch', fetchMock)
 }
 
-async function openResume(over: Partial<Agent> = {}) {
+/*
+ * Waits for a condition instead of a fixed number of flushes.
+ *
+ * The configuration is fetched when the dialog opens, and how many microtask
+ * turns that takes depends on machine load - these tests passed alone and failed
+ * beside the rest of the suite, which is a test bug, not a product one.
+ */
+async function settle(done: () => boolean, tries = 60) {
+  for (let i = 0; i < tries; i++) {
+    await flushPromises()
+    if (done())
+      return
+  }
+}
+
+async function openResume(over: Partial<Agent> = {}, waitForConfig = true) {
   const { default: Dialog } = await import('../AgentLifecycleDialog.vue')
   const w = mount(Dialog, { attachTo: document.body })
   useAgentLifecycle().requestResume(agent(over), { available: true, endsRunningSession: false, reason: '' } as never)
   await flushPromises()
-  await flushPromises()
+  if (waitForConfig)
+    await settle(() => !!q('agent-lifecycle-resume-config'))
   return w
 }
 const q = (id: string) => document.querySelector(`[data-testid="${id}"]`) as HTMLElement | null
 
 beforeEach(() => {
+  /*
+   * `pending` is module-level shared state and the dialog is mounted fresh per
+   * test, so a resume left over from the previous one greets the new mount and
+   * its in-flight config fetch resolves against it. That is what made failures
+   * wander between tests in this file, vanish under --no-file-parallelism, and
+   * never touch another file. Clearing it up front, not only afterwards, is the
+   * isolation the shared setup already applies to mounted components.
+   */
+  useAgentLifecycle().cancel()
+  document.body.innerHTML = ''
   config = {
     agentId: 'agent-1',
     instructions: 'Only touch the portfolio repository.',
@@ -92,7 +118,7 @@ describe('resume confirmation', () => {
     // The text itself is behind a disclosure, not dumped into the dialog.
     expect(q('agent-lifecycle-resume-instructions')).toBeNull()
     q('agent-lifecycle-resume-instructions-toggle')!.click()
-    await flushPromises()
+    await settle(() => !!q('agent-lifecycle-resume-instructions'))
     expect(q('agent-lifecycle-resume-instructions')!.textContent).toContain('Only touch the portfolio repository.')
     w.unmount()
   })
@@ -141,15 +167,14 @@ describe('resume confirmation', () => {
       posts.push({ url: href, body: JSON.parse(String(init?.body ?? '{}')) })
       return { ok: true, json: async () => ({ pid: 9001, previousPid: 5919, endedRunningSession: false }) }
     })
-    const w = await openResume()
+    const w = await openResume({}, false)
 
     expect((q('agent-lifecycle-confirm') as HTMLButtonElement).disabled).toBe(true)
     expect(q('agent-lifecycle-resume-loading')).not.toBeNull()
     expect(q('agent-lifecycle-resume-config')).toBeNull()
 
     release()
-    await flushPromises()
-    await flushPromises()
+    await settle(() => !!q('agent-lifecycle-resume-config'))
 
     expect((q('agent-lifecycle-confirm') as HTMLButtonElement).disabled).toBe(false)
     expect(q('agent-lifecycle-resume-mode')!.textContent).toContain('Auto-accepts edits')
@@ -163,7 +188,7 @@ describe('resume confirmation', () => {
     const w = await openResume()
     expect(await axe(q('agent-lifecycle-dialog')!)).toHaveNoViolations()
     q('agent-lifecycle-resume-instructions-toggle')!.click()
-    await flushPromises()
+    await settle(() => !!q('agent-lifecycle-resume-instructions'))
     expect(await axe(q('agent-lifecycle-dialog')!)).toHaveNoViolations()
     w.unmount()
   })
