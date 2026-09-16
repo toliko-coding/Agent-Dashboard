@@ -26,6 +26,7 @@ GET /api/agents/projectless
 GET /api/agents/spawn/{pid}/status
 GET /api/agents/stream
 GET /api/agents/working-folders
+GET /api/agents/{pid}/config
 GET /api/agents/{pid}/control
 GET /api/agents/{pid}/terminal
 GET /api/agents/{sessionId}/output
@@ -182,6 +183,7 @@ POST /api/tasks/{id}/run
 POST /api/tasks/{id}/worktree
 PUT /*
 PUT /api/agents/projectless
+PUT /api/agents/{pid}/config
 PUT /api/agents/{pid}/profile
 PUT /api/config/file
 PUT /api/notifications/config

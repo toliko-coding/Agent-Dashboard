@@ -23,6 +23,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/capability"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/checkpoint"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/coordlock"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/dashboardagent"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/driftalert"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/evalmetricsnapshot"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/grant"
@@ -79,6 +80,8 @@ type Client struct {
 	Checkpoint *CheckpointClient
 	// CoordLock is the client for interacting with the CoordLock builders.
 	CoordLock *CoordLockClient
+	// DashboardAgent is the client for interacting with the DashboardAgent builders.
+	DashboardAgent *DashboardAgentClient
 	// DriftAlert is the client for interacting with the DriftAlert builders.
 	DriftAlert *DriftAlertClient
 	// EvalMetricSnapshot is the client for interacting with the EvalMetricSnapshot builders.
@@ -164,6 +167,7 @@ func (c *Client) init() {
 	c.Capability = NewCapabilityClient(c.config)
 	c.Checkpoint = NewCheckpointClient(c.config)
 	c.CoordLock = NewCoordLockClient(c.config)
+	c.DashboardAgent = NewDashboardAgentClient(c.config)
 	c.DriftAlert = NewDriftAlertClient(c.config)
 	c.EvalMetricSnapshot = NewEvalMetricSnapshotClient(c.config)
 	c.Grant = NewGrantClient(c.config)
@@ -297,6 +301,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Capability:         NewCapabilityClient(cfg),
 		Checkpoint:         NewCheckpointClient(cfg),
 		CoordLock:          NewCoordLockClient(cfg),
+		DashboardAgent:     NewDashboardAgentClient(cfg),
 		DriftAlert:         NewDriftAlertClient(cfg),
 		EvalMetricSnapshot: NewEvalMetricSnapshotClient(cfg),
 		Grant:              NewGrantClient(cfg),
@@ -357,6 +362,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Capability:         NewCapabilityClient(cfg),
 		Checkpoint:         NewCheckpointClient(cfg),
 		CoordLock:          NewCoordLockClient(cfg),
+		DashboardAgent:     NewDashboardAgentClient(cfg),
 		DriftAlert:         NewDriftAlertClient(cfg),
 		EvalMetricSnapshot: NewEvalMetricSnapshotClient(cfg),
 		Grant:              NewGrantClient(cfg),
@@ -420,13 +426,13 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.AgentCostTrend, c.AgentProfile, c.ApiKey, c.AppSetting, c.AuditEvent,
-		c.Capability, c.Checkpoint, c.CoordLock, c.DriftAlert, c.EvalMetricSnapshot,
-		c.Grant, c.GrantUsage, c.ManagedAgent, c.Materialization, c.MemoryEntry,
-		c.MemoryInjection, c.PermissionPreset, c.PermissionRequest, c.PipelineConfig,
-		c.Plugin, c.PluginSetting, c.Project, c.ProjectFolder, c.PromptTemplate,
-		c.ProviderSetting, c.RefinementTurn, c.RemoteRegistration, c.Resource,
-		c.RoadmapItem, c.RoadmapPhase, c.RoadmapProposal, c.Scratchpad, c.Skill,
-		c.Spawner, c.StageRun, c.SystemPrompt, c.Task, c.TaskDependency,
+		c.Capability, c.Checkpoint, c.CoordLock, c.DashboardAgent, c.DriftAlert,
+		c.EvalMetricSnapshot, c.Grant, c.GrantUsage, c.ManagedAgent, c.Materialization,
+		c.MemoryEntry, c.MemoryInjection, c.PermissionPreset, c.PermissionRequest,
+		c.PipelineConfig, c.Plugin, c.PluginSetting, c.Project, c.ProjectFolder,
+		c.PromptTemplate, c.ProviderSetting, c.RefinementTurn, c.RemoteRegistration,
+		c.Resource, c.RoadmapItem, c.RoadmapPhase, c.RoadmapProposal, c.Scratchpad,
+		c.Skill, c.Spawner, c.StageRun, c.SystemPrompt, c.Task, c.TaskDependency,
 		c.TaskPermission, c.TaskSchedule, c.User,
 	} {
 		n.Use(hooks...)
@@ -438,13 +444,13 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.AgentCostTrend, c.AgentProfile, c.ApiKey, c.AppSetting, c.AuditEvent,
-		c.Capability, c.Checkpoint, c.CoordLock, c.DriftAlert, c.EvalMetricSnapshot,
-		c.Grant, c.GrantUsage, c.ManagedAgent, c.Materialization, c.MemoryEntry,
-		c.MemoryInjection, c.PermissionPreset, c.PermissionRequest, c.PipelineConfig,
-		c.Plugin, c.PluginSetting, c.Project, c.ProjectFolder, c.PromptTemplate,
-		c.ProviderSetting, c.RefinementTurn, c.RemoteRegistration, c.Resource,
-		c.RoadmapItem, c.RoadmapPhase, c.RoadmapProposal, c.Scratchpad, c.Skill,
-		c.Spawner, c.StageRun, c.SystemPrompt, c.Task, c.TaskDependency,
+		c.Capability, c.Checkpoint, c.CoordLock, c.DashboardAgent, c.DriftAlert,
+		c.EvalMetricSnapshot, c.Grant, c.GrantUsage, c.ManagedAgent, c.Materialization,
+		c.MemoryEntry, c.MemoryInjection, c.PermissionPreset, c.PermissionRequest,
+		c.PipelineConfig, c.Plugin, c.PluginSetting, c.Project, c.ProjectFolder,
+		c.PromptTemplate, c.ProviderSetting, c.RefinementTurn, c.RemoteRegistration,
+		c.Resource, c.RoadmapItem, c.RoadmapPhase, c.RoadmapProposal, c.Scratchpad,
+		c.Skill, c.Spawner, c.StageRun, c.SystemPrompt, c.Task, c.TaskDependency,
 		c.TaskPermission, c.TaskSchedule, c.User,
 	} {
 		n.Intercept(interceptors...)
@@ -470,6 +476,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Checkpoint.mutate(ctx, m)
 	case *CoordLockMutation:
 		return c.CoordLock.mutate(ctx, m)
+	case *DashboardAgentMutation:
+		return c.DashboardAgent.mutate(ctx, m)
 	case *DriftAlertMutation:
 		return c.DriftAlert.mutate(ctx, m)
 	case *EvalMetricSnapshotMutation:
@@ -1602,6 +1610,139 @@ func (c *CoordLockClient) mutate(ctx context.Context, m *CoordLockMutation) (Val
 		return (&CoordLockDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown CoordLock mutation op: %q", m.Op())
+	}
+}
+
+// DashboardAgentClient is a client for the DashboardAgent schema.
+type DashboardAgentClient struct {
+	config
+}
+
+// NewDashboardAgentClient returns a client for the DashboardAgent from the given config.
+func NewDashboardAgentClient(c config) *DashboardAgentClient {
+	return &DashboardAgentClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `dashboardagent.Hooks(f(g(h())))`.
+func (c *DashboardAgentClient) Use(hooks ...Hook) {
+	c.hooks.DashboardAgent = append(c.hooks.DashboardAgent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `dashboardagent.Intercept(f(g(h())))`.
+func (c *DashboardAgentClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DashboardAgent = append(c.inters.DashboardAgent, interceptors...)
+}
+
+// Create returns a builder for creating a DashboardAgent entity.
+func (c *DashboardAgentClient) Create() *DashboardAgentCreate {
+	mutation := newDashboardAgentMutation(c.config, OpCreate)
+	return &DashboardAgentCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DashboardAgent entities.
+func (c *DashboardAgentClient) CreateBulk(builders ...*DashboardAgentCreate) *DashboardAgentCreateBulk {
+	return &DashboardAgentCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DashboardAgentClient) MapCreateBulk(slice any, setFunc func(*DashboardAgentCreate, int)) *DashboardAgentCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DashboardAgentCreateBulk{err: fmt.Errorf("calling to DashboardAgentClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DashboardAgentCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DashboardAgentCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DashboardAgent.
+func (c *DashboardAgentClient) Update() *DashboardAgentUpdate {
+	mutation := newDashboardAgentMutation(c.config, OpUpdate)
+	return &DashboardAgentUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DashboardAgentClient) UpdateOne(_m *DashboardAgent) *DashboardAgentUpdateOne {
+	mutation := newDashboardAgentMutation(c.config, OpUpdateOne, withDashboardAgent(_m))
+	return &DashboardAgentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DashboardAgentClient) UpdateOneID(id string) *DashboardAgentUpdateOne {
+	mutation := newDashboardAgentMutation(c.config, OpUpdateOne, withDashboardAgentID(id))
+	return &DashboardAgentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DashboardAgent.
+func (c *DashboardAgentClient) Delete() *DashboardAgentDelete {
+	mutation := newDashboardAgentMutation(c.config, OpDelete)
+	return &DashboardAgentDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DashboardAgentClient) DeleteOne(_m *DashboardAgent) *DashboardAgentDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DashboardAgentClient) DeleteOneID(id string) *DashboardAgentDeleteOne {
+	builder := c.Delete().Where(dashboardagent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DashboardAgentDeleteOne{builder}
+}
+
+// Query returns a query builder for DashboardAgent.
+func (c *DashboardAgentClient) Query() *DashboardAgentQuery {
+	return &DashboardAgentQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDashboardAgent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DashboardAgent entity by its id.
+func (c *DashboardAgentClient) Get(ctx context.Context, id string) (*DashboardAgent, error) {
+	return c.Query().Where(dashboardagent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DashboardAgentClient) GetX(ctx context.Context, id string) *DashboardAgent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DashboardAgentClient) Hooks() []Hook {
+	return c.hooks.DashboardAgent
+}
+
+// Interceptors returns the client interceptors.
+func (c *DashboardAgentClient) Interceptors() []Interceptor {
+	return c.inters.DashboardAgent
+}
+
+func (c *DashboardAgentClient) mutate(ctx context.Context, m *DashboardAgentMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DashboardAgentCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DashboardAgentUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DashboardAgentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DashboardAgentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DashboardAgent mutation op: %q", m.Op())
 	}
 }
 
@@ -6286,20 +6427,20 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 type (
 	hooks struct {
 		AgentCostTrend, AgentProfile, ApiKey, AppSetting, AuditEvent, Capability,
-		Checkpoint, CoordLock, DriftAlert, EvalMetricSnapshot, Grant, GrantUsage,
-		ManagedAgent, Materialization, MemoryEntry, MemoryInjection, PermissionPreset,
-		PermissionRequest, PipelineConfig, Plugin, PluginSetting, Project,
-		ProjectFolder, PromptTemplate, ProviderSetting, RefinementTurn,
+		Checkpoint, CoordLock, DashboardAgent, DriftAlert, EvalMetricSnapshot, Grant,
+		GrantUsage, ManagedAgent, Materialization, MemoryEntry, MemoryInjection,
+		PermissionPreset, PermissionRequest, PipelineConfig, Plugin, PluginSetting,
+		Project, ProjectFolder, PromptTemplate, ProviderSetting, RefinementTurn,
 		RemoteRegistration, Resource, RoadmapItem, RoadmapPhase, RoadmapProposal,
 		Scratchpad, Skill, Spawner, StageRun, SystemPrompt, Task, TaskDependency,
 		TaskPermission, TaskSchedule, User []ent.Hook
 	}
 	inters struct {
 		AgentCostTrend, AgentProfile, ApiKey, AppSetting, AuditEvent, Capability,
-		Checkpoint, CoordLock, DriftAlert, EvalMetricSnapshot, Grant, GrantUsage,
-		ManagedAgent, Materialization, MemoryEntry, MemoryInjection, PermissionPreset,
-		PermissionRequest, PipelineConfig, Plugin, PluginSetting, Project,
-		ProjectFolder, PromptTemplate, ProviderSetting, RefinementTurn,
+		Checkpoint, CoordLock, DashboardAgent, DriftAlert, EvalMetricSnapshot, Grant,
+		GrantUsage, ManagedAgent, Materialization, MemoryEntry, MemoryInjection,
+		PermissionPreset, PermissionRequest, PipelineConfig, Plugin, PluginSetting,
+		Project, ProjectFolder, PromptTemplate, ProviderSetting, RefinementTurn,
 		RemoteRegistration, Resource, RoadmapItem, RoadmapPhase, RoadmapProposal,
 		Scratchpad, Skill, Spawner, StageRun, SystemPrompt, Task, TaskDependency,
 		TaskPermission, TaskSchedule, User []ent.Interceptor

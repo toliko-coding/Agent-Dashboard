@@ -215,6 +215,38 @@ var (
 			},
 		},
 	}
+	// DashboardAgentsColumns holds the columns for the "dashboard_agents" table.
+	DashboardAgentsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "display_name", Type: field.TypeString, Default: ""},
+		{Name: "category", Type: field.TypeString, Default: ""},
+		{Name: "instructions", Type: field.TypeString, Size: 2147483647, Default: ""},
+		{Name: "permission_mode", Type: field.TypeString, Default: ""},
+		{Name: "cwd", Type: field.TypeString, Default: ""},
+		{Name: "project_id", Type: field.TypeString, Default: ""},
+		{Name: "role", Type: field.TypeString, Default: ""},
+		{Name: "session_id", Type: field.TypeString, Default: ""},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// DashboardAgentsTable holds the schema information for the "dashboard_agents" table.
+	DashboardAgentsTable = &schema.Table{
+		Name:       "dashboard_agents",
+		Columns:    DashboardAgentsColumns,
+		PrimaryKey: []*schema.Column{DashboardAgentsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "dashboardagent_session_id",
+				Unique:  false,
+				Columns: []*schema.Column{DashboardAgentsColumns[8]},
+			},
+			{
+				Name:    "dashboardagent_role",
+				Unique:  false,
+				Columns: []*schema.Column{DashboardAgentsColumns[7]},
+			},
+		},
+	}
 	// DriftAlertsColumns holds the columns for the "drift_alerts" table.
 	DriftAlertsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -1218,6 +1250,7 @@ var (
 		CapabilitiesTable,
 		CheckpointsTable,
 		CoordLocksTable,
+		DashboardAgentsTable,
 		DriftAlertsTable,
 		EvalMetricSnapshotsTable,
 		GrantsTable,

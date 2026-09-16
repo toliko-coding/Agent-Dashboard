@@ -28,6 +28,8 @@ type Tx struct {
 	Checkpoint *CheckpointClient
 	// CoordLock is the client for interacting with the CoordLock builders.
 	CoordLock *CoordLockClient
+	// DashboardAgent is the client for interacting with the DashboardAgent builders.
+	DashboardAgent *DashboardAgentClient
 	// DriftAlert is the client for interacting with the DriftAlert builders.
 	DriftAlert *DriftAlertClient
 	// EvalMetricSnapshot is the client for interacting with the EvalMetricSnapshot builders.
@@ -233,6 +235,7 @@ func (tx *Tx) init() {
 	tx.Capability = NewCapabilityClient(tx.config)
 	tx.Checkpoint = NewCheckpointClient(tx.config)
 	tx.CoordLock = NewCoordLockClient(tx.config)
+	tx.DashboardAgent = NewDashboardAgentClient(tx.config)
 	tx.DriftAlert = NewDriftAlertClient(tx.config)
 	tx.EvalMetricSnapshot = NewEvalMetricSnapshotClient(tx.config)
 	tx.Grant = NewGrantClient(tx.config)

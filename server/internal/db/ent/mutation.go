@@ -19,6 +19,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/capability"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/checkpoint"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/coordlock"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/dashboardagent"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/driftalert"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/evalmetricsnapshot"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/grant"
@@ -72,6 +73,7 @@ const (
 	TypeCapability         = "Capability"
 	TypeCheckpoint         = "Checkpoint"
 	TypeCoordLock          = "CoordLock"
+	TypeDashboardAgent     = "DashboardAgent"
 	TypeDriftAlert         = "DriftAlert"
 	TypeEvalMetricSnapshot = "EvalMetricSnapshot"
 	TypeGrant              = "Grant"
@@ -5792,6 +5794,824 @@ func (m *CoordLockMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *CoordLockMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown CoordLock edge %s", name)
+}
+
+// DashboardAgentMutation represents an operation that mutates the DashboardAgent nodes in the graph.
+type DashboardAgentMutation struct {
+	config
+	op              Op
+	typ             string
+	id              *string
+	display_name    *string
+	category        *string
+	instructions    *string
+	permission_mode *string
+	cwd             *string
+	project_id      *string
+	role            *string
+	session_id      *string
+	created_at      *time.Time
+	updated_at      *time.Time
+	clearedFields   map[string]struct{}
+	done            bool
+	oldValue        func(context.Context) (*DashboardAgent, error)
+	predicates      []predicate.DashboardAgent
+}
+
+var _ ent.Mutation = (*DashboardAgentMutation)(nil)
+
+// dashboardagentOption allows management of the mutation configuration using functional options.
+type dashboardagentOption func(*DashboardAgentMutation)
+
+// newDashboardAgentMutation creates new mutation for the DashboardAgent entity.
+func newDashboardAgentMutation(c config, op Op, opts ...dashboardagentOption) *DashboardAgentMutation {
+	m := &DashboardAgentMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDashboardAgent,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDashboardAgentID sets the ID field of the mutation.
+func withDashboardAgentID(id string) dashboardagentOption {
+	return func(m *DashboardAgentMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DashboardAgent
+		)
+		m.oldValue = func(ctx context.Context) (*DashboardAgent, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DashboardAgent.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDashboardAgent sets the old DashboardAgent of the mutation.
+func withDashboardAgent(node *DashboardAgent) dashboardagentOption {
+	return func(m *DashboardAgentMutation) {
+		m.oldValue = func(context.Context) (*DashboardAgent, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DashboardAgentMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DashboardAgentMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of DashboardAgent entities.
+func (m *DashboardAgentMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DashboardAgentMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DashboardAgentMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DashboardAgent.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetDisplayName sets the "display_name" field.
+func (m *DashboardAgentMutation) SetDisplayName(s string) {
+	m.display_name = &s
+}
+
+// DisplayName returns the value of the "display_name" field in the mutation.
+func (m *DashboardAgentMutation) DisplayName() (r string, exists bool) {
+	v := m.display_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDisplayName returns the old "display_name" field's value of the DashboardAgent entity.
+// If the DashboardAgent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAgentMutation) OldDisplayName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDisplayName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDisplayName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDisplayName: %w", err)
+	}
+	return oldValue.DisplayName, nil
+}
+
+// ResetDisplayName resets all changes to the "display_name" field.
+func (m *DashboardAgentMutation) ResetDisplayName() {
+	m.display_name = nil
+}
+
+// SetCategory sets the "category" field.
+func (m *DashboardAgentMutation) SetCategory(s string) {
+	m.category = &s
+}
+
+// Category returns the value of the "category" field in the mutation.
+func (m *DashboardAgentMutation) Category() (r string, exists bool) {
+	v := m.category
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCategory returns the old "category" field's value of the DashboardAgent entity.
+// If the DashboardAgent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAgentMutation) OldCategory(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCategory is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCategory requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCategory: %w", err)
+	}
+	return oldValue.Category, nil
+}
+
+// ResetCategory resets all changes to the "category" field.
+func (m *DashboardAgentMutation) ResetCategory() {
+	m.category = nil
+}
+
+// SetInstructions sets the "instructions" field.
+func (m *DashboardAgentMutation) SetInstructions(s string) {
+	m.instructions = &s
+}
+
+// Instructions returns the value of the "instructions" field in the mutation.
+func (m *DashboardAgentMutation) Instructions() (r string, exists bool) {
+	v := m.instructions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInstructions returns the old "instructions" field's value of the DashboardAgent entity.
+// If the DashboardAgent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAgentMutation) OldInstructions(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInstructions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInstructions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInstructions: %w", err)
+	}
+	return oldValue.Instructions, nil
+}
+
+// ResetInstructions resets all changes to the "instructions" field.
+func (m *DashboardAgentMutation) ResetInstructions() {
+	m.instructions = nil
+}
+
+// SetPermissionMode sets the "permission_mode" field.
+func (m *DashboardAgentMutation) SetPermissionMode(s string) {
+	m.permission_mode = &s
+}
+
+// PermissionMode returns the value of the "permission_mode" field in the mutation.
+func (m *DashboardAgentMutation) PermissionMode() (r string, exists bool) {
+	v := m.permission_mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPermissionMode returns the old "permission_mode" field's value of the DashboardAgent entity.
+// If the DashboardAgent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAgentMutation) OldPermissionMode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPermissionMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPermissionMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPermissionMode: %w", err)
+	}
+	return oldValue.PermissionMode, nil
+}
+
+// ResetPermissionMode resets all changes to the "permission_mode" field.
+func (m *DashboardAgentMutation) ResetPermissionMode() {
+	m.permission_mode = nil
+}
+
+// SetCwd sets the "cwd" field.
+func (m *DashboardAgentMutation) SetCwd(s string) {
+	m.cwd = &s
+}
+
+// Cwd returns the value of the "cwd" field in the mutation.
+func (m *DashboardAgentMutation) Cwd() (r string, exists bool) {
+	v := m.cwd
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCwd returns the old "cwd" field's value of the DashboardAgent entity.
+// If the DashboardAgent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAgentMutation) OldCwd(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCwd is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCwd requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCwd: %w", err)
+	}
+	return oldValue.Cwd, nil
+}
+
+// ResetCwd resets all changes to the "cwd" field.
+func (m *DashboardAgentMutation) ResetCwd() {
+	m.cwd = nil
+}
+
+// SetProjectID sets the "project_id" field.
+func (m *DashboardAgentMutation) SetProjectID(s string) {
+	m.project_id = &s
+}
+
+// ProjectID returns the value of the "project_id" field in the mutation.
+func (m *DashboardAgentMutation) ProjectID() (r string, exists bool) {
+	v := m.project_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProjectID returns the old "project_id" field's value of the DashboardAgent entity.
+// If the DashboardAgent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAgentMutation) OldProjectID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProjectID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProjectID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProjectID: %w", err)
+	}
+	return oldValue.ProjectID, nil
+}
+
+// ResetProjectID resets all changes to the "project_id" field.
+func (m *DashboardAgentMutation) ResetProjectID() {
+	m.project_id = nil
+}
+
+// SetRole sets the "role" field.
+func (m *DashboardAgentMutation) SetRole(s string) {
+	m.role = &s
+}
+
+// Role returns the value of the "role" field in the mutation.
+func (m *DashboardAgentMutation) Role() (r string, exists bool) {
+	v := m.role
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRole returns the old "role" field's value of the DashboardAgent entity.
+// If the DashboardAgent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAgentMutation) OldRole(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRole is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRole requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRole: %w", err)
+	}
+	return oldValue.Role, nil
+}
+
+// ResetRole resets all changes to the "role" field.
+func (m *DashboardAgentMutation) ResetRole() {
+	m.role = nil
+}
+
+// SetSessionID sets the "session_id" field.
+func (m *DashboardAgentMutation) SetSessionID(s string) {
+	m.session_id = &s
+}
+
+// SessionID returns the value of the "session_id" field in the mutation.
+func (m *DashboardAgentMutation) SessionID() (r string, exists bool) {
+	v := m.session_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSessionID returns the old "session_id" field's value of the DashboardAgent entity.
+// If the DashboardAgent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAgentMutation) OldSessionID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSessionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSessionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSessionID: %w", err)
+	}
+	return oldValue.SessionID, nil
+}
+
+// ResetSessionID resets all changes to the "session_id" field.
+func (m *DashboardAgentMutation) ResetSessionID() {
+	m.session_id = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *DashboardAgentMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *DashboardAgentMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the DashboardAgent entity.
+// If the DashboardAgent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAgentMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *DashboardAgentMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *DashboardAgentMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *DashboardAgentMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the DashboardAgent entity.
+// If the DashboardAgent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAgentMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *DashboardAgentMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the DashboardAgentMutation builder.
+func (m *DashboardAgentMutation) Where(ps ...predicate.DashboardAgent) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DashboardAgentMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DashboardAgentMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DashboardAgent, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DashboardAgentMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DashboardAgentMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DashboardAgent).
+func (m *DashboardAgentMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DashboardAgentMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.display_name != nil {
+		fields = append(fields, dashboardagent.FieldDisplayName)
+	}
+	if m.category != nil {
+		fields = append(fields, dashboardagent.FieldCategory)
+	}
+	if m.instructions != nil {
+		fields = append(fields, dashboardagent.FieldInstructions)
+	}
+	if m.permission_mode != nil {
+		fields = append(fields, dashboardagent.FieldPermissionMode)
+	}
+	if m.cwd != nil {
+		fields = append(fields, dashboardagent.FieldCwd)
+	}
+	if m.project_id != nil {
+		fields = append(fields, dashboardagent.FieldProjectID)
+	}
+	if m.role != nil {
+		fields = append(fields, dashboardagent.FieldRole)
+	}
+	if m.session_id != nil {
+		fields = append(fields, dashboardagent.FieldSessionID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, dashboardagent.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, dashboardagent.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DashboardAgentMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case dashboardagent.FieldDisplayName:
+		return m.DisplayName()
+	case dashboardagent.FieldCategory:
+		return m.Category()
+	case dashboardagent.FieldInstructions:
+		return m.Instructions()
+	case dashboardagent.FieldPermissionMode:
+		return m.PermissionMode()
+	case dashboardagent.FieldCwd:
+		return m.Cwd()
+	case dashboardagent.FieldProjectID:
+		return m.ProjectID()
+	case dashboardagent.FieldRole:
+		return m.Role()
+	case dashboardagent.FieldSessionID:
+		return m.SessionID()
+	case dashboardagent.FieldCreatedAt:
+		return m.CreatedAt()
+	case dashboardagent.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DashboardAgentMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case dashboardagent.FieldDisplayName:
+		return m.OldDisplayName(ctx)
+	case dashboardagent.FieldCategory:
+		return m.OldCategory(ctx)
+	case dashboardagent.FieldInstructions:
+		return m.OldInstructions(ctx)
+	case dashboardagent.FieldPermissionMode:
+		return m.OldPermissionMode(ctx)
+	case dashboardagent.FieldCwd:
+		return m.OldCwd(ctx)
+	case dashboardagent.FieldProjectID:
+		return m.OldProjectID(ctx)
+	case dashboardagent.FieldRole:
+		return m.OldRole(ctx)
+	case dashboardagent.FieldSessionID:
+		return m.OldSessionID(ctx)
+	case dashboardagent.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case dashboardagent.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown DashboardAgent field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DashboardAgentMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case dashboardagent.FieldDisplayName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDisplayName(v)
+		return nil
+	case dashboardagent.FieldCategory:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCategory(v)
+		return nil
+	case dashboardagent.FieldInstructions:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInstructions(v)
+		return nil
+	case dashboardagent.FieldPermissionMode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPermissionMode(v)
+		return nil
+	case dashboardagent.FieldCwd:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCwd(v)
+		return nil
+	case dashboardagent.FieldProjectID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProjectID(v)
+		return nil
+	case dashboardagent.FieldRole:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRole(v)
+		return nil
+	case dashboardagent.FieldSessionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSessionID(v)
+		return nil
+	case dashboardagent.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case dashboardagent.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DashboardAgent field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DashboardAgentMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DashboardAgentMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DashboardAgentMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown DashboardAgent numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DashboardAgentMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DashboardAgentMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DashboardAgentMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown DashboardAgent nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DashboardAgentMutation) ResetField(name string) error {
+	switch name {
+	case dashboardagent.FieldDisplayName:
+		m.ResetDisplayName()
+		return nil
+	case dashboardagent.FieldCategory:
+		m.ResetCategory()
+		return nil
+	case dashboardagent.FieldInstructions:
+		m.ResetInstructions()
+		return nil
+	case dashboardagent.FieldPermissionMode:
+		m.ResetPermissionMode()
+		return nil
+	case dashboardagent.FieldCwd:
+		m.ResetCwd()
+		return nil
+	case dashboardagent.FieldProjectID:
+		m.ResetProjectID()
+		return nil
+	case dashboardagent.FieldRole:
+		m.ResetRole()
+		return nil
+	case dashboardagent.FieldSessionID:
+		m.ResetSessionID()
+		return nil
+	case dashboardagent.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case dashboardagent.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DashboardAgent field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DashboardAgentMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DashboardAgentMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DashboardAgentMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DashboardAgentMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DashboardAgentMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DashboardAgentMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DashboardAgentMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown DashboardAgent unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DashboardAgentMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown DashboardAgent edge %s", name)
 }
 
 // DriftAlertMutation represents an operation that mutates the DriftAlert nodes in the graph.

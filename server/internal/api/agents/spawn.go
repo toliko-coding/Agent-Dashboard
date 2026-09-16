@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/lx-wnk/agent-dashboard/sdk"
+	"github.com/lx-wnk/agent-dashboard/server/internal/agentconfig"
 	"github.com/lx-wnk/agent-dashboard/server/internal/agentprofile"
 	"github.com/lx-wnk/agent-dashboard/server/internal/auth"
 	"github.com/lx-wnk/agent-dashboard/server/internal/channelconfig"
@@ -82,6 +83,10 @@ type SpawnManager struct {
 	spawnerRepo repo.SpawnerRepo
 	// profiles persists the display name and icon category given at spawn (3N.1).
 	profiles ProfileSaver
+	// agentConfigs persists the durable agent a spawn creates: its standing
+	// instructions and the permission mode it was started with, so the agent
+	// still has them after this session ends.
+	agentConfigs AgentConfigStore
 	// managed records every agent this server launches: lifecycle ownership (3N.2.1).
 	managed           ManagedRecorder
 	spawnPolicy       services.SpawnPolicy
@@ -156,6 +161,11 @@ type ProfileSaver interface {
 // saved to. Unset, a spawn that carries them reports them as not saved.
 func (m *SpawnManager) SetAgentProfiles(p ProfileSaver) {
 	m.profiles = p
+}
+
+// SetAgentConfigs wires the durable agent record a spawn writes to.
+func (m *SpawnManager) SetAgentConfigs(c AgentConfigStore) {
+	m.agentConfigs = c
 }
 
 // ManagedRecorder stores the proof that this server launched an agent.
@@ -553,7 +563,9 @@ func (m *SpawnManager) spawn(sub string, body map[string]any, prov spawnProvenan
 	m.mu.Unlock()
 	go watch()
 	m.recordOwnership(req, pid)
-	return SpawnOutcome{PID: pid, Profile: m.saveProfile(req)}, nil
+	profile := m.saveProfile(req)
+	m.saveAgentConfig(req)
+	return SpawnOutcome{PID: pid, Profile: profile}, nil
 }
 
 // recordOwnership stores the proof that this server launched pid for the
@@ -584,6 +596,39 @@ func (m *SpawnManager) saveProfile(req *spawnRequest) string {
 		return ProfileFailed
 	}
 	return ProfileSaved
+}
+
+/*
+ * saveAgentConfig records the durable agent this spawn just created.
+ *
+ * Separate from saveProfile, and not conditional on a name being given: a name
+ * is presentation and may be absent, but the instructions and permission mode a
+ * session was started with are the agent's configuration, and losing them when
+ * the process exits is exactly what the durable record exists to prevent.
+ *
+ * Best effort by design. A spawn that started a process must not be reported as
+ * failed because a row could not be written, so a failure is logged and the
+ * agent simply has nothing saved yet.
+ */
+func (m *SpawnManager) saveAgentConfig(req *spawnRequest) {
+	if m.agentConfigs == nil || req.sessionID == "" {
+		return
+	}
+	patch := agentconfig.Patch{
+		Instructions:   &req.systemPrompt,
+		PermissionMode: &req.permissionMode,
+		Cwd:            &req.cwd,
+	}
+	if !req.profile.Empty() {
+		patch.DisplayName = &req.profile.DisplayName
+		patch.Category = &req.profile.Category
+	}
+	if req.projectID != "" {
+		patch.ProjectID = &req.projectID
+	}
+	if _, err := m.agentConfigs.SaveForSession(context.Background(), req.sessionID, patch); err != nil {
+		slog.Warn("spawn: agent configuration not saved", "err", err)
+	}
 }
 
 // launchInteractive starts the resolved command under a headless live transport
@@ -999,7 +1044,10 @@ type SpawnHandler struct {
 	forgetter      AgentForgetter
 	profileDeleter ProfileDeleter
 	profileSaver   ProfileSaver
-	managed        ManagedAgents
+	// agentConfigs is the durable agent record (name, icon, instructions,
+	// permission mode, role). Nil when this server stores none.
+	agentConfigs AgentConfigStore
+	managed      ManagedAgents
 	// Resume under Dashboard control (3N.2.2); tests swap these seams.
 	resumeSpawn func(sub string, body map[string]any) (SpawnOutcome, error)
 	hosted      func(pid int) bool

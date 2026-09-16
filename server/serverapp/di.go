@@ -21,6 +21,7 @@ import (
 
 	sdk "github.com/lx-wnk/agent-dashboard/sdk"
 	"github.com/lx-wnk/agent-dashboard/server/internal/agentbroadcast"
+	"github.com/lx-wnk/agent-dashboard/server/internal/agentconfig"
 	"github.com/lx-wnk/agent-dashboard/server/internal/agentprofile"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/adapters"
@@ -530,6 +531,7 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 	var projectRepo repo.ProjectRepo
 	var projectFolderRepo repo.ProjectFolderRepo
 	var agentProfiles *agentprofile.Store
+	var agentConfigs *agentconfig.Store
 	var managedAgents *managedagent.Store
 	var roadmapSvc *roadmap.Service
 	var spawnerRepo repo.SpawnerRepo
@@ -546,6 +548,39 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 			slog.Warn("agent profiles not loaded; agents show their session titles", "err", err)
 		}
 		agentMerger.SetAgentProfiles(agentProfiles)
+		/*
+		 * Agents as durable entities (name, icon, standing instructions, saved
+		 * permission mode, role), which outlive the sessions running them.
+		 *
+		 * The main agent is seeded rather than designated: there is no API that
+		 * promotes an ordinary agent, so "exactly one main agent" holds by
+		 * construction. It is seeded against this server's own working folder,
+		 * which is the repository it maintains.
+		 */
+		agentConfigs = agentconfig.New(repo.NewDashboardAgentRepo(entClient))
+		if err := agentConfigs.Load(ctx); err != nil {
+			slog.Warn("agent configurations not loaded; agents show their session titles and start with default settings", "err", err)
+		}
+		selfCwd, cwdErr := os.Getwd()
+		if cwdErr != nil {
+			slog.Warn("working directory unreadable; the main agent is seeded without one", "err", cwdErr)
+		}
+		if _, err := agentConfigs.EnsureMain(ctx, selfCwd); err != nil {
+			slog.Warn("main agent not seeded", "err", err)
+		}
+		// One-time migration off the earlier session-keyed designation: the role
+		// now lives on the durable agent, so the old setting is consumed and
+		// cleared rather than left as a second source of truth.
+		if settingsSvc != nil {
+			if legacy := settingsSvc.String(settings.MainAgentSessionKey); legacy != "" {
+				if _, err := agentConfigs.BindMainSession(ctx, legacy); err != nil {
+					slog.Warn("main agent session not migrated", "err", err)
+				} else if err := settingsSvc.Set(ctx, settings.MainAgentSessionKey, ""); err != nil {
+					slog.Warn("legacy main agent setting not cleared", "err", err)
+				}
+			}
+		}
+		agentMerger.SetAgentConfigs(agentConfigs)
 		// Which agents this server launched: the only basis for Stop and Delete (3N.2.1).
 		managedAgents = managedagent.New(repo.NewManagedAgentRepo(entClient))
 		if err := managedAgents.Load(ctx); err != nil {
@@ -998,6 +1033,7 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 		ProjectRepo:            projectRepo,
 		ProjectFolderRepo:      projectFolderRepo,
 		AgentProfiles:          agentProfiles,
+		AgentConfigs:           agentConfigs,
 		ManagedAgents:          managedAgents,
 		Roadmap:                roadmapSvc,
 		SpawnerRepo:            spawnerRepo,

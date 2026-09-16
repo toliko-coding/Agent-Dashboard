@@ -16,6 +16,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/sdk"
 	"github.com/lx-wnk/agent-dashboard/server/frontend"
 	"github.com/lx-wnk/agent-dashboard/server/internal/agentbroadcast"
+	"github.com/lx-wnk/agent-dashboard/server/internal/agentconfig"
 	"github.com/lx-wnk/agent-dashboard/server/internal/agentprofile"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/adapters"
 	"github.com/lx-wnk/agent-dashboard/server/internal/api/admin"
@@ -178,6 +179,9 @@ type RouterDeps struct {
 	ProjectFolderRepo repo.ProjectFolderRepo
 	// AgentProfiles stores display names and icon categories given at spawn.
 	AgentProfiles *agentprofile.Store
+	// AgentConfigs stores agents as durable entities: name, icon, standing
+	// instructions, saved permission mode and role, outliving any session.
+	AgentConfigs *agentconfig.Store
 	// ManagedAgents records the agents this server launched (lifecycle ownership).
 	ManagedAgents *managedagent.Store
 	// Roadmap is Project Intelligence's roadmap service (Phase 4B).
@@ -591,6 +595,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 			deps.SpawnerRepo, spawnPolicy,
 		)
 		spawnMgr.SetProjectFolderRepo(deps.ProjectFolderRepo)
+		if deps.AgentConfigs != nil {
+			// A spawn records the durable agent it creates, so its instructions
+			// and permission mode outlive the session it just started.
+			spawnMgr.SetAgentConfigs(deps.AgentConfigs)
+		}
 		if deps.AgentProfiles != nil {
 			spawnMgr.SetAgentProfiles(deps.AgentProfiles)
 		}
@@ -602,6 +611,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 		spawnMgr.SetScreenProbe(merger.RealScreenProbe)
 		go spawnMgr.StartPruner(serverCtx)
 		spawnHandler := agents.NewSpawnHandler(spawnMgr)
+		if deps.AgentConfigs != nil {
+			spawnHandler.SetAgentConfigs(deps.AgentConfigs)
+		}
 		if deps.AgentProfiles != nil {
 			spawnHandler.SetProfileDeleter(deps.AgentProfiles)
 			spawnHandler.SetProfileSaver(deps.AgentProfiles)
@@ -656,6 +668,10 @@ func NewRouter(deps RouterDeps) http.Handler {
 			roadmapHandler.Mount(r)
 		}
 		r.Put("/api/agents/{pid}/profile", spawnHandler.UpdateAgentProfile)
+		// An agent's durable configuration: what it is called, its standing
+		// instructions, and the permission mode saved for its next session.
+		r.Get("/api/agents/{pid}/config", spawnHandler.AgentConfig)
+		r.Put("/api/agents/{pid}/config", spawnHandler.UpdateAgentConfig)
 		r.Get("/api/agents/{pid}/control", spawnHandler.GetAgentControl)
 		r.Post("/api/agents/{pid}/resume-under-dashboard", spawnHandler.ResumeUnderDashboard)
 		uploadImageHandler := agents.NewUploadImageHandler()

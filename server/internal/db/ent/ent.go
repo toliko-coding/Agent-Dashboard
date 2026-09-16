@@ -20,6 +20,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/capability"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/checkpoint"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/coordlock"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/dashboardagent"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/driftalert"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/evalmetricsnapshot"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/grant"
@@ -121,6 +122,7 @@ func checkColumn(t, c string) error {
 			capability.Table:         capability.ValidColumn,
 			checkpoint.Table:         checkpoint.ValidColumn,
 			coordlock.Table:          coordlock.ValidColumn,
+			dashboardagent.Table:     dashboardagent.ValidColumn,
 			driftalert.Table:         driftalert.ValidColumn,
 			evalmetricsnapshot.Table: evalmetricsnapshot.ValidColumn,
 			grant.Table:              grant.ValidColumn,

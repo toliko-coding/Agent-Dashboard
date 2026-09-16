@@ -556,6 +556,25 @@ type Agent struct {
 	// by session id (server/internal/agentprofile) and never authorize anything.
 	DisplayName string `json:"displayName,omitempty"`
 	Category    string `json:"category,omitempty"`
+	// AgentID is the durable dashboard agent this session is running, when one
+	// has been saved for it. The agent outlives the session: its name, its
+	// standing instructions and its saved permission mode belong to the agent,
+	// not to the process, which is why a finished agent still has all three.
+	AgentID string `json:"agentId,omitempty"`
+	// Role is "main" for the one agent that maintains Agent Dashboard itself,
+	// and empty for every other agent. Identity, never authority: no permission
+	// check, ownership check or control path anywhere consults it.
+	Role string `json:"role,omitempty"`
+	// SavedPermissionMode is the mode saved for this agent's NEXT session. It is
+	// not necessarily SessionPermissionMode, which is what the process already
+	// running was started with; when the two differ, a surface showing them must
+	// say which is which.
+	SavedPermissionMode string `json:"savedPermissionMode,omitempty"`
+	// HasSavedInstructions says whether standing instructions exist for this
+	// agent, without carrying them: they run to thousands of characters and the
+	// roster is broadcast every few seconds, so the text itself is read on
+	// demand from the agent's configuration instead.
+	HasSavedInstructions bool `json:"hasSavedInstructions,omitempty"`
 	// DashboardOwned is true only when this server launched the agent's process
 	// itself: a managed-agent record for this session with this PID, or a spawn
 	// this server run is tracking. Only an owned agent can be stopped or deleted
@@ -670,6 +689,42 @@ type Agent struct {
 	// opt-in hook receiver holds events. Omitted entirely when no hook is
 	// installed, so clients without hooks receive byte-identical payloads.
 	RecentHookEvents []HookEvent `json:"recentHookEvents,omitempty"`
+}
+
+// AgentConfigDTO is one durable agent's saved configuration, read and written
+// through /api/agents/{pid}/config.
+//
+// It carries both halves of the question a user actually asks — "what will this
+// agent do next time" and "what is the session in front of me doing" — because
+// they can differ and a surface that showed only one would be misleading.
+// Claude reads its permission mode and system prompt once, at startup, so
+// nothing saved here changes a session already running.
+type AgentConfigDTO struct {
+	// AgentID is the durable agent; empty when nothing has been saved yet.
+	AgentID     string `json:"agentId"`
+	DisplayName string `json:"displayName"`
+	Category    string `json:"category"`
+	// Instructions is the agent's standing system prompt, in full. Read on
+	// demand rather than carried on the roster, which is broadcast constantly.
+	Instructions   string `json:"instructions"`
+	PermissionMode string `json:"permissionMode"`
+	Cwd            string `json:"cwd,omitempty"`
+	ProjectID      string `json:"projectId,omitempty"`
+	// Role is "main" for the agent that maintains Agent Dashboard, else empty.
+	Role string `json:"role,omitempty"`
+	// SessionPermissionMode is what the process running right now was started
+	// with, read from its own command line. Empty when no session is running or
+	// no command line was observed.
+	SessionPermissionMode string `json:"sessionPermissionMode,omitempty"`
+	// SessionRunning says whether a live process is realising this agent now.
+	SessionRunning bool `json:"sessionRunning"`
+	// ConfigurableHere is false for a session this dashboard did not start:
+	// its name and icon can still be set, but instructions and permission mode
+	// cannot, because those are applied when the dashboard starts a session.
+	ConfigurableHere bool `json:"configurableHere"`
+	// DiffersFromSession is true when a saved permission mode is not the mode
+	// the running session was started with — the case a UI must spell out.
+	DiffersFromSession bool `json:"differsFromSession"`
 }
 
 // RuntimeSelf identifies the dashboard's own server process, so a listening

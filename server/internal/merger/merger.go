@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/lx-wnk/agent-dashboard/server/internal/agentconfig"
 	"github.com/lx-wnk/agent-dashboard/server/internal/agentprofile"
 	"os"
 	"os/exec"
@@ -284,6 +285,11 @@ type Merger struct {
 	// profiles attaches the display name and icon category a user gave an agent
 	// at spawn, by session id (3N.1). Nil: no agent carries either.
 	profiles ProfileLookup
+	// agentConfigs attaches the durable agent behind a session: its id, its
+	// role, and the configuration saved for its next session. Applied to the
+	// whole roster including finished cards, so an agent whose process has
+	// ended still carries what its owner configured.
+	agentConfigs AgentConfigLookup
 	// ownership says which agents this server launched (3N.2.1).
 	ownerMu   sync.RWMutex
 	ownership OwnershipLookup
@@ -314,6 +320,14 @@ type OwnershipLookup interface {
 	Owns(pid int, sessionID string) bool
 }
 
+// AgentConfigLookup finds the durable agent a session is running, when one has
+// been saved. Separate from ProfileLookup because it answers a different
+// question: not "what is this session called" but "which agent is this, and
+// what did its owner configure for it".
+type AgentConfigLookup interface {
+	Lookup(sessionID string) (agentconfig.Config, bool)
+}
+
 // SetOwnership installs the ownership check attached as Agent.DashboardOwned.
 func (m *Merger) SetOwnership(o OwnershipLookup) {
 	m.ownerMu.Lock()
@@ -323,6 +337,9 @@ func (m *Merger) SetOwnership(o OwnershipLookup) {
 
 // SetAgentProfiles installs the profile lookup. Call once, before serving.
 func (m *Merger) SetAgentProfiles(p ProfileLookup) { m.profiles = p }
+
+// SetAgentConfigs wires the durable agent records.
+func (m *Merger) SetAgentConfigs(c AgentConfigLookup) { m.agentConfigs = c }
 
 // applyProfiles attaches saved presentation metadata to each agent by session
 // id — never by folder, Project or process — on every scan, so a rebuilt agent
@@ -342,6 +359,41 @@ func (m *Merger) applyProfiles(agents []sdk.Agent) {
 		if p, ok := m.profiles.Lookup(agents[i].SessionID); ok {
 			agents[i].DisplayName = p.DisplayName
 			agents[i].Category = p.Category
+		}
+	}
+	m.applyAgentConfigs(agents)
+}
+
+/*
+ * applyAgentConfigs attaches the durable agent behind each session.
+ *
+ * It runs after the session-keyed profile so a saved agent wins for the name
+ * and icon: agent_profile is the older, session-scoped store, and an agent's
+ * own record is the thing the user now edits. Empty fields never overwrite -
+ * "not set on the agent" must not erase a name the profile already supplied.
+ *
+ * Instructions are deliberately not attached. They run to thousands of
+ * characters and this roster is broadcast every few seconds; whether any exist
+ * is enough for a card, and the text itself is read on demand.
+ */
+func (m *Merger) applyAgentConfigs(agents []sdk.Agent) {
+	if m.agentConfigs == nil {
+		return
+	}
+	for i := range agents {
+		cfg, ok := m.agentConfigs.Lookup(agents[i].SessionID)
+		if !ok {
+			continue
+		}
+		agents[i].AgentID = cfg.AgentID
+		agents[i].Role = cfg.Role
+		agents[i].SavedPermissionMode = cfg.PermissionMode
+		agents[i].HasSavedInstructions = cfg.Instructions != ""
+		if cfg.DisplayName != "" {
+			agents[i].DisplayName = cfg.DisplayName
+		}
+		if cfg.Category != "" {
+			agents[i].Category = cfg.Category
 		}
 	}
 }

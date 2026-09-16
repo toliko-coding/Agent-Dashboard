@@ -30,6 +30,9 @@ type Checkpoint func(*sql.Selector)
 // CoordLock is the predicate function for coordlock builders.
 type CoordLock func(*sql.Selector)
 
+// DashboardAgent is the predicate function for dashboardagent builders.
+type DashboardAgent func(*sql.Selector)
+
 // DriftAlert is the predicate function for driftalert builders.
 type DriftAlert func(*sql.Selector)
 

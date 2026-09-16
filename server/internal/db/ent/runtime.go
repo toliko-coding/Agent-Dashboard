@@ -13,6 +13,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/capability"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/checkpoint"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/coordlock"
+	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/dashboardagent"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/driftalert"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/evalmetricsnapshot"
 	"github.com/lx-wnk/agent-dashboard/server/internal/db/ent/grant"
@@ -197,6 +198,54 @@ func init() {
 	coordlockDescAcquiredAt := coordlockFields[4].Descriptor()
 	// coordlock.DefaultAcquiredAt holds the default value on creation for the acquired_at field.
 	coordlock.DefaultAcquiredAt = coordlockDescAcquiredAt.Default.(func() time.Time)
+	dashboardagentFields := schema.DashboardAgent{}.Fields()
+	_ = dashboardagentFields
+	// dashboardagentDescDisplayName is the schema descriptor for display_name field.
+	dashboardagentDescDisplayName := dashboardagentFields[1].Descriptor()
+	// dashboardagent.DefaultDisplayName holds the default value on creation for the display_name field.
+	dashboardagent.DefaultDisplayName = dashboardagentDescDisplayName.Default.(string)
+	// dashboardagentDescCategory is the schema descriptor for category field.
+	dashboardagentDescCategory := dashboardagentFields[2].Descriptor()
+	// dashboardagent.DefaultCategory holds the default value on creation for the category field.
+	dashboardagent.DefaultCategory = dashboardagentDescCategory.Default.(string)
+	// dashboardagentDescInstructions is the schema descriptor for instructions field.
+	dashboardagentDescInstructions := dashboardagentFields[3].Descriptor()
+	// dashboardagent.DefaultInstructions holds the default value on creation for the instructions field.
+	dashboardagent.DefaultInstructions = dashboardagentDescInstructions.Default.(string)
+	// dashboardagentDescPermissionMode is the schema descriptor for permission_mode field.
+	dashboardagentDescPermissionMode := dashboardagentFields[4].Descriptor()
+	// dashboardagent.DefaultPermissionMode holds the default value on creation for the permission_mode field.
+	dashboardagent.DefaultPermissionMode = dashboardagentDescPermissionMode.Default.(string)
+	// dashboardagentDescCwd is the schema descriptor for cwd field.
+	dashboardagentDescCwd := dashboardagentFields[5].Descriptor()
+	// dashboardagent.DefaultCwd holds the default value on creation for the cwd field.
+	dashboardagent.DefaultCwd = dashboardagentDescCwd.Default.(string)
+	// dashboardagentDescProjectID is the schema descriptor for project_id field.
+	dashboardagentDescProjectID := dashboardagentFields[6].Descriptor()
+	// dashboardagent.DefaultProjectID holds the default value on creation for the project_id field.
+	dashboardagent.DefaultProjectID = dashboardagentDescProjectID.Default.(string)
+	// dashboardagentDescRole is the schema descriptor for role field.
+	dashboardagentDescRole := dashboardagentFields[7].Descriptor()
+	// dashboardagent.DefaultRole holds the default value on creation for the role field.
+	dashboardagent.DefaultRole = dashboardagentDescRole.Default.(string)
+	// dashboardagentDescSessionID is the schema descriptor for session_id field.
+	dashboardagentDescSessionID := dashboardagentFields[8].Descriptor()
+	// dashboardagent.DefaultSessionID holds the default value on creation for the session_id field.
+	dashboardagent.DefaultSessionID = dashboardagentDescSessionID.Default.(string)
+	// dashboardagentDescCreatedAt is the schema descriptor for created_at field.
+	dashboardagentDescCreatedAt := dashboardagentFields[9].Descriptor()
+	// dashboardagent.DefaultCreatedAt holds the default value on creation for the created_at field.
+	dashboardagent.DefaultCreatedAt = dashboardagentDescCreatedAt.Default.(func() time.Time)
+	// dashboardagentDescUpdatedAt is the schema descriptor for updated_at field.
+	dashboardagentDescUpdatedAt := dashboardagentFields[10].Descriptor()
+	// dashboardagent.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	dashboardagent.DefaultUpdatedAt = dashboardagentDescUpdatedAt.Default.(func() time.Time)
+	// dashboardagent.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	dashboardagent.UpdateDefaultUpdatedAt = dashboardagentDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// dashboardagentDescID is the schema descriptor for id field.
+	dashboardagentDescID := dashboardagentFields[0].Descriptor()
+	// dashboardagent.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	dashboardagent.IDValidator = dashboardagentDescID.Validators[0].(func(string) error)
 	driftalertFields := schema.DriftAlert{}.Fields()
 	_ = driftalertFields
 	// driftalertDescStatus is the schema descriptor for status field.

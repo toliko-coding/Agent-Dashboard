@@ -2,6 +2,8 @@ package agents
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -15,6 +17,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/agentprofile"
 	"github.com/lx-wnk/agent-dashboard/server/internal/channelconfig"
 	"github.com/lx-wnk/agent-dashboard/server/internal/services"
+	"github.com/lx-wnk/agent-dashboard/server/internal/validation"
 )
 
 /*
@@ -159,6 +162,13 @@ func (h *SpawnHandler) ResumeUnderDashboard(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// What this resume will start the session with, decided before the running
+	// session is touched: a refusal must not leave the agent stopped.
+	resumeMode, resumeInstructions, ok := h.confirmedResumeConfig(w, r, agent)
+	if !ok {
+		return
+	}
+
 	if avail.EndsRunningSession {
 		if err := h.exitSession(r.Context(), agent.PID); err != nil {
 			lifecycleJSON(w, http.StatusBadGateway, map[string]string{"error": "Could not ask the session to exit: " + err.Error()})
@@ -183,7 +193,10 @@ func (h *SpawnHandler) ResumeUnderDashboard(w http.ResponseWriter, r *http.Reque
 		"cwd":             agent.CWD,
 		"resumeSessionId": agent.SessionID,
 		"enableChannel":   true,
-		"permissionMode":  "default",
+		"permissionMode":  resumeMode,
+	}
+	if resumeInstructions != "" {
+		body["systemPrompt"] = resumeInstructions
 	}
 	outcome, err := h.startResume(sub, body)
 	if err != nil {
@@ -280,4 +293,88 @@ func (h *SpawnHandler) UpdateAgentProfile(w http.ResponseWriter, r *http.Request
 	}
 	h.audit(r, "agent_profile_update", agent.PID, map[string]any{"sessionId": agent.SessionID, "category": profile.Category, "named": profile.DisplayName != ""})
 	lifecycleJSON(w, http.StatusOK, map[string]string{"displayName": profile.DisplayName, "category": profile.Category})
+}
+
+/*
+ * confirmedResumeConfig decides what a resume starts the new session with.
+ *
+ * The rule the owner asked for: a saved configuration may apply on resume, but
+ * only after the user has seen it and confirmed it. So confirmation is not a
+ * formality the client can skip - it carries back the exact values it displayed,
+ * and they must still be the saved ones. If the configuration changed between
+ * the dialog opening and the click (another tab, another window), the resume is
+ * refused and the user is shown the current values rather than launching with
+ * something they never saw.
+ *
+ * Without a confirmation the resume behaves exactly as it did before saved
+ * configuration existed: claude's default mode and no standing instructions.
+ * That is the non-escalating direction, which is why it is the fallback - a
+ * saved "bypassPermissions" can never be applied by a client that simply did
+ * not ask about it.
+ */
+func (h *SpawnHandler) confirmedResumeConfig(w http.ResponseWriter, r *http.Request, agent sdk.Agent) (mode string, instructions string, ok bool) {
+	const defaultMode = validation.PermissionModeDefault
+	var body struct {
+		Confirmed *bool `json:"confirmed"`
+		// PermissionMode and InstructionsFingerprint are what the confirmation
+		// dialog showed. They are checked, never trusted: the values applied
+		// come from the saved record.
+		PermissionMode          *string `json:"permissionMode"`
+		InstructionsFingerprint *string `json:"instructionsFingerprint"`
+	}
+	if r.Body != nil {
+		// An absent or empty body is a resume with no confirmation, which is
+		// allowed and simply applies nothing.
+		_ = json.NewDecoder(r.Body).Decode(&body)
+	}
+	if body.Confirmed == nil || !*body.Confirmed {
+		return defaultMode, "", true
+	}
+	if h.agentConfigs == nil {
+		return defaultMode, "", true
+	}
+	cfg, found := h.agentConfigs.Lookup(agent.SessionID)
+	if !found {
+		// Nothing is saved, so there was nothing to confirm; starting with the
+		// default is what the user was shown.
+		return defaultMode, "", true
+	}
+
+	savedMode := cfg.PermissionMode
+	if savedMode == "" {
+		savedMode = defaultMode
+	}
+	shown := defaultMode
+	if body.PermissionMode != nil {
+		shown = *body.PermissionMode
+	}
+	if shown != savedMode {
+		lifecycleJSON(w, http.StatusConflict, map[string]any{
+			"error":  "This agent's saved configuration changed since it was shown. Check it and confirm again.",
+			"reason": "stale_configuration",
+			"config": agentConfigDTO(agent, cfg),
+		})
+		return "", "", false
+	}
+	if body.InstructionsFingerprint != nil && *body.InstructionsFingerprint != InstructionsFingerprint(cfg.Instructions) {
+		lifecycleJSON(w, http.StatusConflict, map[string]any{
+			"error":  "This agent's saved instructions changed since they were shown. Check them and confirm again.",
+			"reason": "stale_configuration",
+			"config": agentConfigDTO(agent, cfg),
+		})
+		return "", "", false
+	}
+	if !validation.IsPermissionMode(savedMode) {
+		lifecycleJSON(w, http.StatusConflict, map[string]string{"error": "This agent's saved permission mode is not one this dashboard can use."})
+		return "", "", false
+	}
+	return savedMode, cfg.Instructions, true
+}
+
+// InstructionsFingerprint identifies a body of instructions without carrying it.
+// The confirmation dialog sends back the fingerprint of what it displayed, so a
+// text edited in another tab is caught before a session starts on it.
+func InstructionsFingerprint(instructions string) string {
+	sum := sha256.Sum256([]byte(instructions))
+	return hex.EncodeToString(sum[:])[:16]
 }
