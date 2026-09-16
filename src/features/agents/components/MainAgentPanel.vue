@@ -62,6 +62,12 @@ const externalSession = computed(() => !!session.value && !agentIsDashboardOwned
 
 const confirmStart = ref(false)
 const starting = ref(false)
+/*
+ * A session starts with a message, so starting one asks for it rather than
+ * inventing an opening prompt on the user's behalf.
+ */
+const firstMessage = ref('')
+const canStart = computed(() => firstMessage.value.trim().length > 0 && !starting.value)
 
 const title = computed(() => mainAgent.value?.displayName || 'Agent Dashboard Manager')
 const sessionState = computed(() => session.value ? statusLabel(agentDisplayStatus(session.value)) : null)
@@ -84,10 +90,12 @@ async function startMain() {
     error.value = 'This agent has no folder recorded, so nothing can be started from here.'
     return
   }
+  if (!canStart.value)
+    return
   starting.value = true
   error.value = ''
   try {
-    const body: Record<string, unknown> = { cwd: cfg.cwd, enableChannel: true }
+    const body: Record<string, unknown> = { prompt: firstMessage.value.trim(), cwd: cfg.cwd, enableChannel: true }
     if (cfg.sessionId)
       body.resumeSessionId = cfg.sessionId
     if (cfg.permissionMode)
@@ -105,6 +113,7 @@ async function startMain() {
       throw new Error(failed?.error || `Could not start the main agent (${res.status})`)
     }
     confirmStart.value = false
+    firstMessage.value = ''
     await refresh()
   }
   catch (e) {
@@ -220,10 +229,21 @@ async function link(pid: number) {
           <span data-testid="main-agent-start-mode">{{ permissionModeShortLabel(mainAgent?.permissionMode || 'default').toLowerCase() }}</span>.
           <span data-testid="main-agent-start-instructions">{{ mainAgent?.instructions ? 'Its saved instructions are applied.' : 'It has no saved instructions.' }}</span>
         </p>
+        <label class="flex flex-col gap-1 text-ui-sm text-fg-mute" for="main-agent-start-message">
+          First message
+          <textarea
+            id="main-agent-start-message"
+            v-model="firstMessage"
+            rows="2"
+            placeholder="What should it do?"
+            class="w-full rounded-control border border-line bg-app px-2 py-1 text-ui text-fg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+            data-testid="main-agent-start-message"
+          />
+        </label>
         <span class="flex flex-wrap gap-2">
           <button
             type="button"
-            :disabled="starting"
+            :disabled="!canStart"
             class="cursor-pointer rounded-lg border border-accent/50 bg-accent-soft/40 px-3 py-1 text-ui-sm font-medium text-accent hover:bg-raised disabled:opacity-60 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
             data-testid="main-agent-start-confirm-button"
             @click="startMain()"

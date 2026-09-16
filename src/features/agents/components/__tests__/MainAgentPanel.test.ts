@@ -65,6 +65,14 @@ async function mountPanel(agents: Agent[]) {
 }
 const q = (id: string) => document.querySelector(`[data-testid="${id}"]`) as HTMLElement | null
 
+/** A session starts with a message, so every start test has to supply one. */
+async function typeFirstMessage(text = 'Carry on maintaining the dashboard.') {
+  const box = q('main-agent-start-message') as HTMLTextAreaElement
+  box.value = text
+  box.dispatchEvent(new Event('input'))
+  await flushPromises()
+}
+
 beforeEach(() => {
   record = { ...MAIN }
   resetMainAgentRecordForTest()
@@ -217,9 +225,11 @@ describe('main agent panel', () => {
     expect(q('main-agent-start-mode')!.textContent).toContain('auto-accepts edits')
     expect(q('main-agent-start-instructions')!.textContent).toContain('saved instructions are applied')
 
+    await typeFirstMessage()
     q('main-agent-start-confirm-button')!.click()
     await flushPromises()
     expect(spawns).toEqual([{
+      prompt: 'Carry on maintaining the dashboard.',
       cwd: '/repo/agent-dashboard',
       enableChannel: true,
       permissionMode: 'acceptEdits',
@@ -238,9 +248,10 @@ describe('main agent panel', () => {
     await flushPromises()
     expect(q('main-agent-start-instructions')!.textContent).toContain('no saved instructions')
 
+    await typeFirstMessage('Pick up where you left off.')
     q('main-agent-start-confirm-button')!.click()
     await flushPromises()
-    expect(spawns).toEqual([{ cwd: '/repo/agent-dashboard', enableChannel: true, resumeSessionId: 'sess-old' }])
+    expect(spawns).toEqual([{ prompt: 'Pick up where you left off.', cwd: '/repo/agent-dashboard', enableChannel: true, resumeSessionId: 'sess-old' }])
     w.unmount()
   })
 
@@ -265,6 +276,7 @@ describe('main agent panel', () => {
     }))
     q('main-agent-start-button')!.click()
     await flushPromises()
+    await typeFirstMessage()
     q('main-agent-start-confirm-button')!.click()
     await flushPromises()
 
@@ -277,6 +289,26 @@ describe('main agent panel', () => {
     q('main-agent-start-button')!.click()
     await flushPromises()
     expect(await axe(q('main-agent-panel')!)).toHaveNoViolations()
+    w.unmount()
+  })
+
+  /*
+   * A session cannot start without a message - the server refuses a spawn with
+   * no prompt - so the button waits for one rather than sending a request that
+   * can only fail.
+   */
+  it('will not start a session with nothing to do', async () => {
+    const w = await mountPanel([])
+    q('main-agent-start-button')!.click()
+    await flushPromises()
+
+    expect((q('main-agent-start-confirm-button') as HTMLButtonElement).disabled).toBe(true)
+    q('main-agent-start-confirm-button')!.click()
+    await flushPromises()
+    expect(spawns).toHaveLength(0)
+
+    await typeFirstMessage()
+    expect((q('main-agent-start-confirm-button') as HTMLButtonElement).disabled).toBe(false)
     w.unmount()
   })
 })
