@@ -51,4 +51,33 @@ describe('dashboardView', () => {
     expect(wrapper.find('[data-testid="empty-state"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="agent-card-grid"]').exists()).toBe(false)
   })
+
+  /*
+   * Agents with no session running are kept, not active.
+   *
+   * Nothing in that section is waiting on the user, so it belongs below every
+   * group that describes something happening now - it should not be the first
+   * thing seen on opening Agents.
+   */
+  it('puts the kept agents below the main agent and below the roster', () => {
+    const wrapper = mount(DashboardView, {
+      attachTo: document.body,
+      props: { attention: { status: 'ready', stale: false, items: [] }, permissionItems: [], focusedSessionId: null },
+      global: {
+        stubs: {
+          AutoApprovingStrip: { template: '<div data-testid="auto-approving-strip" />' },
+          DashboardToolbar: { template: '<div data-testid="dashboard-toolbar" />' },
+          ChannelScriptCallout: { template: '<div data-testid="channel-script-callout" />' },
+        },
+      },
+    })
+
+    const kept = wrapper.find('[data-testid="persistent-agents"]').element
+    const main = wrapper.find('[data-testid="main-agent-panel"]').element
+    const roster = wrapper.find('[data-testid="empty-state"]').element
+
+    // DOCUMENT_POSITION_FOLLOWING (4) means the kept section comes after.
+    expect(main.compareDocumentPosition(kept) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(roster.compareDocumentPosition(kept) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
 })

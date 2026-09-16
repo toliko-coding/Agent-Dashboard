@@ -119,7 +119,6 @@ defineExpose({ rosterAgents })
     running it, and a status filter must not make it disappear.
   -->
   <MainAgentPanel :agents="agents" @select="selectAgent" />
-  <PersistentAgents :agents="agents" />
   <template v-if="dashboardLayout === 'list'">
     <EmptyAgentState v-if="rosterAgents.length === 0" :search-query="searchQuery" />
     <AgentTable v-else :agents="rosterAgents" :groups="rosterGroups" :attention-items="attention.items" :stale="!live" @select="selectAgent" />
@@ -131,5 +130,11 @@ defineExpose({ rosterAgents })
       <AgentCardGrid :agents="rosterAgents" :groups="rosterGroups" :group-by="dashboardGroup" :attention-items="attention.items" :stale="!live" @select="selectAgent" />
     </div>
   </template>
+  <!--
+    Agents with no session running, last on the page.
+    They are kept, not active: nothing here is waiting on the user, so they sit
+    below every group that describes something happening now.
+  -->
+  <PersistentAgents :agents="agents" class="mt-4" />
   <ChannelScriptCallout />
 </template>
