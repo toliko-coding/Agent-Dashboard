@@ -169,6 +169,23 @@ func (h *SpawnHandler) ResumeUnderDashboard(w http.ResponseWriter, r *http.Reque
 		lifecycleJSON(w, http.StatusForbidden, map[string]any{"error": avail.Reason, "external": true})
 		return
 	}
+	/*
+	 * Never a second main agent.
+	 *
+	 * resumeAvailability already refuses a session running outside this
+	 * dashboard, so the editor's own Manager cannot be ended or taken over from
+	 * here. This covers the remaining case: a card that says finished for a
+	 * session that is in fact alive. Resuming that would leave two processes
+	 * maintaining this dashboard, which is the one thing the main agent's
+	 * permanence is supposed to rule out.
+	 */
+	if h.mainAgentSessionLive(agent.SessionID) {
+		lifecycleJSON(w, http.StatusConflict, map[string]any{
+			"error": errMainAgentAlreadyRunning.Error(),
+			"main":  true,
+		})
+		return
+	}
 	sub := requestSub(r)
 	if !h.manager.IsSpawnAllowed(sub) {
 		lifecycleJSON(w, http.StatusTooManyRequests, map[string]string{"error": "Too many spawn requests; try again shortly."})
@@ -390,4 +407,17 @@ func (h *SpawnHandler) confirmedResumeConfig(w http.ResponseWriter, r *http.Requ
 func InstructionsFingerprint(instructions string) string {
 	sum := sha256.Sum256([]byte(instructions))
 	return hex.EncodeToString(sum[:])[:16]
+}
+
+// mainAgentSessionLive reports whether sessionID belongs to the main agent and
+// a process is running it right now.
+func (h *SpawnHandler) mainAgentSessionLive(sessionID string) bool {
+	if sessionID == "" || h.agentConfigs == nil || h.liveSessions == nil {
+		return false
+	}
+	cfg, ok := h.agentConfigs.Lookup(sessionID)
+	if !ok || !cfg.IsMain() {
+		return false
+	}
+	return h.liveSessions(sessionID)
 }

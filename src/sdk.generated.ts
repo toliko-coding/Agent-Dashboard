@@ -831,6 +831,36 @@ export interface AgentConfigDTO {
   differsFromSession: boolean
 }
 /**
+ * DashboardAgentDTO is one durable agent in the list of agents this dashboard
+ * keeps, whether or not a Claude session is running it.
+ * A finished agent used to vanish from the page when the server restarted,
+ * because the roster is built from live processes plus an in-process registry
+ * of recently-finished ones. This list is the durable half: it is read from
+ * storage, so an agent stays until someone deletes it.
+ * Instructions are not included, for the same reason they are not on the
+ * roster: they can run to thousands of characters. HasInstructions says whether
+ * any exist; the text is read per agent when something shows it.
+ */
+export interface DashboardAgentDTO {
+  agentId: string
+  displayName: string
+  category: string
+  permissionMode: string
+  hasInstructions: boolean
+  cwd?: string
+  projectId?: string
+  /**
+   * Role is "main" for the agent that maintains Agent Dashboard, else empty.
+   */
+  role?: string
+  /**
+   * SessionID is the last session recorded for this agent, "" when none. The
+   * client matches it against the roster to tell whether one is running now;
+   * this record makes no claim about liveness.
+   */
+  sessionId?: string
+}
+/**
  * MainAgentDTO is the durable record of the agent that maintains Agent
  * Dashboard itself, read through GET /api/main-agent.
  * It is a seeded record with a fixed id: no request promotes an ordinary agent,

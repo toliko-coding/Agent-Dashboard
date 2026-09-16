@@ -5,6 +5,7 @@ DELETE /api/agents/working-folders
 DELETE /api/agents/{pid}
 DELETE /api/agents/{pid}/channel
 DELETE /api/agents/{pid}/profile
+DELETE /api/dashboard-agents/{id}
 DELETE /api/grants/{id}
 DELETE /api/me
 DELETE /api/memory/entries/{id}
@@ -45,6 +46,7 @@ GET /api/config/file
 GET /api/config/memory
 GET /api/config/skills
 GET /api/cost/summary
+GET /api/dashboard-agents
 GET /api/github/search
 GET /api/github/summary
 GET /api/grants
@@ -188,6 +190,7 @@ PUT /api/agents/projectless
 PUT /api/agents/{pid}/config
 PUT /api/agents/{pid}/profile
 PUT /api/config/file
+PUT /api/dashboard-agents/{id}
 PUT /api/notifications/config
 PUT /api/notifications/preferences/{eventType}
 PUT /api/pipeline/config

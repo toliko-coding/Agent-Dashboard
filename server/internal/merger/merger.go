@@ -587,6 +587,25 @@ func (m *Merger) AgentByPID(pid int) (sdk.Agent, bool) {
 	return a, ok
 }
 
+/*
+ * LatestAgents returns the most recent scan, for callers that must answer
+ * "is this session running" without a pid to hand.
+ *
+ * A durable agent record carries a session id and no pid - the process it
+ * named is long gone - so AgentByPID cannot answer for it. The map is copied
+ * out under the lock rather than exposed: the caller is asking about a moment,
+ * not subscribing to one.
+ */
+func (m *Merger) LatestAgents() []sdk.Agent {
+	m.latestMu.RLock()
+	defer m.latestMu.RUnlock()
+	out := make([]sdk.Agent, 0, len(m.latest))
+	for _, a := range m.latest {
+		out = append(out, a)
+	}
+	return out
+}
+
 // ForgetAgent removes a deleted agent's finished card and keeps its session from
 // surfacing as a finished card again. A live process for that session (resumed
 // later) still appears: forgetting is about the dashboard's card, not the session.

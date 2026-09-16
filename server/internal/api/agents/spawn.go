@@ -87,6 +87,9 @@ type SpawnManager struct {
 	// instructions and the permission mode it was started with, so the agent
 	// still has them after this session ends.
 	agentConfigs AgentConfigStore
+	// liveSession reports whether a session has a running process right now,
+	// read from the roster. Nil disables the main-agent resume guard.
+	liveSession func(sessionID string) bool
 	// managed records every agent this server launches: lifecycle ownership (3N.2.1).
 	managed           ManagedRecorder
 	spawnPolicy       services.SpawnPolicy
@@ -166,6 +169,12 @@ func (m *SpawnManager) SetAgentProfiles(p ProfileSaver) {
 // SetAgentConfigs wires the durable agent record a spawn writes to.
 func (m *SpawnManager) SetAgentConfigs(c AgentConfigStore) {
 	m.agentConfigs = c
+}
+
+// SetLiveSessionLookup wires the "is this session running" question the
+// main-agent resume guard asks.
+func (m *SpawnManager) SetLiveSessionLookup(fn func(sessionID string) bool) {
+	m.liveSession = fn
 }
 
 // ManagedRecorder stores the proof that this server launched an agent.
@@ -301,6 +310,9 @@ func (m *SpawnManager) enforceSpawnPolicyFor(body map[string]any, allowResumeWit
 	// the full project-roots allowlist.
 	if resumeSessionID != "" {
 		if err := m.spawnPolicy.AllowResume(cwd); err != nil {
+			return nil, err
+		}
+		if err := m.allowMainAgentResume(resumeSessionID); err != nil {
 			return nil, err
 		}
 	} else if err := m.spawnPolicy.Allow(context.Background(), cwd); err != nil {
@@ -1049,7 +1061,12 @@ type SpawnHandler struct {
 	agentConfigs AgentConfigStore
 	// mainAgents is the seeded main-agent record. Nil when this server stores none.
 	mainAgents MainAgentStore
-	managed    ManagedAgents
+	// dashboardAgents is the durable agent list, addressed by agent id for
+	// agents that have no session running.
+	dashboardAgents DashboardAgentStore
+	// liveSessions reports whether a session has a running process right now.
+	liveSessions func(sessionID string) bool
+	managed      ManagedAgents
 	// Resume under Dashboard control (3N.2.2); tests swap these seams.
 	resumeSpawn func(sub string, body map[string]any) (SpawnOutcome, error)
 	hosted      func(pid int) bool
@@ -1291,6 +1308,42 @@ func resolveSpawnEnv(s *ent.Spawner) []string {
 	}
 	return out
 }
+
+/*
+ * allowMainAgentResume refuses to start a second process for the main agent.
+ *
+ * There is one Agent Dashboard Manager, and a resume is how a second one would
+ * appear: the composer falls back to `claude --resume` whenever it has no live
+ * input path, which is exactly the case for a Manager started from an editor.
+ * Confirming that prompt would leave two Claude processes on one conversation,
+ * both editing this repository.
+ *
+ * So while a live process is already running the main agent's session, a resume
+ * of that session is refused. Nothing is taken over and nothing is stopped: the
+ * running Manager is somebody else's process, and ending it stays their
+ * decision. Once it is gone, resuming is allowed again and is the supported way
+ * to bring the Manager under Agent Dashboard.
+ *
+ * Every other agent is unaffected: resuming an ordinary session while it runs
+ * is an accepted, confirmed action.
+ */
+func (m *SpawnManager) allowMainAgentResume(resumeSessionID string) error {
+	if m.agentConfigs == nil || m.liveSession == nil {
+		return nil
+	}
+	cfg, ok := m.agentConfigs.Lookup(resumeSessionID)
+	if !ok || !cfg.IsMain() {
+		return nil
+	}
+	if !m.liveSession(resumeSessionID) {
+		return nil
+	}
+	return errMainAgentAlreadyRunning
+}
+
+// errMainAgentAlreadyRunning is returned instead of starting a second Manager.
+var errMainAgentAlreadyRunning = errors.New(
+	"the main agent is already running in another process; end that session where it was started, then resume it here")
 
 // allowedPermissionModes is the exhaustive set of values the caller may pass
 // as body["permissionMode"]. Any other non-empty value is rejected.

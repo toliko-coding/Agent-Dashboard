@@ -568,6 +568,54 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 		if _, err := agentConfigs.EnsureMain(ctx, selfCwd); err != nil {
 			slog.Warn("main agent not seeded", "err", err)
 		}
+		/*
+		 * Recover agents that predate durable records.
+		 *
+		 * Finished cards live only in the roster's in-process stale tracker, so a
+		 * server restart used to take every finished agent off the Agents page -
+		 * Resume Editor and Portfolio Developer among them - even though nothing
+		 * had been deleted. Their durable record is what keeps them.
+		 *
+		 * Narrow on purpose: this server must still hold the ownership record
+		 * proving it launched the session, the session must still have a saved
+		 * name, and the working folder must still exist. A deleted agent fails
+		 * the first test, because deleting forgets the ownership record, so this
+		 * can never resurrect one. Instructions and permission mode are left
+		 * empty rather than invented - those agents were never given any here.
+		 */
+		if managedRows, err := repo.NewManagedAgentRepo(entClient).List(ctx); err != nil {
+			slog.Warn("agent recovery: ownership records unreadable", "err", err)
+		} else if profileRows, err := repo.NewAgentProfileRepo(entClient).List(ctx); err != nil {
+			slog.Warn("agent recovery: profiles unreadable", "err", err)
+		} else {
+			named := make(map[string]repo.AgentProfileRow, len(profileRows))
+			for _, p := range profileRows {
+				named[p.SessionID] = p
+			}
+			var candidates []agentconfig.Recoverable
+			for _, m := range managedRows {
+				profile, ok := named[m.SessionID]
+				if !ok || profile.DisplayName == "" || m.Cwd == "" {
+					continue
+				}
+				if info, err := os.Stat(m.Cwd); err != nil || !info.IsDir() {
+					continue
+				}
+				candidates = append(candidates, agentconfig.Recoverable{
+					SessionID:   m.SessionID,
+					DisplayName: profile.DisplayName,
+					Category:    profile.Category,
+					Cwd:         m.Cwd,
+				})
+			}
+			restored, err := agentConfigs.Recover(ctx, candidates)
+			if err != nil {
+				slog.Warn("agent recovery: not all agents restored", "err", err)
+			}
+			for _, cfg := range restored {
+				slog.Info("agent recovered as a persistent agent", "agent", cfg.DisplayName, "sessionId", cfg.SessionID)
+			}
+		}
 		agentMerger.SetAgentConfigs(agentConfigs)
 		// Which agents this server launched: the only basis for Stop and Delete (3N.2.1).
 		managedAgents = managedagent.New(repo.NewManagedAgentRepo(entClient))

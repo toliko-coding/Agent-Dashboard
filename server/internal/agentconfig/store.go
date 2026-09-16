@@ -48,6 +48,10 @@ const (
 // ErrNotFound is returned when no agent matches.
 var ErrNotFound = errors.New("no such agent")
 
+// ErrMainAgentPermanent is returned when something tries to delete the agent
+// that maintains Agent Dashboard. It is seeded, so it is never removed.
+var ErrMainAgentPermanent = errors.New("the main agent is permanent and cannot be deleted")
+
 // Config is one durable agent.
 type Config struct {
 	AgentID        string
@@ -211,6 +215,106 @@ func (s *Store) SaveForSession(ctx context.Context, sessionID string, patch Patc
 		return Config{}, err
 	}
 	return next, s.put(ctx, next)
+}
+
+/*
+ * DeleteForSession removes the durable agent a session belongs to.
+ *
+ * Called when an agent is deleted: the record is the agent, so leaving it
+ * behind would mean a deleted agent still had a name, standing instructions and
+ * a saved permission mode waiting for a session id that will never return.
+ *
+ * The main agent is refused. It is seeded and permanent, so there is no path -
+ * here or anywhere - that removes it; deleting the session it happens to be
+ * running must not delete the agent that owns this dashboard.
+ */
+func (s *Store) DeleteForSession(ctx context.Context, sessionID string) (bool, error) {
+	cfg, ok := s.Lookup(sessionID)
+	if !ok {
+		return false, nil
+	}
+	if cfg.IsMain() {
+		return false, ErrMainAgentPermanent
+	}
+	return true, s.remove(ctx, cfg)
+}
+
+// DeleteByID removes one durable agent, for a record whose session is long
+// gone. The main agent is refused for the same reason.
+func (s *Store) DeleteByID(ctx context.Context, agentID string) (bool, error) {
+	cfg, ok := s.ByID(agentID)
+	if !ok {
+		return false, nil
+	}
+	if cfg.IsMain() {
+		return false, ErrMainAgentPermanent
+	}
+	return true, s.remove(ctx, cfg)
+}
+
+// remove deletes one row and drops both cache entries pointing at it.
+func (s *Store) remove(ctx context.Context, cfg Config) error {
+	if err := s.repo.Delete(ctx, cfg.AgentID); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.byID, cfg.AgentID)
+	for sess, id := range s.bySess {
+		if id == cfg.AgentID {
+			delete(s.bySess, sess)
+		}
+	}
+	return nil
+}
+
+/*
+ * Recover rebuilds durable records for agents that predate them.
+ *
+ * Deliberately narrow, so it can only ever restore an agent that demonstrably
+ * existed: this server must still hold the ownership record proving it launched
+ * the session, the session must still have a saved name, and its working folder
+ * must still be on disk. An agent that was deleted fails the first test - delete
+ * forgets the ownership record - so nothing deleted can come back.
+ *
+ * Nothing is invented. Instructions and permission mode stay empty, because
+ * they were never recorded for these agents; the behaviour rules those agents
+ * were given live in their workspace, not here.
+ *
+ * Idempotent: a session that already has a record is skipped, so this runs on
+ * every start without creating a second anything.
+ */
+func (s *Store) Recover(ctx context.Context, candidates []Recoverable) ([]Config, error) {
+	var restored []Config
+	for _, c := range candidates {
+		if c.SessionID == "" || c.DisplayName == "" || c.Cwd == "" {
+			continue
+		}
+		if _, exists := s.Lookup(c.SessionID); exists {
+			continue
+		}
+		cfg := Config{
+			AgentID:     uuid.NewString(),
+			DisplayName: c.DisplayName,
+			Category:    c.Category,
+			Cwd:         c.Cwd,
+			SessionID:   c.SessionID,
+		}
+		if err := s.put(ctx, cfg); err != nil {
+			return restored, err
+		}
+		restored = append(restored, cfg)
+	}
+	return restored, nil
+}
+
+// Recoverable is one agent this server can prove it created: its ownership
+// record, the name it was given, and the folder it ran in.
+type Recoverable struct {
+	SessionID   string
+	DisplayName string
+	Category    string
+	Cwd         string
 }
 
 // SaveByID writes configuration for an agent that may have no session running.

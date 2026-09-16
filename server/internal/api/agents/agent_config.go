@@ -32,6 +32,9 @@ import (
 type AgentConfigStore interface {
 	Lookup(sessionID string) (agentconfig.Config, bool)
 	SaveForSession(ctx context.Context, sessionID string, patch agentconfig.Patch) (agentconfig.Config, error)
+	// DeleteForSession removes the durable agent behind a session. It refuses
+	// the main agent, which is seeded and permanent.
+	DeleteForSession(ctx context.Context, sessionID string) (bool, error)
 }
 
 // SetAgentConfigs wires the durable agent records. Unset, the routes answer 503.

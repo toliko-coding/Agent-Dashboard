@@ -614,6 +614,26 @@ func NewRouter(deps RouterDeps) http.Handler {
 		if deps.AgentConfigs != nil {
 			spawnHandler.SetAgentConfigs(deps.AgentConfigs)
 			spawnHandler.SetMainAgents(deps.AgentConfigs)
+			spawnHandler.SetDashboardAgents(deps.AgentConfigs)
+			/*
+			 * Whether a session is running, answered from the roster. Two rules
+			 * depend on it: a durable record is not deleted from under a live
+			 * process, and the main agent is not resumed into a second process
+			 * while something else is already running it.
+			 */
+			liveSession := func(sessionID string) bool {
+				if sessionID == "" || deps.Merger == nil {
+					return false
+				}
+				for _, a := range deps.Merger.LatestAgents() {
+					if a.SessionID == sessionID && a.Status != sdk.AgentStatusFinished {
+						return true
+					}
+				}
+				return false
+			}
+			spawnHandler.SetLiveSessionLookup(liveSession)
+			spawnMgr.SetLiveSessionLookup(liveSession)
 		}
 		if deps.AgentProfiles != nil {
 			spawnHandler.SetProfileDeleter(deps.AgentProfiles)
@@ -678,6 +698,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 		// session is running it can be set.
 		r.Get("/api/main-agent", spawnHandler.MainAgent)
 		r.Post("/api/main-agent/session", spawnHandler.LinkMainAgentSession)
+		// The agents this dashboard keeps, whether or not one is running now.
+		// Addressed by agent id: an agent with no session has no pid.
+		r.Get("/api/dashboard-agents", spawnHandler.ListDashboardAgents)
+		r.Put("/api/dashboard-agents/{id}", spawnHandler.UpdateDashboardAgent)
+		r.Delete("/api/dashboard-agents/{id}", spawnHandler.DeleteDashboardAgent)
 		r.Get("/api/agents/{pid}/control", spawnHandler.GetAgentControl)
 		r.Post("/api/agents/{pid}/resume-under-dashboard", spawnHandler.ResumeUnderDashboard)
 		uploadImageHandler := agents.NewUploadImageHandler()

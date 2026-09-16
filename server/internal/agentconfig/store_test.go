@@ -2,6 +2,7 @@ package agentconfig
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -256,5 +257,189 @@ func TestSaveForSessionRequiresASession(t *testing.T) {
 	s, _ := newStore(t)
 	if _, err := s.SaveForSession(context.Background(), "  ", Patch{DisplayName: str("x")}); err == nil {
 		t.Error("a configuration was saved with no session to key it by")
+	}
+}
+
+/*
+ * Deleting an agent, and the one agent that cannot be deleted.
+ *
+ * Delete removes what the dashboard remembers about an agent. Nothing it names
+ * is touched: the folder, the repository and the session transcript are the
+ * user's, and an agent record is only a record.
+ */
+func TestDeleteForSessionRemovesTheAgentAndSaysWhenThereWasNone(t *testing.T) {
+	s, r := newStore(t)
+	ctx := context.Background()
+
+	cfg, err := s.SaveForSession(ctx, "sess-1", Patch{DisplayName: str("Resume Editor")})
+	if err != nil {
+		t.Fatalf("SaveForSession: %v", err)
+	}
+
+	removed, err := s.DeleteForSession(ctx, "sess-1")
+	if err != nil || !removed {
+		t.Fatalf("DeleteForSession: removed=%v err=%v", removed, err)
+	}
+	if _, ok := s.Lookup("sess-1"); ok {
+		t.Fatal("the session still resolves to an agent")
+	}
+	if _, ok := s.ByID(cfg.AgentID); ok {
+		t.Fatal("the agent is still addressable by id")
+	}
+	if _, ok := r.rows[cfg.AgentID]; ok {
+		t.Fatal("the row was not deleted from storage")
+	}
+
+	// Deleting what is already gone is not an error: the end state is the same.
+	removed, err = s.DeleteForSession(ctx, "sess-1")
+	if err != nil {
+		t.Fatalf("second DeleteForSession: %v", err)
+	}
+	if removed {
+		t.Fatal("reported removing an agent that no longer existed")
+	}
+}
+
+func TestDeleteByIDRemovesTheAgent(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+
+	cfg, err := s.SaveForSession(ctx, "sess-2", Patch{DisplayName: str("Portfolio Developer")})
+	if err != nil {
+		t.Fatalf("SaveForSession: %v", err)
+	}
+	removed, err := s.DeleteByID(ctx, cfg.AgentID)
+	if err != nil || !removed {
+		t.Fatalf("DeleteByID: removed=%v err=%v", removed, err)
+	}
+	if _, ok := s.Lookup("sess-2"); ok {
+		t.Fatal("the session still resolves to an agent")
+	}
+
+	if removed, err := s.DeleteByID(ctx, "no-such-agent"); removed || err != nil {
+		t.Fatalf("unknown id: removed=%v err=%v", removed, err)
+	}
+}
+
+// The main agent is seeded and permanent. Neither route to deletion may take it.
+func TestTheMainAgentCannotBeDeleted(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+
+	main, err := s.EnsureMain(ctx, "/repo/agent-dashboard")
+	if err != nil {
+		t.Fatalf("EnsureMain: %v", err)
+	}
+	if _, err := s.BindMainSession(ctx, "sess-main"); err != nil {
+		t.Fatalf("BindMainSession: %v", err)
+	}
+
+	if _, err := s.DeleteByID(ctx, main.AgentID); !errors.Is(err, ErrMainAgentPermanent) {
+		t.Fatalf("DeleteByID by id: want ErrMainAgentPermanent, got %v", err)
+	}
+	if _, err := s.DeleteForSession(ctx, "sess-main"); !errors.Is(err, ErrMainAgentPermanent) {
+		t.Fatalf("DeleteForSession by session: want ErrMainAgentPermanent, got %v", err)
+	}
+	if _, ok := s.Main(); !ok {
+		t.Fatal("the main agent is gone after two refused deletions")
+	}
+}
+
+/*
+ * Recovery: agents that were only ever remembered in memory.
+ *
+ * Finished agents lived in the merger's in-process registry, so a server
+ * restart took them off the Agents page although nothing had been deleted.
+ * Recovery gives such a session a durable record from what is already on disk -
+ * its ownership row and its profile - and nothing else. No instructions and no
+ * permission mode are invented: an agent that saved none starts on Claude's
+ * default, which is the honest answer rather than a guessed one.
+ */
+func TestRecoverRestoresUnrecordedAgentsAndInventsNothing(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+
+	restored, err := s.Recover(ctx, []Recoverable{
+		{SessionID: "sess-resume", DisplayName: "Resume Editor", Category: "document", Cwd: "/work/Resume-Editor"},
+		{SessionID: "", DisplayName: "No session", Cwd: "/work/x"},
+		{SessionID: "sess-nameless", DisplayName: "", Cwd: "/work/y"},
+		{SessionID: "sess-nowhere", DisplayName: "Homeless", Cwd: ""},
+	})
+	if err != nil {
+		t.Fatalf("Recover: %v", err)
+	}
+	if len(restored) != 1 {
+		t.Fatalf("restored %d agents, want only the complete one: %+v", len(restored), restored)
+	}
+
+	cfg, ok := s.Lookup("sess-resume")
+	if !ok {
+		t.Fatal("the recovered session resolves to no agent")
+	}
+	if cfg.AgentID == "" || cfg.AgentID == "sess-resume" {
+		t.Fatalf("a recovered agent needs an identity of its own, got %q", cfg.AgentID)
+	}
+	if cfg.DisplayName != "Resume Editor" || cfg.Category != "document" || cfg.Cwd != "/work/Resume-Editor" {
+		t.Fatalf("recovered the wrong agent: %+v", cfg)
+	}
+	if cfg.Instructions != "" || cfg.PermissionMode != "" {
+		t.Fatalf("recovery invented configuration: %+v", cfg)
+	}
+	if cfg.Role != "" {
+		t.Fatalf("recovery granted a role: %+v", cfg)
+	}
+}
+
+// Recovery runs at every startup, so running it again must change nothing -
+// neither a second record for the same session nor a new id for the same agent.
+func TestRecoverIsIdempotent(t *testing.T) {
+	s, r := newStore(t)
+	ctx := context.Background()
+	candidates := []Recoverable{{SessionID: "sess-portfolio", DisplayName: "Portfolio Developer", Category: "web", Cwd: "/work/portfolio"}}
+
+	if _, err := s.Recover(ctx, candidates); err != nil {
+		t.Fatalf("first Recover: %v", err)
+	}
+	first, _ := s.Lookup("sess-portfolio")
+	rowsAfterFirst := len(r.rows)
+
+	restored, err := s.Recover(ctx, candidates)
+	if err != nil {
+		t.Fatalf("second Recover: %v", err)
+	}
+	if len(restored) != 0 {
+		t.Fatalf("recovered an agent that already had a record: %+v", restored)
+	}
+	if len(r.rows) != rowsAfterFirst {
+		t.Fatalf("rows changed on a second recovery: %d then %d", rowsAfterFirst, len(r.rows))
+	}
+	again, _ := s.Lookup("sess-portfolio")
+	if again.AgentID != first.AgentID {
+		t.Fatalf("the agent changed identity: %q then %q", first.AgentID, again.AgentID)
+	}
+}
+
+// An agent the user has configured is never overwritten by a recovery pass.
+func TestRecoverLeavesAConfiguredAgentAlone(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+
+	if _, err := s.SaveForSession(ctx, "sess-kept", Patch{
+		DisplayName:    str("Resume Editor"),
+		Instructions:   str("Only touch the tailored folder."),
+		PermissionMode: str("acceptEdits"),
+	}); err != nil {
+		t.Fatalf("SaveForSession: %v", err)
+	}
+
+	if _, err := s.Recover(ctx, []Recoverable{
+		{SessionID: "sess-kept", DisplayName: "Something Else", Category: "web", Cwd: "/elsewhere"},
+	}); err != nil {
+		t.Fatalf("Recover: %v", err)
+	}
+
+	cfg, _ := s.Lookup("sess-kept")
+	if cfg.DisplayName != "Resume Editor" || cfg.Instructions == "" || cfg.PermissionMode != "acceptEdits" {
+		t.Fatalf("recovery overwrote a configured agent: %+v", cfg)
 	}
 }

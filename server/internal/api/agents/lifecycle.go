@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/lx-wnk/agent-dashboard/sdk"
+	"github.com/lx-wnk/agent-dashboard/server/internal/agentconfig"
 	"github.com/lx-wnk/agent-dashboard/server/internal/channelconfig"
 	"github.com/lx-wnk/agent-dashboard/server/internal/managedagent"
 	"github.com/lx-wnk/agent-dashboard/server/internal/services"
@@ -284,9 +285,33 @@ func (h *SpawnHandler) DeleteAgent(w http.ResponseWriter, r *http.Request) {
 			profileRemoved = true
 		}
 	}
+	/*
+	 * The durable record is the agent, so deleting the agent deletes it too.
+	 * Left behind it became an invisible leftover: a name, standing instructions
+	 * and a saved permission mode waiting for a session id that never returns.
+	 *
+	 * Only the record. The working folder, the repository and the session
+	 * transcript are untouched here, exactly as before.
+	 */
+	configRemoved := false
+	if h.agentConfigs != nil && agent.SessionID != "" {
+		removed, err := h.agentConfigs.DeleteForSession(r.Context(), agent.SessionID)
+		switch {
+		case errors.Is(err, agentconfig.ErrMainAgentPermanent):
+			lifecycleJSON(w, http.StatusForbidden, map[string]any{
+				"error": "This is the main agent, which maintains Agent Dashboard. It cannot be deleted.",
+				"main":  true,
+			})
+			return
+		case err != nil:
+			slog.Warn("agent delete: durable record not removed", "err", err)
+		default:
+			configRemoved = removed
+		}
+	}
 	allowedFolderRemoved := h.releaseCreatedWorkspace(r.Context(), agent.SessionID)
-	h.audit(r, "agent_delete", agent.PID, map[string]any{"sessionId": agent.SessionID, "stopped": running, "allowedFolderRemoved": allowedFolderRemoved})
-	lifecycleJSON(w, http.StatusOK, map[string]any{"deleted": true, "stopped": running, "profileRemoved": profileRemoved, "allowedFolderRemoved": allowedFolderRemoved})
+	h.audit(r, "agent_delete", agent.PID, map[string]any{"sessionId": agent.SessionID, "stopped": running, "allowedFolderRemoved": allowedFolderRemoved, "configRemoved": configRemoved})
+	lifecycleJSON(w, http.StatusOK, map[string]any{"deleted": true, "stopped": running, "profileRemoved": profileRemoved, "allowedFolderRemoved": allowedFolderRemoved, "configRemoved": configRemoved})
 }
 
 /*
