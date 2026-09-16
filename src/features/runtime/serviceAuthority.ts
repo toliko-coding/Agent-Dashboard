@@ -35,13 +35,13 @@ import type { RuntimeSelf } from '@/sdk.generated'
  */
 
 export type ServiceAuthority
-  = /** This process is the Agent Dashboard server. */
-  | 'dashboard-server'
-  /** The dashboard's own user interface (the dev server serving this page). */
+  /** This process is the Agent Dashboard server. */
+  = | 'dashboard-server'
+    /** The dashboard's own user interface (the dev server serving this page). */
     | 'dashboard-ui'
-  /** Runs in the same workspace as an agent the dashboard started. */
+    /** Runs in the same workspace as an agent the dashboard started. */
     | 'agent-workspace'
-  /** Observed on this machine, with nothing tying it to the dashboard. */
+    /** Observed on this machine, with nothing tying it to the dashboard. */
     | 'external'
 
 /** How good the evidence is. Never upgraded by a label or a port number. */

@@ -37,7 +37,9 @@ async function load(): Promise<void> {
 }
 
 export function useRuntimeSelf(): { self: Readonly<typeof self> } {
-  onMounted(() => { void load() })
+  onMounted(() => {
+    void load()
+  })
   return { self: readonly(self) as Readonly<typeof self> }
 }
 

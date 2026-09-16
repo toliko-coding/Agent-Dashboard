@@ -672,21 +672,15 @@ type Agent struct {
 	RecentHookEvents []HookEvent `json:"recentHookEvents,omitempty"`
 }
 
-/*
- * RuntimeSelf identifies the dashboard's own server process.
- *
- * Runtime lists every listening service on the machine, and the one question
- * that cannot be answered by looking at a port number is "is this the dashboard
- * itself?". Guessing it from a port (13120, 5173) would be wrong the moment
- * either is configured differently or another process squats one, and a wrong
- * answer here is the kind that ends with someone stopping the server they are
- * reading the page from.
- *
- * So the server states its own identity as fact: the pid it runs as, the
- * address it bound, and the directory it runs in. Everything a client concludes
- * from it is an equality check against an observed service, never an inference
- * from a label.
- */
+// RuntimeSelf identifies the dashboard's own server process, so a listening
+// service observed on this machine can be recognised as the dashboard itself
+// instead of guessed at from a port number. Guessing from a port (13120, 5173)
+// would be wrong the moment either is configured differently or another process
+// squats one, and a wrong answer here is the kind that ends with someone
+// stopping the server they are reading the page from. So the server states its
+// identity as fact — the pid it runs as, the address it bound, the directory it
+// runs in — and everything a client concludes from it is an equality check
+// against an observed service, never an inference from a label.
 type RuntimeSelf struct {
 	// PID is the dashboard server process. A service listening on this pid IS
 	// the dashboard, with no inference involved.
