@@ -195,6 +195,27 @@ func (s *Store) BindMainSession(ctx context.Context, sessionID string) (Config, 
 }
 
 /*
+ * BindSession points an agent at the session now running it.
+ *
+ * An agent outlives its sessions, so starting one for an agent that has none
+ * must give the existing record the new session pointer rather than leave a
+ * record behind and create another. Without this, starting a recovered agent
+ * would produce a second agent with the same name and folder, which is exactly
+ * the duplication the durable record exists to prevent.
+ *
+ * It records which process is realising the agent and grants that process
+ * nothing: ownership still decides what may be done to it.
+ */
+func (s *Store) BindSession(ctx context.Context, agentID, sessionID string) (Config, error) {
+	cfg, ok := s.ByID(agentID)
+	if !ok {
+		return Config{}, ErrNotFound
+	}
+	cfg.SessionID = strings.TrimSpace(sessionID)
+	return cfg, s.put(ctx, cfg)
+}
+
+/*
  * SaveForSession writes configuration for the agent a session is running,
  * creating the durable row on first save.
  *

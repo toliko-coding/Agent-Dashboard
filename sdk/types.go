@@ -727,6 +727,32 @@ type AgentConfigDTO struct {
 	DiffersFromSession bool `json:"differsFromSession"`
 }
 
+/*
+ * DashboardAgentConfigDTO is one durable agent in full, for the surface that
+ * opens it: what it is, where it works, and what its next session would start
+ * with.
+ *
+ * Resumable is the fact that decides whether that session continues the
+ * agent's conversation or begins a new one. It is the transcript actually being
+ * on disk, not merely a session id being stored - a pruned transcript would
+ * otherwise produce an empty session presented as a continuation.
+ */
+type DashboardAgentConfigDTO struct {
+	AgentID        string `json:"agentId"`
+	DisplayName    string `json:"displayName"`
+	Category       string `json:"category"`
+	Cwd            string `json:"cwd,omitempty"`
+	ProjectID      string `json:"projectId,omitempty"`
+	Instructions   string `json:"instructions"`
+	PermissionMode string `json:"permissionMode"`
+	// Role is "main" for the agent that maintains Agent Dashboard, else empty.
+	Role string `json:"role,omitempty"`
+	// SessionID is the last session this agent ran, or "".
+	SessionID string `json:"sessionId,omitempty"`
+	// Resumable is true when that session's transcript is still on disk.
+	Resumable bool `json:"resumable"`
+}
+
 // DashboardAgentDTO is one durable agent in the list of agents this dashboard
 // keeps, whether or not a Claude session is running it.
 //
@@ -752,6 +778,9 @@ type DashboardAgentDTO struct {
 	// client matches it against the roster to tell whether one is running now;
 	// this record makes no claim about liveness.
 	SessionID string `json:"sessionId,omitempty"`
+	// Resumable is true when this agent's last session still has a transcript on
+	// disk, which is what decides whether it is started or resumed.
+	Resumable bool `json:"resumable"`
 }
 
 // MainAgentDTO is the durable record of the agent that maintains Agent

@@ -47,6 +47,7 @@ GET /api/config/memory
 GET /api/config/skills
 GET /api/cost/summary
 GET /api/dashboard-agents
+GET /api/dashboard-agents/{id}/config
 GET /api/github/search
 GET /api/github/summary
 GET /api/grants

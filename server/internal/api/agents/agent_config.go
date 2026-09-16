@@ -35,6 +35,10 @@ type AgentConfigStore interface {
 	// DeleteForSession removes the durable agent behind a session. It refuses
 	// the main agent, which is seeded and permanent.
 	DeleteForSession(ctx context.Context, sessionID string) (bool, error)
+	// BindSession points an existing agent at the session now running it, so
+	// starting one never produces a second agent for the same identity.
+	BindSession(ctx context.Context, agentID, sessionID string) (agentconfig.Config, error)
+	SaveByID(ctx context.Context, agentID string, patch agentconfig.Patch) (agentconfig.Config, error)
 }
 
 // SetAgentConfigs wires the durable agent records. Unset, the routes answer 503.

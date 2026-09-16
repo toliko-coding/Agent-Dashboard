@@ -244,6 +244,25 @@ func filterOutClaimed(candidates []sessionFileCandidate, claimed map[string]bool
 	return out
 }
 
+/*
+ * SessionTranscriptExists reports whether Claude still holds a transcript for
+ * this session.
+ *
+ * It is what separates resuming an agent from starting one. A durable agent
+ * outlives its sessions, so a stored session id alone proves nothing: the
+ * transcript may have been pruned, or the agent may never have run. Resuming a
+ * session Claude cannot find starts an empty one while telling the user their
+ * conversation is being continued, so the choice is derived from the file
+ * actually being there rather than from the id being non-empty.
+ */
+func SessionTranscriptExists(sessionID string) bool {
+	if sessionID == "" {
+		return false
+	}
+	_, ok := locateSessionFile(sessionID, allClaudeConfigDirs())
+	return ok
+}
+
 // locateSessionFile finds <configDir>/projects/*/<sessionID>.jsonl across the
 // given config dirs (used when a pinned session is not under cwd's own encoded
 // project directory).

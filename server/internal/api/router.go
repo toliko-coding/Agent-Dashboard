@@ -65,6 +65,7 @@ import (
 	"github.com/lx-wnk/agent-dashboard/server/internal/managedagent"
 	mcp "github.com/lx-wnk/agent-dashboard/server/internal/mcp"
 	"github.com/lx-wnk/agent-dashboard/server/internal/merger"
+	"github.com/lx-wnk/agent-dashboard/server/internal/parser"
 	"github.com/lx-wnk/agent-dashboard/server/internal/pipeline"
 	"github.com/lx-wnk/agent-dashboard/server/internal/plugin"
 	"github.com/lx-wnk/agent-dashboard/server/internal/roadmap"
@@ -633,6 +634,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 				return false
 			}
 			spawnHandler.SetLiveSessionLookup(liveSession)
+		// Whether a stored session can still be resumed is a fact about the
+		// filesystem: the transcript Claude would reopen.
+		spawnHandler.SetResumableLookup(parser.SessionTranscriptExists)
 			spawnMgr.SetLiveSessionLookup(liveSession)
 		}
 		if deps.AgentProfiles != nil {
@@ -701,6 +705,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 		// The agents this dashboard keeps, whether or not one is running now.
 		// Addressed by agent id: an agent with no session has no pid.
 		r.Get("/api/dashboard-agents", spawnHandler.ListDashboardAgents)
+	r.Get("/api/dashboard-agents/{id}/config", spawnHandler.DashboardAgentConfig)
 		r.Put("/api/dashboard-agents/{id}", spawnHandler.UpdateDashboardAgent)
 		r.Delete("/api/dashboard-agents/{id}", spawnHandler.DeleteDashboardAgent)
 		r.Get("/api/agents/{pid}/control", spawnHandler.GetAgentControl)

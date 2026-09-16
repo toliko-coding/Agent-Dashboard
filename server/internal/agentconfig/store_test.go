@@ -443,3 +443,52 @@ func TestRecoverLeavesAConfiguredAgentAlone(t *testing.T) {
 		t.Fatalf("recovery overwrote a configured agent: %+v", cfg)
 	}
 }
+
+/*
+ * Starting a session for an agent that already exists keeps that agent.
+ *
+ * A recovered agent has a record and no process. Starting one gives it a brand
+ * new Claude session id, and keying the save on that id would create a second
+ * agent with the same name and folder - two rows for one agent, which is the
+ * duplication the durable record exists to prevent.
+ */
+func TestBindSessionKeepsTheSameAgent(t *testing.T) {
+	s, r := newStore(t)
+	ctx := context.Background()
+
+	first, err := s.SaveForSession(ctx, "sess-old", Patch{DisplayName: str("Portfolio Developer"), Instructions: str("Keep to the portfolio repository.")})
+	if err != nil {
+		t.Fatalf("SaveForSession: %v", err)
+	}
+	rowsBefore := len(r.rows)
+
+	bound, err := s.BindSession(ctx, first.AgentID, "sess-new")
+	if err != nil {
+		t.Fatalf("BindSession: %v", err)
+	}
+	if bound.AgentID != first.AgentID {
+		t.Fatalf("the agent changed identity: %q then %q", first.AgentID, bound.AgentID)
+	}
+	if len(r.rows) != rowsBefore {
+		t.Fatalf("a second row appeared: %d then %d", rowsBefore, len(r.rows))
+	}
+	if bound.Instructions != "Keep to the portfolio repository." {
+		t.Fatalf("binding a session lost the agent's configuration: %+v", bound)
+	}
+
+	// The new session resolves to it, and the old pointer is gone.
+	got, ok := s.Lookup("sess-new")
+	if !ok || got.AgentID != first.AgentID {
+		t.Fatalf("the new session does not resolve to the agent: %+v ok=%v", got, ok)
+	}
+	if _, stale := s.Lookup("sess-old"); stale {
+		t.Fatal("the old session still resolves to this agent")
+	}
+}
+
+func TestBindSessionRefusesAnUnknownAgent(t *testing.T) {
+	s, _ := newStore(t)
+	if _, err := s.BindSession(context.Background(), "no-such-agent", "sess-new"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}

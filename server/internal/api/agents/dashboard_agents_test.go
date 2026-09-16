@@ -12,6 +12,7 @@ import (
 
 	"github.com/lx-wnk/agent-dashboard/sdk"
 	"github.com/lx-wnk/agent-dashboard/server/internal/agentconfig"
+	"github.com/lx-wnk/agent-dashboard/server/internal/services"
 )
 
 /*
@@ -83,9 +84,21 @@ func (f *fakeDashboardAgents) Lookup(sessionID string) (agentconfig.Config, bool
 func (f *fakeDashboardAgents) SaveForSession(_ context.Context, sessionID string, patch agentconfig.Patch) (agentconfig.Config, error) {
 	c, ok := f.Lookup(sessionID)
 	if !ok {
-		return agentconfig.Config{}, agentconfig.ErrNotFound
+		// First save for a session creates the agent, as the real store does.
+		c = agentconfig.Config{AgentID: "generated-" + sessionID, SessionID: sessionID}
+		f.rows[c.AgentID] = c
 	}
 	return f.SaveByID(context.Background(), c.AgentID, patch)
+}
+
+func (f *fakeDashboardAgents) BindSession(_ context.Context, agentID, sessionID string) (agentconfig.Config, error) {
+	c, ok := f.rows[agentID]
+	if !ok {
+		return agentconfig.Config{}, agentconfig.ErrNotFound
+	}
+	c.SessionID = sessionID
+	f.rows[agentID] = c
+	return c, nil
 }
 
 func (f *fakeDashboardAgents) DeleteForSession(ctx context.Context, sessionID string) (bool, error) {
@@ -299,4 +312,113 @@ func TestDeleteAgent_LeavesAnExternalAgentsRecordAlone(t *testing.T) {
 	_, ok := store.ByID("a-external")
 	require.True(t, ok, "an external session's record was deleted")
 	require.Empty(t, store.deleted)
+}
+
+/*
+ * Start or resume is derived from what is on disk, never from the id alone.
+ *
+ * A durable agent outlives its sessions, so a stored session id proves nothing:
+ * the transcript may have been pruned. Resuming one Claude cannot open would
+ * start an empty session while telling the user it was continuing theirs.
+ */
+func TestDashboardAgentConfig_SaysWhetherTheLastSessionCanBeResumed(t *testing.T) {
+	store := newFakeDashboardAgents(resumeCfg)
+
+	h := dashboardHandler(store)
+	h.SetResumableLookup(func(sessionID string) bool { return sessionID == "sess-resume" })
+	rr, body := callByID(t, h.DashboardAgentConfig, http.MethodGet, "a-resume", "")
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	require.Equal(t, true, body["resumable"])
+	// This is the surface that shows them, so this is where instructions are read.
+	require.Equal(t, "Only the tailored folder.", body["instructions"])
+	require.Equal(t, "/work/Resume-Editor", body["cwd"])
+
+	gone := dashboardHandler(store)
+	gone.SetResumableLookup(func(string) bool { return false })
+	_, body2 := callByID(t, gone.DashboardAgentConfig, http.MethodGet, "a-resume", "")
+	require.Equal(t, false, body2["resumable"])
+
+	// With no lookup wired at all, an agent reports as not resumable: the
+	// surface then offers to start one rather than promise a conversation.
+	bare := dashboardHandler(store)
+	_, body3 := callByID(t, bare.DashboardAgentConfig, http.MethodGet, "a-resume", "")
+	require.Equal(t, false, body3["resumable"])
+
+	rr4, _ := callByID(t, h.DashboardAgentConfig, http.MethodGet, "a-nothing", "")
+	require.Equal(t, http.StatusNotFound, rr4.Code)
+}
+
+/*
+ * Starting an agent that already exists keeps that agent.
+ *
+ * The new session has a session id nothing has seen before, so saving the
+ * configuration against it would create a second durable agent - same name,
+ * same folder, different id. The record is pointed at the new session instead.
+ */
+func TestSaveAgentConfig_StartingAnExistingAgentCreatesNoSecondOne(t *testing.T) {
+	store := newFakeDashboardAgents(portfolioCfg)
+	m := NewSpawnManager(5, 60000, 30, 60000, nil, services.NewSpawnPolicy(nil))
+	m.SetAgentConfigs(store)
+
+	m.saveAgentConfig(&spawnRequest{
+		agentID:        "a-portfolio",
+		sessionID:      "a-brand-new-session",
+		cwd:            "/work/portfolio",
+		systemPrompt:   "Keep to the portfolio repository.",
+		permissionMode: "acceptEdits",
+	})
+
+	require.Len(t, store.rows, 1, "a second durable agent was created for the same agent")
+	got, ok := store.ByID("a-portfolio")
+	require.True(t, ok)
+	require.Equal(t, "a-brand-new-session", got.SessionID, "the agent was not pointed at its new session")
+	require.Equal(t, "Keep to the portfolio repository.", got.Instructions)
+	require.Equal(t, "acceptEdits", got.PermissionMode)
+	require.Equal(t, "Portfolio Developer", got.DisplayName, "starting an agent renamed it")
+}
+
+// A spawn that names no agent still creates one, as it always has.
+func TestSaveAgentConfig_ANewAgentIsStillCreated(t *testing.T) {
+	store := newFakeDashboardAgents()
+	m := NewSpawnManager(5, 60000, 30, 60000, nil, services.NewSpawnPolicy(nil))
+	m.SetAgentConfigs(store)
+
+	m.saveAgentConfig(&spawnRequest{sessionID: "sess-fresh", cwd: "/work/new"})
+	require.Len(t, store.rows, 1)
+}
+
+/*
+ * Stopping a session is not deleting an agent.
+ *
+ * The process ends; the agent stays, with its name, its folder, its
+ * instructions and its saved permission mode, ready to be started again. This
+ * is the distinction the durable record exists to make, and the one a user
+ * relies on every time they stop something.
+ */
+func TestStopAgent_LeavesTheDurableAgent(t *testing.T) {
+	work := t.TempDir()
+	agent := sdk.Agent{PID: 51, SessionID: "sess-portfolio", Status: sdk.AgentStatusActive, CWD: work, ProjectPath: work}
+	f := newLifecycleFixture(t, agent)
+	f.ownAgent(t, agent)
+	f.alive[51] = true
+	store := newFakeDashboardAgents(agentconfig.Config{
+		AgentID:        "a-portfolio",
+		DisplayName:    "Portfolio Developer",
+		SessionID:      "sess-portfolio",
+		Cwd:            work,
+		Instructions:   "Keep to the portfolio repository.",
+		PermissionMode: "acceptEdits",
+	})
+	f.h.SetAgentConfigs(store)
+
+	rr, _ := f.do(http.MethodPost, "/api/agents/51/stop", 51, f.h.StopAgent)
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	require.Equal(t, []int{51}, f.killed, "the process was not stopped")
+
+	got, ok := store.ByID("a-portfolio")
+	require.True(t, ok, "stopping a session deleted the agent")
+	require.Empty(t, store.deleted)
+	require.Equal(t, "Keep to the portfolio repository.", got.Instructions, "stopping lost the agent's configuration")
+	require.Equal(t, "acceptEdits", got.PermissionMode)
+	require.Equal(t, "sess-portfolio", got.SessionID, "stopping unlinked the agent from its session")
 }

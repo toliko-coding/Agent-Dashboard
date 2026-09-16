@@ -45,6 +45,54 @@ func (h *SpawnHandler) SetDashboardAgents(s DashboardAgentStore) { h.dashboardAg
 // record is never removed from under a live process.
 func (h *SpawnHandler) SetLiveSessionLookup(fn func(sessionID string) bool) { h.liveSessions = fn }
 
+/*
+ * SetResumableLookup wires the "can this session still be resumed" question.
+ *
+ * A seam rather than a direct read, because it is the one fact here that comes
+ * from the filesystem: whether Claude still holds the session's transcript.
+ * Unset, an agent reports as not resumable, so the surface offers to start one
+ * rather than promise a conversation it cannot prove exists.
+ */
+func (h *SpawnHandler) SetResumableLookup(fn func(sessionID string) bool) { h.resumableSessions = fn }
+
+/*
+ * DashboardAgentConfig handles GET /api/dashboard-agents/{id}/config.
+ *
+ * The agent in full, for the surface that opens one with no session running:
+ * identity, folder, Project, saved instructions and saved permission mode, plus
+ * whether its last session can still be resumed. The list route deliberately
+ * omits instructions, which run to thousands of characters; this is where they
+ * are read, when something actually shows them.
+ */
+func (h *SpawnHandler) DashboardAgentConfig(w http.ResponseWriter, r *http.Request) {
+	if h.dashboardAgents == nil {
+		lifecycleJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "this server stores no agents"})
+		return
+	}
+	id := r.PathValue("id")
+	cfg, found := h.dashboardAgents.ByID(id)
+	if !found {
+		lifecycleJSON(w, http.StatusNotFound, map[string]string{"error": "no such agent"})
+		return
+	}
+	resumable := false
+	if cfg.SessionID != "" && h.resumableSessions != nil {
+		resumable = h.resumableSessions(cfg.SessionID)
+	}
+	lifecycleJSON(w, http.StatusOK, sdk.DashboardAgentConfigDTO{
+		AgentID:        cfg.AgentID,
+		DisplayName:    cfg.DisplayName,
+		Category:       cfg.Category,
+		Cwd:            cfg.Cwd,
+		ProjectID:      cfg.ProjectID,
+		Instructions:   cfg.Instructions,
+		PermissionMode: cfg.PermissionMode,
+		Role:           cfg.Role,
+		SessionID:      cfg.SessionID,
+		Resumable:      resumable,
+	})
+}
+
 // ListDashboardAgents handles GET /api/dashboard-agents.
 func (h *SpawnHandler) ListDashboardAgents(w http.ResponseWriter, r *http.Request) {
 	if h.dashboardAgents == nil {
@@ -54,7 +102,7 @@ func (h *SpawnHandler) ListDashboardAgents(w http.ResponseWriter, r *http.Reques
 	rows := h.dashboardAgents.List()
 	out := make([]sdk.DashboardAgentDTO, 0, len(rows))
 	for _, cfg := range rows {
-		out = append(out, dashboardAgentDTO(cfg))
+		out = append(out, dashboardAgentDTO(cfg, h.resumable(cfg)))
 	}
 	// A stable order, so the list does not shuffle between reads.
 	sort.Slice(out, func(i, j int) bool {
@@ -108,7 +156,7 @@ func (h *SpawnHandler) UpdateDashboardAgent(w http.ResponseWriter, r *http.Reque
 	h.audit(r, "dashboard_agent_update", 0, map[string]any{
 		"agentId": cfg.AgentID, "permissionMode": cfg.PermissionMode, "hasInstructions": cfg.Instructions != "",
 	})
-	lifecycleJSON(w, http.StatusOK, dashboardAgentDTO(cfg))
+	lifecycleJSON(w, http.StatusOK, dashboardAgentDTO(cfg, h.resumable(cfg)))
 }
 
 /*
@@ -179,7 +227,12 @@ func (h *SpawnHandler) DeleteDashboardAgent(w http.ResponseWriter, r *http.Reque
 	lifecycleJSON(w, http.StatusOK, map[string]any{"deleted": removed, "agentId": id})
 }
 
-func dashboardAgentDTO(cfg agentconfig.Config) sdk.DashboardAgentDTO {
+// resumable reports whether this agent's last session can still be reopened.
+func (h *SpawnHandler) resumable(cfg agentconfig.Config) bool {
+	return cfg.SessionID != "" && h.resumableSessions != nil && h.resumableSessions(cfg.SessionID)
+}
+
+func dashboardAgentDTO(cfg agentconfig.Config, resumable bool) sdk.DashboardAgentDTO {
 	return sdk.DashboardAgentDTO{
 		AgentID:         cfg.AgentID,
 		DisplayName:     cfg.DisplayName,
@@ -190,5 +243,6 @@ func dashboardAgentDTO(cfg agentconfig.Config) sdk.DashboardAgentDTO {
 		ProjectID:       cfg.ProjectID,
 		Role:            cfg.Role,
 		SessionID:       cfg.SessionID,
+		Resumable:       resumable,
 	}
 }

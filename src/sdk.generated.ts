@@ -831,6 +831,37 @@ export interface AgentConfigDTO {
   differsFromSession: boolean
 }
 /**
+ *  DashboardAgentConfigDTO is one durable agent in full, for the surface that
+ *  opens it: what it is, where it works, and what its next session would start
+ *  with.
+ *
+ *  Resumable is the fact that decides whether that session continues the
+ *  agent's conversation or begins a new one. It is the transcript actually being
+ *  on disk, not merely a session id being stored - a pruned transcript would
+ *  otherwise produce an empty session presented as a continuation.
+ */
+export interface DashboardAgentConfigDTO {
+  agentId: string
+  displayName: string
+  category: string
+  cwd?: string
+  projectId?: string
+  instructions: string
+  permissionMode: string
+  /**
+   * Role is "main" for the agent that maintains Agent Dashboard, else empty.
+   */
+  role?: string
+  /**
+   * SessionID is the last session this agent ran, or "".
+   */
+  sessionId?: string
+  /**
+   * Resumable is true when that session's transcript is still on disk.
+   */
+  resumable: boolean
+}
+/**
  * DashboardAgentDTO is one durable agent in the list of agents this dashboard
  * keeps, whether or not a Claude session is running it.
  * A finished agent used to vanish from the page when the server restarted,
@@ -859,6 +890,11 @@ export interface DashboardAgentDTO {
    * this record makes no claim about liveness.
    */
   sessionId?: string
+  /**
+   * Resumable is true when this agent's last session still has a transcript on
+   * disk, which is what decides whether it is started or resumed.
+   */
+  resumable: boolean
 }
 /**
  * MainAgentDTO is the durable record of the agent that maintains Agent

@@ -273,6 +273,9 @@ type spawnRequest struct {
 	// sessionID is the Claude session this spawn pins (--session-id) or resumes;
 	// set by buildSpawnArgs, "" for an adapter that cannot be pinned.
 	sessionID string
+	// agentID is the durable agent this session belongs to, when the caller
+	// started one that already exists. Empty for a brand new agent.
+	agentID string
 	// provenance: the server created this working folder and allowed it (3N.2.1).
 	workspaceCreated bool
 	allowedFolder    string
@@ -335,6 +338,14 @@ func (m *SpawnManager) enforceSpawnPolicyFor(body map[string]any, allowResumeWit
 	}
 
 	projectID, _ := body["projectId"].(string)
+	/*
+	 * The durable agent this session is being started for.
+	 *
+	 * Starting an agent that already exists must give that record the new
+	 * session pointer, not create a second agent with the same name and folder.
+	 * It carries no authority: the record is looked up, never created, from it.
+	 */
+	agentID, _ := body["agentId"].(string)
 
 	enableChannel, _ := body["enableChannel"].(bool)
 	if _, hasChannel := body["enableChannel"]; !hasChannel {
@@ -358,6 +369,7 @@ func (m *SpawnManager) enforceSpawnPolicyFor(body map[string]any, allowResumeWit
 		systemPrompt:    systemPrompt,
 		permissionMode:  permissionMode,
 		projectID:       projectID,
+		agentID:         agentID,
 		enableChannel:   enableChannel,
 		profile:         profile,
 	}, nil
@@ -637,6 +649,21 @@ func (m *SpawnManager) saveAgentConfig(req *spawnRequest) {
 	}
 	if req.projectID != "" {
 		patch.ProjectID = &req.projectID
+	}
+	/*
+	 * An agent the caller already has keeps its identity: the record is pointed
+	 * at the new session, then written by id. Going through SaveForSession here
+	 * would key on a session id nothing has seen before and create a second
+	 * durable agent - the same name, the same folder, a different id - which is
+	 * what "start this agent" must never produce.
+	 */
+	if req.agentID != "" {
+		if _, err := m.agentConfigs.BindSession(context.Background(), req.agentID, req.sessionID); err != nil {
+			slog.Warn("spawn: agent not bound to its new session", "err", err, "agentId", req.agentID)
+		} else if _, err := m.agentConfigs.SaveByID(context.Background(), req.agentID, patch); err != nil {
+			slog.Warn("spawn: agent configuration not saved", "err", err)
+		}
+		return
 	}
 	if _, err := m.agentConfigs.SaveForSession(context.Background(), req.sessionID, patch); err != nil {
 		slog.Warn("spawn: agent configuration not saved", "err", err)
@@ -1066,6 +1093,9 @@ type SpawnHandler struct {
 	dashboardAgents DashboardAgentStore
 	// liveSessions reports whether a session has a running process right now.
 	liveSessions func(sessionID string) bool
+	// resumableSessions reports whether Claude still holds a session's
+	// transcript, which is what separates resuming an agent from starting it.
+	resumableSessions func(sessionID string) bool
 	managed      ManagedAgents
 	// Resume under Dashboard control (3N.2.2); tests swap these seams.
 	resumeSpawn func(sub string, body map[string]any) (SpawnOutcome, error)
