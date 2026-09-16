@@ -2,6 +2,7 @@ import type { Ref } from 'vue'
 import type { Agent, OutputMessage } from '@/types'
 import { onUnmounted, ref } from 'vue'
 import { dispatchSlashCommand, parseSlashCommand, SLASH_COMMAND_DEFS } from '@/composables/useSlashCommands'
+import { isMainAgent } from '@/features/agents/composables/useMainAgent'
 import { errorMessage } from '@/utils/errorMessage'
 import { addPending } from '@/utils/pendingMessages'
 import { BACKGROUND_SYNC_TAG } from '@/utils/swConstants'
@@ -56,6 +57,18 @@ export function useAgentPrompt(
   const sendStatus = ref<'sent' | 'error' | 'queued' | null>(null)
   const sendError = ref('')
   const resumeConfirm = ref<string | null>(null)
+  /*
+   * Why a send to the main agent can be refused outright.
+   *
+   * Sending to a session the dashboard cannot inject into resumes it, which
+   * starts a new process. For any other agent that is the point. For the main
+   * agent it would mean a second process maintaining this dashboard, alongside
+   * the one already running in the user's editor - so the composer refuses, and
+   * the panel keeps the explicit start.
+   *
+   * 'external' - a session is running, elsewhere; 'start' - none is running.
+   */
+  const mainAgentBlocked = ref<'external' | 'start' | null>(null)
 
   /**
    * Combines the typed text with any pending attachment paths into the final
@@ -150,6 +163,7 @@ export function useAgentPrompt(
   async function handleSend() {
     const agent = getAgent()
     const msg = buildMessage()
+    mainAgentBlocked.value = null
     if (!msg || isSending.value || !agent)
       return
 
@@ -195,6 +209,17 @@ export function useAgentPrompt(
       if (attachments && sendStatus.value !== 'error')
         attachments.value = []
     }
+    else if (isMainAgent(agent)) {
+      /*
+       * The main agent is never started from the composer.
+       *
+       * Its session is usually the one running in the user's editor, which this
+       * dashboard observes and does not own. Staging a resume here would offer
+       * to start a second main agent behind a button labelled Send, so the text
+       * is left in the input and the panel is where starting happens.
+       */
+      mainAgentBlocked.value = agent.status === 'finished' ? 'start' : 'external'
+    }
     else {
       // Non-injectable session: require explicit user confirmation before resuming
       // to prevent silent duplicate detached processes on each send. The staged
@@ -223,6 +248,14 @@ export function useAgentPrompt(
     if (!agent)
       return
 
+    // Re-checked here too: the roster may have named this the main agent since
+    // the confirmation was staged, and confirming must still not start a second.
+    if (isMainAgent(agent) && !agent.liveInjectable) {
+      mainAgentBlocked.value = agent.status === 'finished' ? 'start' : 'external'
+      promptInput.value = msg
+      return
+    }
+
     await deliver(agent, msg, agent.liveInjectable ? 'inject' : 'resume')
   }
 
@@ -241,5 +274,5 @@ export function useAgentPrompt(
   window.addEventListener('drain-success', onDrainSuccess)
   onUnmounted(() => window.removeEventListener('drain-success', onDrainSuccess))
 
-  return { promptInput, isSending, sendStatus, sendError, handleSend, resumeConfirm, confirmResume, cancelResume }
+  return { promptInput, isSending, sendStatus, sendError, handleSend, resumeConfirm, confirmResume, cancelResume, mainAgentBlocked }
 }

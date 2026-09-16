@@ -3,6 +3,7 @@ import type { DynamicCommandSet } from '../composables/useSlashCommands'
 import type { Agent, OutputMessage } from '../types'
 import { computed, nextTick, ref, useId, watch } from 'vue'
 import { useAgentPrompt } from '@/features/agents/composables/useAgentPrompt'
+import { isMainAgent } from '@/features/agents/composables/useMainAgent'
 import { emptyCommandSet, fetchDynamicCommands, SLASH_COMMAND_DEFS } from '../composables/useSlashCommands'
 import TemplatePicker from './TemplatePicker.vue'
 
@@ -28,7 +29,7 @@ const listboxId = useId()
 // "@<path>" tokens by useAgentPrompt (full variant only).
 const attachments = ref<string[]>([])
 
-const { promptInput, isSending, sendStatus, sendError, handleSend, resumeConfirm, confirmResume, cancelResume } = useAgentPrompt(
+const { promptInput, isSending, sendStatus, sendError, handleSend, resumeConfirm, confirmResume, cancelResume, mainAgentBlocked } = useAgentPrompt(
   () => props.agent,
   msg => emit('messageSent', msg),
   {
@@ -162,10 +163,28 @@ const showStaleNote = computed(() => isSlashQuery.value && commandSet.value.buil
 // an internal process is not a session at all, a disconnected agent has no
 // channel file yet, and a connected-but-not-injectable agent can only be
 // resumed as a new one.
+/*
+ * The main agent, when this dashboard cannot inject into its session.
+ *
+ * Its session is normally the Claude running in the user's editor: observable
+ * here, owned there. A composer that took a prompt would have only one way to
+ * deliver it - by starting another session - so instead of a send that quietly
+ * means "start a second main agent", this says which of the two situations it
+ * is and leaves starting to the main agent panel.
+ *
+ * 'external': a session is running elsewhere. 'start': none is running.
+ */
+const mainAgentMode = computed<'external' | 'start' | null>(() => {
+  const a = props.agent
+  if (!a || !isMainAgent(a) || a.liveInjectable)
+    return null
+  return a.status === 'finished' ? 'start' : 'external'
+})
+
 type ResumeReason = 'internal' | 'disconnected' | 'noLiveChannel'
 const resumeReason = computed<ResumeReason | null>(() => {
   const a = props.agent
-  if (!a || a.liveInjectable)
+  if (!a || a.liveInjectable || mainAgentMode.value)
     return null
   if (a.internalProcess)
     return 'internal'
@@ -345,7 +364,25 @@ defineExpose({ focus })
       class="px-4 pt-2"
       @update:model-value="(val) => { promptInput = val; nextTick(autoResize) }"
     />
+    <!--
+      No composer for the main agent while the dashboard cannot inject into it:
+      an input here could only ever start a second one.
+    -->
     <div
+      v-if="mainAgentMode"
+      class="border-t border-line text-ui-sm text-fg-mute"
+      :class="variant === 'full' ? 'px-4 py-2.5' : 'px-3 py-2'"
+      data-testid="main-agent-composer-blocked"
+    >
+      <template v-if="mainAgentMode === 'external'">
+        This session is running outside Agent Dashboard. You can read it here; starting another one would run a second main agent, so use <strong>Open session</strong> on the main agent panel.
+      </template>
+      <template v-else>
+        No session is running for the main agent. Start one from the main agent panel, where it is confirmed first.
+      </template>
+    </div>
+    <div
+      v-else
       class="border-t border-line flex items-end focus-within:ring-[3px] focus-within:ring-accent"
       :class="variant === 'full' ? 'px-4 py-2.5 gap-2 flex-shrink-0' : 'px-3 py-2 gap-1.5 items-center'"
     >
@@ -420,6 +457,17 @@ defineExpose({ focus })
         {{ isSending ? '...' : (isResumeMode ? '⤳' : '↵') }}
       </button>
     </div>
+    <p
+      v-if="mainAgentBlocked"
+      role="status"
+      data-testid="main-agent-send-blocked"
+      class="text-[11px] text-amber-700 dark:text-amber-400"
+      :class="variant === 'full' ? 'px-4 pb-2' : 'px-3 pb-1.5 pt-0.5'"
+    >
+      {{ mainAgentBlocked === 'external'
+        ? 'Not sent. The main agent is running outside Agent Dashboard — open that session to continue it.'
+        : 'Not sent. No main agent session is running — start one from the main agent panel.' }}
+    </p>
     <!-- Resume confirmation strip — shown when a send was intercepted on a non-injectable session -->
     <div
       v-if="resumeConfirm !== null"

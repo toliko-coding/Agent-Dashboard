@@ -37,12 +37,18 @@ function agent(o: Partial<Agent> = {}) {
 
 let record: Record<string, unknown>
 let posts: Array<Record<string, unknown>>
+let spawns: Array<Record<string, unknown>>
 
 function stubFetch() {
   posts = []
+  spawns = []
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     if (init?.method === 'POST') {
       const body = JSON.parse(String(init.body ?? '{}'))
+      if (String(url).includes('/api/agents/spawn')) {
+        spawns.push(body)
+        return { ok: true, json: async () => ({ pid: 4242 }) }
+      }
       posts.push(body)
       record = { ...record, sessionId: body.pid === 0 ? '' : 'sess-manager' }
       return { ok: true, json: async () => record }
@@ -165,6 +171,112 @@ describe('main agent panel', () => {
     await flushPromises()
 
     expect(q('main-agent-error')!.textContent).toContain('on this machine')
+    w.unmount()
+  })
+
+  /*
+   * The Manager running in the user's editor is observed, not owned. The panel
+   * says which it is, because the difference decides what may be done to it.
+   */
+  it('says when the session runs outside the dashboard, and offers to observe it', async () => {
+    record = { ...MAIN, sessionId: 'sess-manager' }
+    const w = await mountPanel([agent()])
+
+    expect(q('main-agent-external')!.textContent).toContain('outside Agent Dashboard')
+    expect(q('main-agent-external')!.textContent).toContain('a second main agent')
+    expect(q('main-agent-open')!.textContent).toContain('Observe session')
+    w.unmount()
+  })
+
+  it('opens, rather than observes, a session this dashboard started', async () => {
+    record = { ...MAIN, sessionId: 'sess-manager' }
+    const w = await mountPanel([agent({ dashboardOwned: true })])
+
+    expect(q('main-agent-external')).toBeNull()
+    expect(q('main-agent-open')!.textContent).toContain('Open session')
+    w.unmount()
+  })
+
+  // Starting is never offered beside a running session: that is the one way a
+  // second main agent could be produced from this page.
+  it('offers no start while a session is running it', async () => {
+    record = { ...MAIN, sessionId: 'sess-manager' }
+    const w = await mountPanel([agent()])
+    expect(q('main-agent-start')).toBeNull()
+    w.unmount()
+  })
+
+  it('starts nothing until the user confirms what will be started', async () => {
+    record = { ...MAIN, cwd: '/repo/agent-dashboard', permissionMode: 'acceptEdits', instructions: 'Maintain the dashboard.' }
+    const w = await mountPanel([])
+
+    q('main-agent-start-button')!.click()
+    await flushPromises()
+    expect(spawns).toHaveLength(0)
+    expect(q('main-agent-start-folder')!.textContent).toContain('/repo/agent-dashboard')
+    expect(q('main-agent-start-mode')!.textContent).toContain('auto-accepts edits')
+    expect(q('main-agent-start-instructions')!.textContent).toContain('saved instructions are applied')
+
+    q('main-agent-start-confirm-button')!.click()
+    await flushPromises()
+    expect(spawns).toEqual([{
+      cwd: '/repo/agent-dashboard',
+      enableChannel: true,
+      permissionMode: 'acceptEdits',
+      systemPrompt: 'Maintain the dashboard.',
+    }])
+    w.unmount()
+  })
+
+  // Nothing is invented: an agent with no saved mode starts on Claude's own
+  // default, and the confirmation says exactly that.
+  it('promises no configuration the agent has not saved', async () => {
+    record = { ...MAIN, sessionId: 'sess-old', cwd: '/repo/agent-dashboard' }
+    const w = await mountPanel([])
+
+    q('main-agent-start-button')!.click()
+    await flushPromises()
+    expect(q('main-agent-start-instructions')!.textContent).toContain('no saved instructions')
+
+    q('main-agent-start-confirm-button')!.click()
+    await flushPromises()
+    expect(spawns).toEqual([{ cwd: '/repo/agent-dashboard', enableChannel: true, resumeSessionId: 'sess-old' }])
+    w.unmount()
+  })
+
+  it('cancelling the start leaves nothing started', async () => {
+    const w = await mountPanel([])
+    q('main-agent-start-button')!.click()
+    await flushPromises()
+    q('main-agent-start-cancel')!.click()
+    await flushPromises()
+
+    expect(spawns).toHaveLength(0)
+    expect(q('main-agent-start-confirm')).toBeNull()
+    w.unmount()
+  })
+
+  it('shows the server refusing a second main agent', async () => {
+    const w = await mountPanel([])
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST' && String(url).includes('/api/agents/spawn'))
+        return { ok: false, status: 409, json: async () => ({ error: 'the main agent is already running in another process', main: true }) }
+      return { ok: true, json: async () => record }
+    }))
+    q('main-agent-start-button')!.click()
+    await flushPromises()
+    q('main-agent-start-confirm-button')!.click()
+    await flushPromises()
+
+    expect(q('main-agent-error')!.textContent).toContain('already running in another process')
+    w.unmount()
+  })
+
+  it('has no axe violations while confirming a start', async () => {
+    const w = await mountPanel([])
+    q('main-agent-start-button')!.click()
+    await flushPromises()
+    expect(await axe(q('main-agent-panel')!)).toHaveNoViolations()
     w.unmount()
   })
 })

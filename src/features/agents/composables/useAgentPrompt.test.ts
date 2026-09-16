@@ -141,3 +141,75 @@ describe('useAgentPrompt offline queueing', () => {
     expect(isSending.value).toBe(false)
   })
 })
+
+/*
+ * The main agent is never started from the composer.
+ *
+ * Sending to a session the dashboard cannot inject into resumes it, which
+ * starts a new process. For every other agent that is the point; for the main
+ * agent it would mean a second process maintaining this dashboard beside the
+ * one already running in the user's editor. So the composer refuses, keeps what
+ * was typed, and says which situation it is.
+ */
+describe('the main agent is not started by sending to it', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({}) })))
+  })
+
+  it('stages no resume and sends nothing when its session runs elsewhere', async () => {
+    const agent = makeAgent({ role: 'main', liveInjectable: false, status: 'active' })
+    const onMessageSent = vi.fn()
+    const { promptInput, handleSend, resumeConfirm, mainAgentBlocked } = useAgentPrompt(() => agent, onMessageSent)
+    promptInput.value = 'take over please'
+
+    await handleSend()
+
+    expect(fetch).not.toHaveBeenCalled()
+    expect(resumeConfirm.value).toBeNull()
+    expect(mainAgentBlocked.value).toBe('external')
+    expect(onMessageSent).not.toHaveBeenCalled()
+    // What was typed is still there: nothing was sent, so nothing is lost.
+    expect(promptInput.value).toBe('take over please')
+  })
+
+  it('says a session must be started, rather than starting one', async () => {
+    const agent = makeAgent({ role: 'main', liveInjectable: false, status: 'finished' })
+    const { promptInput, handleSend, mainAgentBlocked } = useAgentPrompt(() => agent)
+    promptInput.value = 'carry on'
+
+    await handleSend()
+
+    expect(fetch).not.toHaveBeenCalled()
+    expect(mainAgentBlocked.value).toBe('start')
+  })
+
+  // Confirming a resume staged before the roster named this agent main must
+  // still not start a second one.
+  it('refuses at confirmation time too', async () => {
+    let agent = makeAgent({ liveInjectable: false, status: 'active' })
+    const { promptInput, handleSend, confirmResume, mainAgentBlocked } = useAgentPrompt(() => agent)
+    promptInput.value = 'hello'
+    await handleSend()
+    expect(fetch).not.toHaveBeenCalled()
+
+    agent = makeAgent({ role: 'main', liveInjectable: false, status: 'active' })
+    await confirmResume()
+
+    expect(fetch).not.toHaveBeenCalled()
+    expect(mainAgentBlocked.value).toBe('external')
+    expect(promptInput.value).toBe('hello')
+  })
+
+  // A session this dashboard owns and can inject into is an ordinary send: no
+  // new process is started, so there is nothing to refuse.
+  it('sends normally to a main agent session the dashboard can inject into', async () => {
+    const agent = makeAgent({ role: 'main', liveInjectable: true, status: 'active' })
+    const { promptInput, handleSend, mainAgentBlocked } = useAgentPrompt(() => agent)
+    promptInput.value = 'status please'
+
+    await handleSend()
+
+    expect(fetch).toHaveBeenCalledWith('/api/agents/123/message', expect.objectContaining({ method: 'POST' }))
+    expect(mainAgentBlocked.value).toBeNull()
+  })
+})

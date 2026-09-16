@@ -3,8 +3,10 @@ import type { Agent } from '@/types'
 import { computed, ref } from 'vue'
 import AgentGlyph from '@/components/ui/AgentGlyph.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
+import { agentIsDashboardOwned } from '@/composables/useAgentLifecycle'
 import { linkMainAgentSession, useMainAgentRecord } from '@/features/agents/composables/useMainAgentRecord'
 import { agentTitle } from '@/utils/agentLabels'
+import { permissionModeShortLabel } from '@/utils/permissionModes'
 import { agentDisplayStatus, statusLabel } from '@/utils/statusColors'
 
 /*
@@ -51,8 +53,67 @@ const candidates = computed(() => {
   return props.agents.filter(a => a.cwd === cwd && a.status !== 'finished' && !a.internalProcess && !a.machine)
 })
 
+/*
+ * A session this dashboard did not start - normally the Claude running in the
+ * user's own editor. It is observed here and owned there, so the panel says so
+ * and offers to open it, and nothing on this page sends to it or ends it.
+ */
+const externalSession = computed(() => !!session.value && !agentIsDashboardOwned(session.value))
+
+const confirmStart = ref(false)
+const starting = ref(false)
+
 const title = computed(() => mainAgent.value?.displayName || 'Agent Dashboard Manager')
 const sessionState = computed(() => session.value ? statusLabel(agentDisplayStatus(session.value)) : null)
+
+/*
+ * Starting the main agent is explicit, and confirmed against what it will
+ * actually start with: the folder, the saved permission mode, and whether it
+ * has saved instructions. Nothing is invented - a record with no saved mode
+ * starts on Claude's default, which is what the confirmation says.
+ *
+ * It goes through the ordinary spawn route, which refuses to resume the main
+ * agent while a session is already running it. So this button cannot produce a
+ * second main agent even if the roster is wrong about the first.
+ */
+async function startMain() {
+  const cfg = mainAgent.value
+  if (!cfg || starting.value)
+    return
+  if (!cfg.cwd) {
+    error.value = 'This agent has no folder recorded, so nothing can be started from here.'
+    return
+  }
+  starting.value = true
+  error.value = ''
+  try {
+    const body: Record<string, unknown> = { cwd: cfg.cwd, enableChannel: true }
+    if (cfg.sessionId)
+      body.resumeSessionId = cfg.sessionId
+    if (cfg.permissionMode)
+      body.permissionMode = cfg.permissionMode
+    if (cfg.instructions)
+      body.systemPrompt = cfg.instructions
+    const res = await fetch('/api/agents/spawn', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const failed = await res.json().catch(() => null) as { error?: string } | null
+      throw new Error(failed?.error || `Could not start the main agent (${res.status})`)
+    }
+    confirmStart.value = false
+    await refresh()
+  }
+  catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  }
+  finally {
+    starting.value = false
+  }
+}
 
 async function link(pid: number) {
   linking.value = true
@@ -103,7 +164,7 @@ async function link(pid: number) {
             data-testid="main-agent-open"
             @click="emit('select', session)"
           >
-            Open session
+            {{ externalSession ? 'Observe session' : 'Open session' }}
           </button>
         </template>
         <span v-else class="text-ui-sm text-fg-mute" data-testid="main-agent-no-session">No session running</span>
@@ -112,6 +173,9 @@ async function link(pid: number) {
 
     <p v-if="session" class="m-0 text-ui-sm text-fg-mute" data-testid="main-agent-session">
       Running as {{ agentTitle(session) }} · {{ sessionState }}
+    </p>
+    <p v-if="externalSession" class="m-0 text-ui-sm text-fg-mute" data-testid="main-agent-external">
+      This session runs outside Agent Dashboard, which observes it and does not control it. Open it to read along; it is continued where it was started, and starting another here would run a second main agent.
     </p>
 
     <!--
@@ -133,6 +197,50 @@ async function link(pid: number) {
           {{ agentTitle(candidate) }}
         </button>
       </span>
+    </div>
+
+    <!--
+      No session: starting one is offered here and nowhere else, so it is always
+      a deliberate act with its configuration in front of the user first.
+    -->
+    <div v-if="!session" class="flex min-w-0 flex-col gap-1.5" data-testid="main-agent-start">
+      <button
+        v-if="!confirmStart"
+        type="button"
+        class="self-start cursor-pointer rounded-lg border border-accent/50 bg-accent-soft/40 px-3 py-1 text-ui-sm font-medium text-accent hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+        data-testid="main-agent-start-button"
+        @click="confirmStart = true"
+      >
+        Start main agent
+      </button>
+      <div v-else role="group" aria-label="Confirm starting the main agent" class="flex min-w-0 flex-col gap-1.5" data-testid="main-agent-start-confirm">
+        <p class="m-0 text-ui-sm text-fg-soft">
+          Starts a session for {{ title }} in
+          <span class="font-mono" data-testid="main-agent-start-folder">{{ mainAgent?.cwd }}</span>, which
+          <span data-testid="main-agent-start-mode">{{ permissionModeShortLabel(mainAgent?.permissionMode || 'default').toLowerCase() }}</span>.
+          <span data-testid="main-agent-start-instructions">{{ mainAgent?.instructions ? 'Its saved instructions are applied.' : 'It has no saved instructions.' }}</span>
+        </p>
+        <span class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            :disabled="starting"
+            class="cursor-pointer rounded-lg border border-accent/50 bg-accent-soft/40 px-3 py-1 text-ui-sm font-medium text-accent hover:bg-raised disabled:opacity-60 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+            data-testid="main-agent-start-confirm-button"
+            @click="startMain()"
+          >
+            {{ starting ? 'Starting…' : 'Start session' }}
+          </button>
+          <button
+            type="button"
+            :disabled="starting"
+            class="cursor-pointer rounded-lg border border-line bg-transparent px-3 py-1 text-ui-sm text-fg-mute hover:bg-raised disabled:opacity-60 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+            data-testid="main-agent-start-cancel"
+            @click="confirmStart = false"
+          >
+            Cancel
+          </button>
+        </span>
+      </div>
     </div>
 
     <p v-if="error" class="m-0 text-ui-sm text-danger-text" role="alert" data-testid="main-agent-error">
