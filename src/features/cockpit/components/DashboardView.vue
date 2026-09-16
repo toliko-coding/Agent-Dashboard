@@ -8,7 +8,7 @@ import DashboardToolbar from '@/components/shell/DashboardToolbar.vue'
 import { useNow } from '@/composables/useNow'
 import { useSpawners } from '@/composables/useSpawners'
 import { useViewState } from '@/composables/useViewState'
-import { AgentCardGrid, AgentStatusFilterBar, AgentTable, AgentTriageBand, EmptyAgentState, isMainAgent, MainAgentPanel, useAgents } from '@/features/agents'
+import { AgentCardGrid, AgentStatusFilterBar, AgentTable, AgentTriageBand, EmptyAgentState, isMainAgent, MainAgentPanel, PersistentAgents, useAgents } from '@/features/agents'
 import { groupAgents, sortAgents } from '@/utils/agentGroup'
 import { matchesStatusFilter, statusFilterCounts } from '@/utils/agentStatusFilter'
 import { friendlyProjectName } from '@/utils/friendlyProjectName'
@@ -119,6 +119,7 @@ defineExpose({ rosterAgents })
     running it, and a status filter must not make it disappear.
   -->
   <MainAgentPanel :agents="agents" @select="selectAgent" />
+  <PersistentAgents :agents="agents" />
   <template v-if="dashboardLayout === 'list'">
     <EmptyAgentState v-if="rosterAgents.length === 0" :search-query="searchQuery" />
     <AgentTable v-else :agents="rosterAgents" :groups="rosterGroups" :attention-items="attention.items" :stale="!live" @select="selectAgent" />

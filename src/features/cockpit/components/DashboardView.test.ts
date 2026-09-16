@@ -24,6 +24,7 @@ vi.mock('@/features/agents', async () => {
     AgentTriageBand: { name: 'AgentTriageBand', template: '<div data-testid="triage-band" />' },
     EmptyAgentState: { name: 'EmptyAgentState', template: '<div data-testid="empty-state" />' },
     MainAgentPanel: { name: 'MainAgentPanel', template: '<div data-testid="main-agent-panel" />' },
+    PersistentAgents: { name: 'PersistentAgents', template: '<div data-testid="persistent-agents" />' },
     // The real rule, not a stub: the roster filters the main agent's running
     // session out so it is not listed twice, and a stub returning nothing would
     // hide a mistake in that filter.
