@@ -75,7 +75,7 @@ async function openResume(over: Partial<Agent> = {}, waitForConfig = true) {
   const { default: Dialog } = await import('../AgentLifecycleDialog.vue')
   const w = mount(Dialog, { attachTo: document.body })
   useAgentLifecycle().requestResume(agent(over), { available: true, endsRunningSession: false, reason: '' } as never)
-  await flushPromises()
+  await settle(() => !!q('agent-lifecycle-dialog'))
   if (waitForConfig)
     await settle(() => !!q('agent-lifecycle-resume-config'))
   return w
@@ -91,7 +91,6 @@ beforeEach(() => {
    * isolation the shared setup already applies to mounted components.
    */
   useAgentLifecycle().cancel()
-  document.body.innerHTML = ''
   config = {
     agentId: 'agent-1',
     instructions: 'Only touch the portfolio repository.',
@@ -177,18 +176,20 @@ describe('resume confirmation', () => {
     expect(q('agent-lifecycle-resume-config')).toBeNull()
 
     release()
-    await settle(() => !!q('agent-lifecycle-resume-config'))
+    await settle(() => !(q('agent-lifecycle-confirm') as HTMLButtonElement | null)?.disabled)
 
     expect((q('agent-lifecycle-confirm') as HTMLButtonElement).disabled).toBe(false)
     expect(q('agent-lifecycle-resume-mode')!.textContent).toContain('Auto-accepts edits')
     q('agent-lifecycle-confirm')!.click()
-    await flushPromises()
+    await settle(() => posts.length > 0)
     expect(posts[0].body.permissionMode).toBe('acceptEdits')
     w.unmount()
   })
 
   it('has no axe violations, including with the instructions expanded', async () => {
     const w = await openResume()
+    await settle(() => !!q('agent-lifecycle-dialog'))
+    expect(q('agent-lifecycle-dialog')).not.toBeNull()
     expect(await axe(q('agent-lifecycle-dialog')!)).toHaveNoViolations()
     q('agent-lifecycle-resume-instructions-toggle')!.click()
     await settle(() => !!q('agent-lifecycle-resume-instructions'))
