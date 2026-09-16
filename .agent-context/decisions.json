@@ -172,5 +172,32 @@
     "context": "Phase 4.1.1 acceptance: Project Intelligence can be maintained by hand and updated from AI proposals the user reviews (Add new phases / Replace / Reject). The user accepted the current roadmap implementation as good enough for this stage.",
     "decision": "For now roadmap changes happen only through the user: inline edits, or an AI proposal they review. Later, the Architect/Project Manager maintains roadmap state as work progresses, through the intended flow Architect plans → Developer → Reviewer → QA → verified result → Architect proposes/updates the roadmap from that structured evidence. The Architect never declares its own work verified: Verified stays server-assigned from linked pipeline tasks of the same project, and User / Suggested / Verified provenance is kept.",
     "consequences": "No autonomous roadmap writes before the Architect/PM phase. That phase must add proposal-from-structured-evidence, not direct writes, and must not bypass the provenance rules."
+  },
+  {
+    "id": "AD-2026-09-16-service-authority-classification",
+    "title": "Runtime classifies service authority; it does not control services",
+    "status": "accepted",
+    "date": "2026-09-16",
+    "context": "Runtime lists every listening port on the machine. Stop/Restart needs a resource identity the server can re-verify at the moment of the click. The dashboard proves it owns an AGENT with a managed_agent row (this server launched that process; session id + pid must both match). No equivalent exists for a service: a service's pid is the listening process, an agent's is the CLI, and nothing the dashboard reads links the two (documented in useAgentServices.ts).",
+    "decision": "Ship classification and protection only. GET /api/system/self reports the server's own pid, bound address and working directory, and each service is classified by equality against it: dashboard-server (pid match), dashboard-ui (serves the page being viewed, or runs in the server's own cwd), agent-workspace (same workspace as an agent the dashboard started - attribution, not ownership), external. The first two are marked protected. No tier is controllable, and `controllable` is a literal false rather than a per-row field.",
+    "consequences": "Runtime can say what the dashboard knows about each service without implying it can act on it. Classification is deliberately not by port number: 13120 and 5173 are defaults, not identities, and the backend was observed restarting onto a new pid mid-session. Stop/Restart stays blocked until a service carries an ownership record the server can re-verify."
+  },
+  {
+    "id": "AD-2026-09-16-main-agent-designation",
+    "title": "The main agent is an explicit designation that grants nothing",
+    "status": "accepted",
+    "date": "2026-09-16",
+    "context": "The agent maintaining Agent Dashboard itself was indistinguishable from any other agent. Inferring it from the working folder would name several agents at once and would make the designation a guess about a path.",
+    "decision": "One setting, agents.mainSessionId, holding one Claude session id - so there is at most one main agent by construction. The badge additionally requires an agent the dashboard started, because a session id outlives the session it named. Main status grants no permission, no authority over other agents and no exemption from ownership.",
+    "consequences": "Because nothing on the server depends on it, the designation can be stored as a setting and read by the client. If it ever gates behaviour, it must move behind server-side enforcement first."
+  },
+  {
+    "id": "AD-2026-09-16-saved-agent-configuration",
+    "title": "NEEDS OWNER DECISION: whether saved agent configuration applies on resume",
+    "status": "proposed",
+    "date": "2026-09-16",
+    "context": "permissionMode and the system prompt are launch-time CLI arguments; claude reads its mode once, at startup. Nothing persists them per agent today (agent_profile is explicitly presentation-only), and ResumeUnderDashboard deliberately hardcodes permissionMode \"default\". So an agent's posture cannot be edited after creation, and 'applies next session' is the only honest wording available.",
+    "decision": "Deferred to the owner. Implemented tonight is the observable half only: the server reads the mode each running process was actually started with (parser.PermissionModeFromArgs) and the workspace shows it. The saved half - an agent_config table holding permission mode and persistent instructions, plus Agent -> Edit sections for Identity / Instructions / Permissions / Session behavior - is designed but NOT built, because making a saved mode take effect on resume changes resume's authority posture from always-default to whatever was saved. That is a material, ambiguous change to the security model and is the owner's call.",
+    "consequences": "Question for the owner: should resuming an agent under Dashboard control apply its saved permission mode (with the resume dialog naming the mode before the user confirms), or should resume keep starting at Manual/default and saved configuration apply only to newly started agents? Until answered, no saved configuration exists to be applied, so nothing can silently escalate."
   }
 ]
