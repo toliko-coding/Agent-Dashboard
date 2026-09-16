@@ -42,16 +42,28 @@ const CONFIRM = { stop: ['Stop Agent', 'Stopping…'], delete: ['Delete Agent', 
  * server starts the session on Claude's default.
  */
 const resumeConfig = ref<AgentConfigDTO | null>(null)
+/*
+ * True while the configuration is being read.
+ *
+ * Confirming is held back until it lands. Otherwise the dialog is briefly
+ * showing Claude's default with no instructions - because nothing has loaded
+ * yet - and a click in that moment confirms nothing, so the session starts on
+ * the default while the agent's saved mode sits unused. The user would have
+ * confirmed something they were never shown.
+ */
+const configLoading = ref(false)
 const showInstructions = ref(false)
 
 watch(pending, (next) => {
   busy.value = false
   error.value = ''
   resumeConfig.value = null
+  configLoading.value = false
   showInstructions.value = false
   if (next?.action !== 'resume' || !next.agent)
     return
   const pid = next.agent.pid
+  configLoading.value = true
   void fetchAgentConfig(pid)
     .then((loaded) => {
       if (pending.value?.agent?.pid === pid)
@@ -60,6 +72,10 @@ watch(pending, (next) => {
     .catch(() => {
       // Unread configuration confirms nothing; the resume falls back to the
       // default mode rather than to a guess.
+    })
+    .finally(() => {
+      if (pending.value?.agent?.pid === pid)
+        configLoading.value = false
     })
 })
 
@@ -149,7 +165,10 @@ async function confirm() {
             before it starts. Claude reads its permission mode and system prompt
             once, at startup, so this is the only moment it can be reviewed.
           -->
-          <dl class="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-control border border-line bg-raised/40 px-3 py-2 text-ui-sm" data-testid="agent-lifecycle-resume-config">
+          <p v-if="configLoading" class="m-0 text-ui-sm text-fg-mute" data-testid="agent-lifecycle-resume-loading">
+            Reading this agent's saved configuration…
+          </p>
+          <dl v-else class="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-control border border-line bg-raised/40 px-3 py-2 text-ui-sm" data-testid="agent-lifecycle-resume-config">
             <dt class="text-fg-mute">
               Agent
             </dt>
@@ -227,7 +246,7 @@ async function confirm() {
         <AppButton variant="outline" :disabled="busy" data-testid="agent-lifecycle-cancel" @click="close">
           Cancel
         </AppButton>
-        <AppButton :variant="action === 'resume' ? 'primary' : 'danger'" :disabled="busy" data-testid="agent-lifecycle-confirm" @click="confirm">
+        <AppButton :variant="action === 'resume' ? 'primary' : 'danger'" :disabled="busy || configLoading" data-testid="agent-lifecycle-confirm" @click="confirm">
           {{ CONFIRM[action][busy ? 1 : 0] }}
         </AppButton>
       </footer>

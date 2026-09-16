@@ -1,6 +1,7 @@
 import type { Agent } from '@/types'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { axe } from '@/utils/testA11y'
 import { resetMainAgentRecordForTest } from '../../composables/useMainAgentRecord'
 import MainAgentPanel from '../MainAgentPanel.vue'
 
@@ -137,6 +138,18 @@ describe('main agent panel', () => {
     const w = await mountPanel([agent()])
     expect(q('main-agent-panel')).toBeNull()
     w.unmount()
+  })
+
+  it('has no axe violations, with a session and without one', async () => {
+    const empty = await mountPanel([])
+    expect(await axe(q('main-agent-panel')!)).toHaveNoViolations()
+    empty.unmount()
+
+    record = { ...MAIN, sessionId: 'sess-manager' }
+    resetMainAgentRecordForTest()
+    const linked = await mountPanel([agent()])
+    expect(await axe(q('main-agent-panel')!)).toHaveNoViolations()
+    linked.unmount()
   })
 
   it('shows the server\'s refusal rather than pretending the link worked', async () => {

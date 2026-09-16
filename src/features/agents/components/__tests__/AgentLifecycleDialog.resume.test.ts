@@ -2,6 +2,7 @@ import type { Agent } from '@/types'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAgentLifecycle } from '@/composables/useAgentLifecycle'
+import { axe } from '@/utils/testA11y'
 
 /*
  * Resuming an agent shows what the new session will start with, before it
@@ -117,6 +118,53 @@ describe('resume confirmation', () => {
 
     expect(posts).toHaveLength(0)
     expect(useAgentLifecycle().pending.value).toBeNull()
+    w.unmount()
+  })
+
+  /*
+   * Confirming is held until the configuration is read.
+   *
+   * Found live: the dialog renders before the fetch resolves, so for a moment
+   * it shows Claude's default with no instructions. Clicking Confirm then sends
+   * no confirmation at all, and the session starts on the default while the
+   * agent's saved mode goes unused - the user confirms something never shown.
+   */
+  it('will not let you confirm before the configuration has been read', async () => {
+    let release = () => {}
+    const held = new Promise<void>((resolve) => { release = resolve })
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      const href = String(url)
+      if (href.endsWith('/config')) {
+        await held
+        return { ok: true, json: async () => config }
+      }
+      posts.push({ url: href, body: JSON.parse(String(init?.body ?? '{}')) })
+      return { ok: true, json: async () => ({ pid: 9001, previousPid: 5919, endedRunningSession: false }) }
+    })
+    const w = await openResume()
+
+    expect((q('agent-lifecycle-confirm') as HTMLButtonElement).disabled).toBe(true)
+    expect(q('agent-lifecycle-resume-loading')).not.toBeNull()
+    expect(q('agent-lifecycle-resume-config')).toBeNull()
+
+    release()
+    await flushPromises()
+    await flushPromises()
+
+    expect((q('agent-lifecycle-confirm') as HTMLButtonElement).disabled).toBe(false)
+    expect(q('agent-lifecycle-resume-mode')!.textContent).toContain('Auto-accepts edits')
+    q('agent-lifecycle-confirm')!.click()
+    await flushPromises()
+    expect(posts[0].body.permissionMode).toBe('acceptEdits')
+    w.unmount()
+  })
+
+  it('has no axe violations, including with the instructions expanded', async () => {
+    const w = await openResume()
+    expect(await axe(q('agent-lifecycle-dialog')!)).toHaveNoViolations()
+    q('agent-lifecycle-resume-instructions-toggle')!.click()
+    await flushPromises()
+    expect(await axe(q('agent-lifecycle-dialog')!)).toHaveNoViolations()
     w.unmount()
   })
 
