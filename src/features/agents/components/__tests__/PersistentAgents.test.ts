@@ -18,9 +18,11 @@ import PersistentAgents from '../PersistentAgents.vue'
 
 // In the order the server returns: the main agent first, then by display name.
 const STORED = [
-  { agentId: 'a-main', displayName: 'Agent Dashboard Manager', category: 'development', permissionMode: '', hasInstructions: false, cwd: '/repo/agent-dashboard', role: 'main', sessionId: 'sess-manager' },
-  { agentId: 'a-portfolio', displayName: 'Portfolio Developer', category: 'web', permissionMode: '', hasInstructions: false, cwd: '/Users/me/GitHub/Protfolio', role: '', sessionId: 'sess-portfolio' },
-  { agentId: 'a-resume', displayName: 'Resume Editor', category: 'document', permissionMode: 'acceptEdits', hasInstructions: true, cwd: '/Users/me/AI-Agents/Resume-Editor', role: '', sessionId: 'sess-resume' },
+  { agentId: 'a-main', displayName: 'Agent Dashboard Manager', category: 'development', permissionMode: '', hasInstructions: false, cwd: '/repo/agent-dashboard', role: 'main', sessionId: 'sess-manager', resumable: true },
+  // Portfolio Developer still has its transcript; Resume Editor's is gone, so
+  // one is resumed and the other started - the difference the row must show.
+  { agentId: 'a-portfolio', displayName: 'Portfolio Developer', category: 'web', permissionMode: '', hasInstructions: false, cwd: '/Users/me/GitHub/Protfolio', role: '', sessionId: 'sess-portfolio', resumable: true },
+  { agentId: 'a-resume', displayName: 'Resume Editor', category: 'document', permissionMode: 'acceptEdits', hasInstructions: true, cwd: '/Users/me/AI-Agents/Resume-Editor', role: '', sessionId: 'sess-resume', resumable: false },
 ]
 
 function agent(o: Partial<Agent> = {}) {
@@ -147,6 +149,41 @@ describe('agents kept with no session running', () => {
   it('has no axe violations', async () => {
     const w = await mountSection([])
     expect(await axe(q('persistent-agents')!)).toHaveNoViolations()
+    w.unmount()
+  })
+
+  /*
+   * An agent with no session was previously a row with nothing to click: it
+   * could be seen and deleted, and not opened, started or inspected.
+   */
+  it('gives every kept agent something to do', async () => {
+    const w = await mountSection([])
+
+    expect(q('persistent-agent-open-a-resume')).not.toBeNull()
+    expect(q('persistent-agent-start-a-resume')).not.toBeNull()
+    expect(q('persistent-agent-delete-a-resume')).not.toBeNull()
+    expect(q('persistent-agent-state')!.textContent).toContain('No session running')
+    w.unmount()
+  })
+
+  // Resume continues a conversation and Start begins one, so the row says which
+  // it will be - taken from whether the transcript is still on disk.
+  it('says whether it would resume the conversation or start a new one', async () => {
+    const w = await mountSection([])
+
+    expect(q('persistent-agent-start-a-portfolio')!.textContent).toContain('Resume agent')
+    expect(q('persistent-agent-start-a-resume')!.textContent).toContain('Start agent')
+    w.unmount()
+  })
+
+  it('opens the agent rather than acting on it immediately', async () => {
+    const w = await mountSection([])
+
+    q('persistent-agent-open-a-resume')!.click()
+    await flushPromises()
+    await flushPromises()
+
+    expect(q('persistent-agent-dialog')).not.toBeNull()
     w.unmount()
   })
 })

@@ -3,6 +3,7 @@ import type { DashboardAgentDTO } from '@/sdk.generated'
 import type { Agent } from '@/types'
 import { computed, ref } from 'vue'
 import AgentGlyph from '@/components/ui/AgentGlyph.vue'
+import PersistentAgentDialog from '@/features/agents/components/PersistentAgentDialog.vue'
 import { deletePersistentAgent, usePersistentAgents, withoutLiveSession } from '@/features/agents/composables/usePersistentAgents'
 import { permissionModeShortLabel } from '@/utils/permissionModes'
 
@@ -28,6 +29,8 @@ const props = defineProps<{
 const { persistentAgents, loaded } = usePersistentAgents()
 const busy = ref('')
 const error = ref('')
+/** The agent whose detail surface is open, if any. */
+const openAgentId = ref<string | null>(null)
 
 const dormant = computed(() => withoutLiveSession(persistentAgents.value, props.agents))
 
@@ -43,6 +46,15 @@ async function remove(agent: DashboardAgentDTO) {
   finally {
     busy.value = ''
   }
+}
+
+/*
+ * Resume continues a conversation, Start begins one, and the row says which
+ * before it is clicked: the server reports whether the agent's last session
+ * still has a transcript, so neither word is a guess.
+ */
+function startLabel(agent: DashboardAgentDTO): string {
+  return agent.resumable ? 'Resume agent' : 'Start agent'
 }
 
 /** The folder's own name; the full path is a diagnostic, not a card heading. */
@@ -77,21 +89,40 @@ function folderName(cwd?: string): string {
         <span class="flex min-w-0 flex-col">
           <span class="truncate text-ui font-medium text-fg" data-testid="persistent-agent-name">{{ agent.displayName || 'Unnamed agent' }}</span>
           <span class="flex flex-wrap items-center gap-x-2 text-ui-sm text-fg-mute">
-            <span data-testid="persistent-agent-folder">{{ folderName(agent.cwd) }}</span>
+            <span data-testid="persistent-agent-state">No session running</span>
+            <span data-testid="persistent-agent-folder">· {{ folderName(agent.cwd) }}</span>
             <span v-if="agent.permissionMode" data-testid="persistent-agent-mode">· {{ permissionModeShortLabel(agent.permissionMode) }} next session</span>
             <span v-if="agent.hasInstructions" data-testid="persistent-agent-instructions">· has instructions</span>
           </span>
         </span>
 
-        <button
-          type="button"
-          :disabled="busy === agent.agentId"
-          class="ml-auto cursor-pointer rounded-lg border border-line bg-transparent px-3 py-1 text-ui-sm text-fg-mute hover:border-danger-line hover:bg-danger-soft hover:text-danger-text disabled:opacity-60 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
-          :data-testid="`persistent-agent-delete-${agent.agentId}`"
-          @click="remove(agent)"
-        >
-          {{ busy === agent.agentId ? 'Deleting…' : 'Delete agent' }}
-        </button>
+        <span class="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+          <button
+            type="button"
+            class="cursor-pointer rounded-lg border border-line bg-raised/50 px-3 py-1 text-ui-sm text-accent hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+            :data-testid="`persistent-agent-open-${agent.agentId}`"
+            @click="openAgentId = agent.agentId"
+          >
+            Open
+          </button>
+          <button
+            type="button"
+            class="cursor-pointer rounded-lg border border-accent/50 bg-accent-soft/40 px-3 py-1 text-ui-sm font-medium text-accent hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+            :data-testid="`persistent-agent-start-${agent.agentId}`"
+            @click="openAgentId = agent.agentId"
+          >
+            {{ startLabel(agent) }}
+          </button>
+          <button
+            type="button"
+            :disabled="busy === agent.agentId"
+            class="cursor-pointer rounded-lg border border-line bg-transparent px-3 py-1 text-ui-sm text-fg-mute hover:border-danger-line hover:bg-danger-soft hover:text-danger-text disabled:opacity-60 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent"
+            :data-testid="`persistent-agent-delete-${agent.agentId}`"
+            @click="remove(agent)"
+          >
+            {{ busy === agent.agentId ? 'Deleting…' : 'Delete agent' }}
+          </button>
+        </span>
       </li>
     </ul>
 
@@ -101,5 +132,11 @@ function folderName(cwd?: string): string {
     <p v-if="error" class="m-0 text-ui-sm text-danger-text" role="alert" data-testid="persistent-agents-error">
       {{ error }}
     </p>
+
+    <PersistentAgentDialog
+      :agent-id="openAgentId"
+      @close="openAgentId = null"
+      @deleted="openAgentId = null"
+    />
   </section>
 </template>
