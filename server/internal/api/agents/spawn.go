@@ -1047,7 +1047,9 @@ type SpawnHandler struct {
 	// agentConfigs is the durable agent record (name, icon, instructions,
 	// permission mode, role). Nil when this server stores none.
 	agentConfigs AgentConfigStore
-	managed      ManagedAgents
+	// mainAgents is the seeded main-agent record. Nil when this server stores none.
+	mainAgents MainAgentStore
+	managed    ManagedAgents
 	// Resume under Dashboard control (3N.2.2); tests swap these seams.
 	resumeSpawn func(sub string, body map[string]any) (SpawnOutcome, error)
 	hosted      func(pid int) bool

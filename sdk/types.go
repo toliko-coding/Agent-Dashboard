@@ -727,6 +727,29 @@ type AgentConfigDTO struct {
 	DiffersFromSession bool `json:"differsFromSession"`
 }
 
+// MainAgentDTO is the durable record of the agent that maintains Agent
+// Dashboard itself, read through GET /api/main-agent.
+//
+// It is a seeded record with a fixed id: no request promotes an ordinary agent,
+// so there is exactly one main agent by construction. The role is a product
+// identity and grants nothing — no permission, no ownership exemption, no
+// authority over other agents.
+//
+// SessionID points at whichever Claude session is running it at the moment, and
+// is empty when none is. Whether that session is alive is deliberately not
+// reported here: the client already has the roster and can match it, so the
+// record does not carry a liveness claim that could be stale the instant it is
+// written.
+type MainAgentDTO struct {
+	AgentID        string `json:"agentId"`
+	DisplayName    string `json:"displayName"`
+	Category       string `json:"category"`
+	Instructions   string `json:"instructions"`
+	PermissionMode string `json:"permissionMode"`
+	Cwd            string `json:"cwd,omitempty"`
+	SessionID      string `json:"sessionId,omitempty"`
+}
+
 // RuntimeSelf identifies the dashboard's own server process, so a listening
 // service observed on this machine can be recognised as the dashboard itself
 // instead of guessed at from a port number. Guessing from a port (13120, 5173)

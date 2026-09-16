@@ -568,18 +568,6 @@ func initializeServer(ctx context.Context, cfg config.Config, cfgFile string, re
 		if _, err := agentConfigs.EnsureMain(ctx, selfCwd); err != nil {
 			slog.Warn("main agent not seeded", "err", err)
 		}
-		// One-time migration off the earlier session-keyed designation: the role
-		// now lives on the durable agent, so the old setting is consumed and
-		// cleared rather than left as a second source of truth.
-		if settingsSvc != nil {
-			if legacy := settingsSvc.String(settings.MainAgentSessionKey); legacy != "" {
-				if _, err := agentConfigs.BindMainSession(ctx, legacy); err != nil {
-					slog.Warn("main agent session not migrated", "err", err)
-				} else if err := settingsSvc.Set(ctx, settings.MainAgentSessionKey, ""); err != nil {
-					slog.Warn("legacy main agent setting not cleared", "err", err)
-				}
-			}
-		}
 		agentMerger.SetAgentConfigs(agentConfigs)
 		// Which agents this server launched: the only basis for Stop and Delete (3N.2.1).
 		managedAgents = managedagent.New(repo.NewManagedAgentRepo(entClient))

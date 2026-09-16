@@ -211,11 +211,56 @@ export interface ResumeResult {
   endedRunningSession: boolean
 }
 
-export async function resumeUnderDashboard(pid: number): Promise<ResumeResult> {
-  const res = await fetch(`/api/agents/${pid}/resume-under-dashboard`, { method: 'POST', credentials: 'same-origin' })
+/**
+ * What the user was shown before confirming a resume.
+ *
+ * Sent back so the server can check it is still what is saved: if the
+ * configuration changed while the dialog was open, the resume is refused rather
+ * than starting a session on settings nobody saw.
+ */
+export interface ResumeConfirmation {
+  permissionMode: string
+  /** Omitted when the browser cannot hash; the server then skips that check. */
+  instructionsFingerprint?: string
+}
+
+/**
+ * Resumes a session under Agent Dashboard.
+ *
+ * Without a confirmation the server applies nothing saved and starts on
+ * claude's default mode, exactly as it did before agents had configuration —
+ * so a saved mode can never be applied by a caller that did not ask about it.
+ */
+export async function resumeUnderDashboard(pid: number, confirmation?: ResumeConfirmation): Promise<ResumeResult> {
+  const res = await fetch(`/api/agents/${pid}/resume-under-dashboard`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: confirmation ? { 'Content-Type': 'application/json' } : undefined,
+    body: confirmation ? JSON.stringify({ confirmed: true, ...confirmation }) : undefined,
+  })
   if (!res.ok)
     throw await errorFrom(res, 'Could not resume the session under Agent Dashboard')
   return await res.json() as ResumeResult
+}
+
+/**
+ * Identifies a body of instructions without sending it back: the same sha256
+ * prefix the server computes, so "what I showed" and "what is saved" can be
+ * compared. Returns undefined where WebCrypto is unavailable (an insecure
+ * origin, or a test environment) — the field is then simply omitted rather than
+ * sent wrong, and the server skips the comparison.
+ */
+export async function instructionsFingerprint(text: string): Promise<string | undefined> {
+  const subtle = globalThis.crypto?.subtle
+  if (!subtle)
+    return undefined
+  try {
+    const digest = await subtle.digest('SHA-256', new TextEncoder().encode(text))
+    return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16)
+  }
+  catch {
+    return undefined
+  }
 }
 
 /** The editor the user picked for worktrees, or VS Code. */

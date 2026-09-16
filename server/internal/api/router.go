@@ -613,6 +613,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 		spawnHandler := agents.NewSpawnHandler(spawnMgr)
 		if deps.AgentConfigs != nil {
 			spawnHandler.SetAgentConfigs(deps.AgentConfigs)
+			spawnHandler.SetMainAgents(deps.AgentConfigs)
 		}
 		if deps.AgentProfiles != nil {
 			spawnHandler.SetProfileDeleter(deps.AgentProfiles)
@@ -672,6 +673,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 		// instructions, and the permission mode saved for its next session.
 		r.Get("/api/agents/{pid}/config", spawnHandler.AgentConfig)
 		r.Put("/api/agents/{pid}/config", spawnHandler.UpdateAgentConfig)
+		// The agent that maintains Agent Dashboard itself. There is no route
+		// that promotes an ordinary agent: the record is seeded, and only which
+		// session is running it can be set.
+		r.Get("/api/main-agent", spawnHandler.MainAgent)
+		r.Post("/api/main-agent/session", spawnHandler.LinkMainAgentSession)
 		r.Get("/api/agents/{pid}/control", spawnHandler.GetAgentControl)
 		r.Post("/api/agents/{pid}/resume-under-dashboard", spawnHandler.ResumeUnderDashboard)
 		uploadImageHandler := agents.NewUploadImageHandler()

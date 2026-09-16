@@ -17,7 +17,7 @@ import { useNow } from '@/composables/useNow'
 import { usePermissionResolve } from '@/composables/usePermissionResolve'
 import { useTerminalPermissionDecision } from '@/composables/useTerminalPermission'
 import { toast } from '@/composables/useToast'
-import { useMainAgent } from '@/features/agents/composables/useMainAgent'
+import { isMainAgent } from '@/features/agents/composables/useMainAgent'
 import { useMetricsDisclosure } from '@/features/agents/composables/useMetricsDisclosure'
 import { PluginSlot } from '@/features/plugins'
 import { agentTechnical, agentTitle, agentTopic } from '@/utils/agentLabels'
@@ -83,9 +83,9 @@ watch([() => props.agent?.pid, terminalRequest, canAttachTerminal], ([pid, reque
  */
 const sessionMode = computed(() => props.agent?.sessionPermissionMode ?? '')
 
-// The agent that maintains Agent Dashboard itself: a designation, shown only
-// for an agent the dashboard started. It grants nothing.
-const { isMain } = useMainAgent()
+// The agent that maintains Agent Dashboard itself. A role on the durable agent
+// record, carried on the agent payload; it grants nothing.
+const isMain = computed(() => isMainAgent(props.agent))
 
 // Approve once / Deny on the recognised prompt (Phase 4); the terminal stays the fallback.
 const permissionPrompt = computed(() => props.agent?.terminalPermission ?? null)
@@ -262,7 +262,7 @@ watch(() => props.agent?.sessionId, (sessionId) => {
                 {{ agentTitle(agent) }}
               </h2>
               <span
-                v-if="isMain(agent)"
+                v-if="isMain"
                 class="shrink-0 rounded-control border border-accent/50 px-1.5 py-px text-label font-semibold uppercase tracking-wide text-accent"
                 data-testid="agent-modal-main"
                 title="Main agent — maintains Agent Dashboard itself. A designation only: it grants no permission and no authority over other agents."

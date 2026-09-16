@@ -178,11 +178,6 @@ var definitions = func() map[string]Definition {
 		{Key: "eval.stddevK", Type: TypeFloat, Default: "3", Apply: ApplyRestart, Category: "eval", validate: nonNegativeFloat("eval.stddevK")},
 		{Key: "usage.budget.session", Type: TypeInt, Default: "0", Apply: ApplyLive, Category: "usage", validate: nonNegativeInt("usage.budget.session")},
 		{Key: "usage.budget.weekly", Type: TypeInt, Default: "0", Apply: ApplyLive, Category: "usage", validate: nonNegativeInt("usage.budget.weekly")},
-		// The agent that maintains Agent Dashboard itself. One key, so there is
-		// exactly one main agent by construction rather than by convention. It is
-		// a designation and nothing more: it grants no permission, bypasses no
-		// ownership check, and gives the agent no authority over other agents.
-		{Key: MainAgentSessionKey, Type: TypeString, Default: "", Apply: ApplyLive, Category: "agents", validate: optionalSessionID(MainAgentSessionKey)},
 		{Key: "onboarding.completed", Type: TypeBool, Default: "false", Apply: ApplyLive, Category: "onboarding"},
 		{Key: "obsidian.apiKey", Type: TypeString, Secret: true, Apply: ApplyRestart, Category: "obsidian"},
 		{Key: "obsidian.baseURL", Type: TypeString, Default: "", Apply: ApplyRestart, Category: "obsidian"},
@@ -238,41 +233,4 @@ func All() []Definition {
 		out = append(out, d)
 	}
 	return out
-}
-
-// MainAgentSessionKey holds the Claude session id of the agent that maintains
-// Agent Dashboard itself. Empty means none is designated.
-const MainAgentSessionKey = "agents.mainSessionId"
-
-/*
- * optionalSessionID accepts an empty value or a Claude session id.
- *
- * The format check is all this layer can do: whether that session exists, and
- * whether the dashboard started it, are facts about a running roster rather
- * than about a stored string. Callers that show the designation check those
- * separately, so a stale or foreign id is simply never matched.
- */
-func optionalSessionID(key string) func(raw string) error {
-	return func(raw string) error {
-		if raw == "" {
-			return nil
-		}
-		const uuidLen = 36
-		if len(raw) != uuidLen {
-			return fmt.Errorf("%s must be a session id (UUID) or empty", key)
-		}
-		for i, r := range raw {
-			if i == 8 || i == 13 || i == 18 || i == 23 {
-				if r != '-' {
-					return fmt.Errorf("%s must be a session id (UUID) or empty", key)
-				}
-				continue
-			}
-			isHex := (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')
-			if !isHex {
-				return fmt.Errorf("%s must be a session id (UUID) or empty", key)
-			}
-		}
-		return nil
-	}
 }

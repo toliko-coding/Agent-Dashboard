@@ -1,36 +1,38 @@
 import type { Agent } from '@/types'
 import { describe, expect, it } from 'vitest'
-import { isMainAgent } from './useMainAgent'
+import { isMainAgent, MAIN_AGENT_ROLE } from './useMainAgent'
 
-const SID = 'cdc9e4c8-1111-4222-8333-444455556666'
-const agent = (over: Partial<Agent> = {}) => ({ sessionId: SID, dashboardOwned: true, ...over }) as Agent
+const agent = (over: Partial<Agent> = {}) => ({ sessionId: 'sess-1', ...over }) as Agent
 
-describe('main agent designation', () => {
-  it('names the designated agent', () => {
-    expect(isMainAgent(agent(), SID)).toBe(true)
-  })
-
-  it('names nobody when no agent is designated', () => {
-    expect(isMainAgent(agent(), '')).toBe(false)
-  })
-
-  it('does not name a different session', () => {
-    expect(isMainAgent(agent({ sessionId: 'another-session' }), SID)).toBe(false)
+describe('main agent', () => {
+  it('names the agent carrying the main role', () => {
+    expect(isMainAgent(agent({ role: MAIN_AGENT_ROLE }))).toBe(true)
   })
 
   /*
-   * A session id outlives the session it named, and the setting can hold an id
-   * typed in by hand. Decorating a Terminal or VS Code session as the
-   * dashboard's own maintainer would be a claim about ownership the dashboard
-   * cannot make, so the designation shows only on an agent it started.
+   * Every other agent is an ordinary agent, whatever it is called and wherever
+   * it works. Project Intelligence, a Portfolio Developer and a Resume Editor
+   * are all simply not main, and there is no client-side way to change that:
+   * the role is seeded once on the server, so nothing here can promote an
+   * agent by setting a field.
    */
-  it('never designates a session the dashboard did not start', () => {
-    expect(isMainAgent(agent({ dashboardOwned: false }), SID)).toBe(false)
-    expect(isMainAgent(agent({ dashboardOwned: undefined }), SID)).toBe(false)
+  it('names nothing else, including agents working in the dashboard itself', () => {
+    expect(isMainAgent(agent({ role: '' }))).toBe(false)
+    expect(isMainAgent(agent({ role: undefined }))).toBe(false)
+    expect(isMainAgent(agent({ displayName: 'Project Intelligence' }))).toBe(false)
+    expect(isMainAgent(agent({ cwd: '/Users/me/Agent-Dashboard' }))).toBe(false)
+    expect(isMainAgent(agent({ role: 'Main' }))).toBe(false)
   })
 
-  it('handles an agent with no session id, and no agent at all', () => {
-    expect(isMainAgent(agent({ sessionId: '' }), SID)).toBe(false)
-    expect(isMainAgent(null, SID)).toBe(false)
+  it('handles no agent at all', () => {
+    expect(isMainAgent(null)).toBe(false)
+    expect(isMainAgent(undefined)).toBe(false)
+  })
+
+  // The role travels with the agent, not with the session running it: a
+  // finished main agent is still the main agent.
+  it('does not depend on a session running, or on the dashboard owning one', () => {
+    expect(isMainAgent(agent({ role: MAIN_AGENT_ROLE, status: 'finished' }))).toBe(true)
+    expect(isMainAgent(agent({ role: MAIN_AGENT_ROLE, dashboardOwned: false }))).toBe(true)
   })
 })
