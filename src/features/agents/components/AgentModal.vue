@@ -104,15 +104,21 @@ const composerNote = computed(() => {
     ? 'No live input path to the running process: sending starts a new Claude process that resumes this conversation, managed by Agent Dashboard. The running process is not touched.'
     : 'This session has ended: sending resumes the conversation as a new process managed by Agent Dashboard. Its history is kept.'
 })
-// Whether an observed session can be resumed under Dashboard control (3N.2.2):
-// asked once per agent and state change, never polled. Owned and pipeline
-// agents are never asked.
+/*
+ * Whether this session can be resumed (3N.2.2): asked once per agent and state
+ * change, never polled.
+ *
+ * An owned agent that is still running has nothing to resume — Stop is the
+ * action there — but one whose session has ended does, and that is the path
+ * which shows its saved configuration before the next session starts. Pipeline
+ * agents are never asked: they are stopped or cancelled through their task.
+ */
 const control = ref<AgentControl | null>(null)
 watch(
   () => [props.agent?.pid, owned.value, props.agent ? agentIsRunning(props.agent) : false, props.agent?.pipelineTaskId] as const,
-  async ([pid, isOwned, , pipelineTaskId]) => {
+  async ([pid, isOwned, isRunning, pipelineTaskId]) => {
     control.value = null
-    if (!pid || isOwned || pipelineTaskId || !canAct.value)
+    if (!pid || pipelineTaskId || !canAct.value || (isOwned && isRunning))
       return
     try {
       const answer = await getAgentControl(pid)
@@ -125,13 +131,20 @@ watch(
   },
   { immediate: true },
 )
-const resumable = computed(() => !owned.value && control.value?.resume?.available === true)
+/*
+ * The server decides whether resuming is possible, including for an agent this
+ * dashboard owns whose session has ended - that is the path which shows the
+ * saved configuration before the next session starts.
+ */
+const resumable = computed(() => control.value?.resume?.available === true)
 // What resuming would do, in the user's terms; only once the server has said it can.
 const resumeHelp = computed(() => {
   const resume = control.value?.resume
-  if (!resume || owned.value)
+  if (!resume)
     return null
   if (resume.available) {
+    if (owned.value)
+      return 'This session has ended. Resuming starts a new one for this agent, and shows you its saved configuration first.'
     return resume.endsRunningSession
       ? 'Agent Dashboard can end it with /exit and resume the conversation as a process it manages.'
       : 'Resume this Claude conversation as a new Dashboard-managed process.'
@@ -416,20 +429,20 @@ watch(() => props.agent?.sessionId, (sessionId) => {
           session, said once, with the one action that changes it.
         -->
         <div
-          v-if="presentation?.note"
+          v-if="presentation?.note || resumable"
           class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-line bg-app/40 px-3 py-2 text-ui-sm"
           data-testid="agent-modal-lifecycle"
-          :data-kind="presentation.kind"
+          :data-kind="presentation?.kind"
         >
-          <span class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-line bg-raised/60 px-2 py-0.5 font-medium text-fg-soft" data-testid="agent-modal-lifecycle-badge">
+          <span v-if="presentation?.badge" class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-line bg-raised/60 px-2 py-0.5 font-medium text-fg-soft" data-testid="agent-modal-lifecycle-badge">
             <svg viewBox="0 0 16 16" class="size-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
               <g v-if="presentation.kind === 'ended-unmanaged'"><circle cx="8" cy="8" r="6" /><path d="M6.25 6.25h3.5v3.5h-3.5z" /></g>
               <g v-else><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z" /><circle cx="8" cy="8" r="1.8" /></g>
             </svg>
-            {{ presentation.badge }}
+            {{ presentation?.badge }}
           </span>
           <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="text-fg-mute" data-testid="agent-modal-observe-only">{{ presentation.note }}</span>
+            <span v-if="presentation?.note" class="text-fg-mute" data-testid="agent-modal-observe-only">{{ presentation?.note }}</span>
             <span v-if="resumeHelp" class="text-fg-soft" data-testid="agent-modal-resume-help">{{ resumeHelp }}</span>
           </span>
           <button
@@ -439,7 +452,7 @@ watch(() => props.agent?.sessionId, (sessionId) => {
             data-testid="agent-modal-resume"
             @click="requestResume(agent, control.resume)"
           >
-            Resume under Dashboard
+            {{ owned ? 'Resume agent' : 'Resume under Dashboard' }}
           </button>
         </div>
 

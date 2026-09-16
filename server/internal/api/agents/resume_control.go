@@ -132,9 +132,19 @@ func (h *SpawnHandler) GetAgentControl(w http.ResponseWriter, r *http.Request) {
 	case agent.PipelineTaskID != "":
 		control.ManagedBy = "pipeline"
 		control.Resume = ResumeAvailability{Reason: "This agent runs a pipeline task; stop or cancel the task instead."}
-	case h.owns(agent):
+	case h.owns(agent) && h.running(agent):
 		control.Owned = true
 		control.Resume = ResumeAvailability{Reason: "Already managed by Agent Dashboard."}
+	case h.owns(agent):
+		/*
+		 * An agent this dashboard owns whose process has ended. There is no
+		 * session to take over, so resuming is simply starting the next one for
+		 * an agent that already belongs here - and it is the path that shows the
+		 * saved configuration first. Sending it a message resumes it too, but
+		 * silently and with none of its configuration.
+		 */
+		control.Owned = true
+		control.Resume = h.resumeAvailability(agent)
 	default:
 		control.Resume = h.resumeAvailability(agent)
 	}
@@ -147,7 +157,10 @@ func (h *SpawnHandler) ResumeUnderDashboard(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
-	if agent.PipelineTaskID == "" && h.owns(agent) {
+	// Refused only while a process is still running: an owned agent that has
+	// finished is resumed here, which is what puts its saved configuration in
+	// front of the user before the next session starts.
+	if agent.PipelineTaskID == "" && h.owns(agent) && h.running(agent) {
 		lifecycleJSON(w, http.StatusConflict, map[string]any{"error": "Already managed by Agent Dashboard.", "owned": true})
 		return
 	}

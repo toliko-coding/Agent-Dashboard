@@ -227,6 +227,34 @@ describe('agentModal — workspace', () => {
     vi.unstubAllGlobals()
   })
 
+  /*
+   * An agent this dashboard already owns, whose session has ended.
+   *
+   * Sending it a message also resumes it, but silently and with none of its
+   * configuration. Resume is the path that shows what the next session will
+   * start with, so the affordance has to reach this case - and it nearly did
+   * not: an owned agent has no "observe only" note, and the strip carrying the
+   * button used to render only when there was one.
+   */
+  it('offers a finished owned agent a resume that will show its configuration', async () => {
+    const { flushPromises } = await import('@vue/test-utils')
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => String(url).endsWith('/control') ? { owned: true, resume: { available: true, endsRunningSession: false } } : {},
+    })))
+    const w = workspace({ ...baseAgent, status: 'finished', dashboardOwned: true, displayName: 'Portfolio Developer' } as Agent)
+    await flushPromises()
+
+    const strip = w.get('[data-testid="agent-modal-lifecycle"]')
+    const resume = strip.get('[data-testid="agent-modal-resume"]')
+    expect(resume.text()).toBe('Resume agent')
+    expect(w.get('[data-testid="agent-modal-resume-help"]').text()).toContain('saved configuration')
+    // Owned agents carry no observe-only note, and an empty badge chip would be
+    // worse than none: both are absent rather than blank.
+    expect(strip.find('[data-testid="agent-modal-observe-only"]').exists()).toBe(false)
+    expect(strip.find('[data-testid="agent-modal-lifecycle-badge"]').exists()).toBe(false)
+  })
+
   // 3N.2.3: the lifecycle strip says what the dashboard can do, and the composer what sending does.
   it('explains a finished unmanaged session and what resuming does', async () => {
     const { flushPromises } = await import('@vue/test-utils')

@@ -175,20 +175,32 @@ func TestResume_ASessionThatDoesNotExit_IsNotResumed(t *testing.T) {
 	require.Empty(t, f.killed)
 }
 
-func TestResume_RefusesOwnedAndPipelineAgents(t *testing.T) {
-	owned := legacyAgent(71, sdk.AgentStatusFinished)
+/*
+ * A running owned agent is not resumed, and a pipeline agent never is.
+ *
+ * This used to refuse an owned agent whatever state it was in, on the grounds
+ * that it was "already managed". That is right while a process is running -
+ * there the session would have to be taken over, and Stop is the honest action
+ * - but wrong once it has ended: an owned agent that has finished is resumed
+ * here precisely so its saved configuration is shown and confirmed before the
+ * next session starts (see TestResume_OwnedFinishedAgentStartsWithItsConfirmedConfiguration).
+ * A pipeline agent stays forbidden in both states: its task owns its lifecycle.
+ */
+func TestResume_RefusesRunningOwnedAndPipelineAgents(t *testing.T) {
+	owned := legacyAgent(71, sdk.AgentStatusActive)
 	pipeline := legacyAgent(72, sdk.AgentStatusFinished)
 	pipeline.SessionID = "44444444-4444-4444-8444-444444444444"
 	pipeline.PipelineTaskID = "task-1"
 	f := newLifecycleFixture(t, owned, pipeline)
+	f.alive[71] = true
 	f.ownAgent(t, owned)
 	s := f.withResumeSeams(true)
 
 	rr, _ := f.do(http.MethodPost, "/x", 71, f.h.ResumeUnderDashboard)
-	require.Equal(t, http.StatusConflict, rr.Code)
+	require.Equal(t, http.StatusConflict, rr.Code, "a running owned session is not taken over")
 	rr, _ = f.do(http.MethodPost, "/x", 72, f.h.ResumeUnderDashboard)
-	require.Equal(t, http.StatusForbidden, rr.Code)
-	require.Empty(t, s.spawns)
+	require.Equal(t, http.StatusForbidden, rr.Code, "a pipeline agent is stopped or cancelled through its task")
+	require.Empty(t, s.spawns, "neither refusal started anything")
 }
 
 // 2: ownership survives a server restart when the recorded provenance still matches.

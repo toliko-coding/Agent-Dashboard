@@ -185,19 +185,28 @@
   {
     "id": "AD-2026-09-16-main-agent-designation",
     "title": "The main agent is an explicit designation that grants nothing",
-    "status": "accepted",
+    "status": "superseded",
     "date": "2026-09-16",
     "context": "The agent maintaining Agent Dashboard itself was indistinguishable from any other agent. Inferring it from the working folder would name several agents at once and would make the designation a guess about a path.",
-    "decision": "One setting, agents.mainSessionId, holding one Claude session id - so there is at most one main agent by construction. The badge additionally requires an agent the dashboard started, because a session id outlives the session it named. Main status grants no permission, no authority over other agents and no exemption from ownership.",
+    "decision": "One setting, agents.mainSessionId, holding one Claude session id - so there is at most one main agent by construction. The badge additionally requires an agent the dashboard started, because a session id outlives the session it named. Main status grants no permission, no authority over other agents and no exemption from ownership. SUPERSEDED on 2026-09-16 by AD-2026-09-16-permanent-main-agent: the settings key agents.mainSessionId, its validator and its migration were removed, because a role keyed by a transient Claude session id cannot be permanent.",
     "consequences": "Because nothing on the server depends on it, the designation can be stored as a setting and read by the client. If it ever gates behaviour, it must move behind server-side enforcement first."
   },
   {
     "id": "AD-2026-09-16-saved-agent-configuration",
     "title": "NEEDS OWNER DECISION: whether saved agent configuration applies on resume",
-    "status": "proposed",
+    "status": "accepted",
     "date": "2026-09-16",
     "context": "permissionMode and the system prompt are launch-time CLI arguments; claude reads its mode once, at startup. Nothing persists them per agent today (agent_profile is explicitly presentation-only), and ResumeUnderDashboard deliberately hardcodes permissionMode \"default\". So an agent's posture cannot be edited after creation, and 'applies next session' is the only honest wording available.",
-    "decision": "Deferred to the owner. Implemented tonight is the observable half only: the server reads the mode each running process was actually started with (parser.PermissionModeFromArgs) and the workspace shows it. The saved half - an agent_config table holding permission mode and persistent instructions, plus Agent -> Edit sections for Identity / Instructions / Permissions / Session behavior - is designed but NOT built, because making a saved mode take effect on resume changes resume's authority posture from always-default to whatever was saved. That is a material, ambiguous change to the security model and is the owner's call.",
-    "consequences": "Question for the owner: should resuming an agent under Dashboard control apply its saved permission mode (with the resume dialog naming the mode before the user confirms), or should resume keep starting at Manual/default and saved configuration apply only to newly started agents? Until answered, no saved configuration exists to be applied, so nothing can silently escalate."
+    "decision": "Owner decision (2026-09-16): saved configuration MAY apply when an agent is resumed under Dashboard control, but only after the user sees and confirms it. Implemented as dashboard_agent (a durable agent record with its own id, holding display name, icon, instructions, permission mode, cwd, project and role), GET/PUT /api/agents/{pid}/config, and a resume that carries back the values the dialog displayed. The server re-checks them against what is saved and refuses on a mismatch BEFORE ending the running session, so a refusal never leaves the agent stopped. A resume that confirms nothing applies nothing and starts on Claude's default, which keeps 'no confirmation' the non-escalating direction.",
+    "consequences": "Configuration outlives the process, so a finished agent still has its name, instructions and saved mode. Nothing hot-mutates a running session: claude reads its mode and system prompt once, at startup, and the UI states both the saved and the running value when they differ. Instructions and permission mode are writable only for an agent this dashboard started; a session started elsewhere can still be labelled but never configured."
+  },
+  {
+    "id": "AD-2026-09-16-permanent-main-agent",
+    "title": "The main agent is a seeded record, and no request can promote an ordinary agent",
+    "status": "accepted",
+    "date": "2026-09-16",
+    "context": "Owner decision: Agent Dashboard Manager is the permanent Main Agent. The previous implementation stored one Claude session id in a setting, which cannot be permanent - the Manager's session is typically started from an editor, is not dashboard-owned, and its id changes whenever a new session begins. A generic 'designate as Main' control also let any agent claim the role, which the owner ruled out.",
+    "decision": "The main agent is a row in dashboard_agent with the fixed id 'main', seeded at startup against the server's own working folder. There is no route that sets role, so 'exactly one main agent' holds by construction rather than by a rule anyone enforces. The only settable thing is which session is currently running it (POST /api/main-agent/session), offered in the UI only on the main agent's own panel and only for sessions in its folder. The Edit agent dialog has no main-agent control at all.",
+    "consequences": "Project Intelligence, Portfolio Developer, Resume Editor and any future agent cannot become main. The role survives the Manager's session ending, being resumed, or being started fresh. Main grants nothing: ownership still decides Stop, Delete and terminal attach, so an external session running the main agent keeps every limit it had. Because nothing on the server branches on role, the client may read it straight from the agent payload."
   }
 ]
