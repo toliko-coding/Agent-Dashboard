@@ -4,4 +4,6 @@ export { default as AgentStatusFilterBar } from './components/AgentStatusFilterB
 export { default as AgentTable } from './components/AgentTable.vue'
 export { default as AgentTriageBand } from './components/AgentTriageBand.vue'
 export { default as EmptyAgentState } from './components/EmptyAgentState.vue'
+export { default as MainAgentPanel } from './components/MainAgentPanel.vue'
 export * from './composables/useAgents'
+export { isMainAgent, MAIN_AGENT_ROLE } from './composables/useMainAgent'

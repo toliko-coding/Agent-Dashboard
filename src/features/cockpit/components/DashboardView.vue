@@ -8,7 +8,7 @@ import DashboardToolbar from '@/components/shell/DashboardToolbar.vue'
 import { useNow } from '@/composables/useNow'
 import { useSpawners } from '@/composables/useSpawners'
 import { useViewState } from '@/composables/useViewState'
-import { AgentCardGrid, AgentStatusFilterBar, AgentTable, AgentTriageBand, EmptyAgentState, useAgents } from '@/features/agents'
+import { AgentCardGrid, AgentStatusFilterBar, AgentTable, AgentTriageBand, EmptyAgentState, isMainAgent, MainAgentPanel, useAgents } from '@/features/agents'
 import { groupAgents, sortAgents } from '@/utils/agentGroup'
 import { matchesStatusFilter, statusFilterCounts } from '@/utils/agentStatusFilter'
 import { friendlyProjectName } from '@/utils/friendlyProjectName'
@@ -37,7 +37,10 @@ const autoApprovingStrip = ref<InstanceType<typeof AutoApprovingStrip> | null>(n
 // Dashboard roster: project + spawner filter → sort → optional grouping. Project
 // options list every known project (pre-filter) so the dropdown stays stable.
 const rosterAgents = computed(() => {
-  let base = filteredAgents.value
+  // The main agent has its own panel above the roster, so its running session
+  // is not also listed as an ordinary card. A finished one stays in the roster:
+  // the panel only shows a session that is actually running.
+  let base = filteredAgents.value.filter(a => !(isMainAgent(a) && a.status !== 'finished'))
   if (dashboardProject.value !== 'all')
     base = base.filter(a => a.projectName === dashboardProject.value)
   if (dashboardSpawner.value !== 'all')
@@ -110,6 +113,12 @@ defineExpose({ rosterAgents })
     :counts="statusCounts"
     class="mb-3"
   />
+  <!--
+    The agent that maintains Agent Dashboard, above the roster and outside the
+    filters: it is a durable record, so it is shown whether or not a session is
+    running it, and a status filter must not make it disappear.
+  -->
+  <MainAgentPanel :agents="agents" @select="selectAgent" />
   <template v-if="dashboardLayout === 'list'">
     <EmptyAgentState v-if="rosterAgents.length === 0" :search-query="searchQuery" />
     <AgentTable v-else :agents="rosterAgents" :groups="rosterGroups" :attention-items="attention.items" :stale="!live" @select="selectAgent" />
